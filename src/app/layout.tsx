@@ -15,7 +15,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <body>
         <Providers>
           <Header />
-          <main className="mx-auto px-4 pt-3 pb-20 min-h-[calc(100vh-56px)]" style={{ maxWidth: 640 }}>
+          <main className="mx-auto px-4 pt-3 pb-24 min-h-[calc(100vh-56px)]" style={{ maxWidth: 640 }}>
             {children}
           </main>
           <BottomNav />

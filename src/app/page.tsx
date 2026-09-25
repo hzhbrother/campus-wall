@@ -9,6 +9,7 @@ const CATEGORIES = ['校园', '失物招领', '二手交易', '表白墙', '寻�
 
 export default function HomePage() {
   const [items, setItems] = useState<PostListItem[]>([]);
+  const [hotItems, setHotItems] = useState<PostListItem[]>([]);
   const [category, setCategory] = useState<string>('');
   const [q, setQ] = useState('');
   const [searchOpen, setSearchOpen] = useState(false);
@@ -28,6 +29,13 @@ export default function HomePage() {
       setLoading(false);
     }
   }, [category, q]);
+
+  // 加载热榜
+  useEffect(() => {
+    api.get<{ items: PostListItem[] }>('/api/posts?sort=hot&pageSize=5')
+      .then(d => setHotItems(d.items))
+      .catch(() => {});
+  }, []);
 
   useEffect(() => { load(); }, [load]);
 
@@ -78,6 +86,34 @@ export default function HomePage() {
             autoFocus
           />
           <button className="px-4 py-2 rounded-xl bg-brand-600 text-white text-sm" onClick={load}>搜索</button>
+        </div>
+      )}
+
+      {/* 今日热榜 */}
+      {hotItems.length > 0 && (
+        <div className="rounded-2xl bg-white p-3">
+          <div className="mb-2 flex items-center gap-1.5">
+            <span className="text-sm font-bold text-orange-500">🔥 今日热榜</span>
+          </div>
+          <div className="space-y-1.5">
+            {hotItems.map((p, i) => (
+              <Link
+                key={p.id}
+                href={`/post/${p.id}`}
+                className="flex items-center gap-2 no-underline"
+              >
+                <span className={`w-5 text-center text-sm font-bold ${i < 3 ? 'text-orange-500' : 'text-slate-300'}`}>
+                  {i + 1}
+                </span>
+                <span className="flex-1 truncate text-sm text-slate-700 hover:text-blue-500">
+                  {p.title || p.content.slice(0, 30)}
+                </span>
+                <span className="shrink-0 text-xs text-slate-300">
+                  {p.likeCount > 0 ? `👍 ${p.likeCount}` : `${p.commentCount}评`}
+                </span>
+              </Link>
+            ))}
+          </div>
         </div>
       )}
 

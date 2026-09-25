@@ -113,7 +113,7 @@ export default function NewPostPage() {
   if (loading) return <p className="text-center text-slate-400 py-10">加载中…</p>;
 
   return (
-    <div className="pb-28">
+    <div className="pb-36">
       {/* 顶部提示 */}
       <div className="mx-4 mt-3 rounded-lg bg-orange-50 px-3 py-2 text-center text-xs text-orange-600">
         禁止发布重复信息, 广告营销类, 含二维码等内容
@@ -217,7 +217,7 @@ export default function NewPostPage() {
       {err && <div className="mx-4 mb-3 bg-red-50 text-red-600 text-sm p-3 rounded-lg">{err}</div>}
 
       {/* 发布按钮 */}
-      <div className="fixed bottom-0 left-0 right-0 z-20 border-t border-slate-100 bg-white px-4 py-3">
+      <div className="fixed bottom-16 left-0 right-0 z-20 border-t border-slate-100 bg-white px-4 py-3">
         <button
           onClick={onSubmit}
           disabled={busy}

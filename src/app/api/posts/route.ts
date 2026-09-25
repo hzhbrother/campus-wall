@@ -20,6 +20,7 @@ export async function GET(req: NextRequest) {
     const category = sp.get('category') || undefined;
     const q = sp.get('q') || undefined;
     const authorId = sp.get('authorId') || undefined;
+    const sort = sp.get('sort') || 'latest';
     const where: Prisma.PostWhereInput = {
       status: PostStatus.APPROVED,
       ...(category ? { category } : {}),
@@ -31,10 +32,14 @@ export async function GET(req: NextRequest) {
           ] }
         : {}),
     };
+    const orderBy = sort === 'hot'
+      ? [{ likeCount: 'desc' as const }, { commentCount: 'desc' as const }, { viewCount: 'desc' as const }]
+      : [{ pinned: 'desc' as const }, { createdAt: 'desc' as const }];
+
     const [items, total] = await Promise.all([
       prisma.post.findMany({
         where,
-        orderBy: [{ pinned: 'desc' }, { createdAt: 'desc' }],
+        orderBy,
         skip: (page - 1) * pageSize,
         take: pageSize,
         include: { author: { select: { id: true, nickname: true, avatar: true, role: true } } },
