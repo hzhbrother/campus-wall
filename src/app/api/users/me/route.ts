@@ -11,6 +11,8 @@ const UpdateSchema = z.object({
   avatar: z.string().optional(),
   studentId: z.string().max(20).optional(),
   realName: z.string().max(32).optional().or(z.literal('')),
+  countryCode: z.string().max(8).optional().or(z.literal('')),
+  phoneNumber: z.string().max(20).optional().or(z.literal('')),
   grade: z.string().max(20).optional().or(z.literal('')),
   className: z.string().max(20).optional().or(z.literal('')),
   remark: z.string().max(200).optional().or(z.literal('')),

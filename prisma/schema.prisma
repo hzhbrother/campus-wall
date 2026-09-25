@@ -34,6 +34,10 @@ enum AccountProvider {
   WECHAT
   QQ
   WEIBO
+  HUAWEI
+  ALIPAY
+  BAIDU
+  DOUYIN
 }
 
 enum PostStatus {
@@ -79,6 +83,8 @@ model User {
   realName     String?          // 真实姓名
   avatar       String?
   studentId    String?          // 学号 (可选实名)
+  countryCode  String?          // 手机区号, 如 +86 / +852
+  phoneNumber  String?          // 手机号 (不含区号)
   grade        String?          // 年级
   className    String?          // 班级
   remark       String?          // 备注

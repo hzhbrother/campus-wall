@@ -10,6 +10,12 @@ export interface AuthUser {
   email: string | null;
   nickname: string;
   avatar?: string | null;
+  realName?: string | null;
+  countryCode?: string | null;
+  phoneNumber?: string | null;
+  grade?: string | null;
+  className?: string | null;
+  remark?: string | null;
   role: Role;
   bannedUntil?: string | null;
   banReason?: string | null;
@@ -19,11 +25,11 @@ export interface AuthUser {
 interface AuthCtx {
   user: AuthUser | null;
   loading: boolean;
-  login: (account: string, password: string) => Promise<void>;
-  register: (data: { nickname: string; password: string; realName?: string; grade?: string; className?: string; remark?: string }) => Promise<void>;
-  applyToken: (token: string) => Promise<void>;
+  login: (account: string, password: string) => Promise<AuthUser>;
+  register: (data: { nickname: string; password: string; realName?: string; grade?: string; className?: string; remark?: string }) => Promise<AuthUser>;
+  applyToken: (token: string) => Promise<AuthUser | null>;
   logout: () => void;
-  refreshUser: () => Promise<void>;
+  refreshUser: () => Promise<AuthUser | null>;
 }
 
 const Ctx = createContext<AuthCtx>(null as any);
@@ -32,12 +38,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<AuthUser | null>(null);
   const [loading, setLoading] = useState(true);
 
-  const fetchMe = useCallback(async () => {
+  const fetchMe = useCallback(async (): Promise<AuthUser | null> => {
     try {
       const me = await api.get<AuthUser>('/api/auth/me');
       setUser(me);
+      return me;
     } catch {
       setUser(null);
+      return null;
     } finally {
       setLoading(false);
     }
@@ -51,21 +59,23 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   }, [fetchMe]);
 
-  const applyToken = useCallback(async (token: string) => {
+  const applyToken = useCallback(async (token: string): Promise<AuthUser | null> => {
     localStorage.setItem('cw_token', token);
-    await fetchMe();
+    return fetchMe();
   }, [fetchMe]);
 
-  const login = useCallback(async (account: string, password: string) => {
+  const login = useCallback(async (account: string, password: string): Promise<AuthUser> => {
     const res = await api.post<{ token: string; user: AuthUser }>('/api/auth/login', { account, password });
     localStorage.setItem('cw_token', res.token);
     setUser(res.user);
+    return res.user;
   }, []);
 
-  const register = useCallback(async (data: { nickname: string; password: string; realName?: string; grade?: string; className?: string; remark?: string }) => {
+  const register = useCallback(async (data: { nickname: string; password: string; realName?: string; grade?: string; className?: string; remark?: string }): Promise<AuthUser> => {
     const res = await api.post<{ token: string; user: AuthUser }>('/api/auth/register', data);
     localStorage.setItem('cw_token', res.token);
     setUser(res.user);
+    return res.user;
   }, []);
 
   const logout = useCallback(() => {

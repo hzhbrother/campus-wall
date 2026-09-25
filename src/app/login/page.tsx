@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useAuth } from '@/lib/auth-context';
 import { api } from '@/lib/api';
+import { JUHE_TYPES } from '@/lib/aggregated-login';
 
 const OAUTH_BASE = process.env.NEXT_PUBLIC_API_BASE || '';
 
@@ -16,18 +17,31 @@ export default function LoginPage() {
   const [showPwd, setShowPwd] = useState(false);
   const [err, setErr] = useState('');
   const [busy, setBusy] = useState(false);
+  const [showAggregated, setShowAggregated] = useState(false);
+  const [juheReady, setJuheReady] = useState(false);
 
-  // 已登录则跳转首页
+  // 已登录则跳转首页 (若未填手机号则强制去资料页)
   useEffect(() => {
-    if (!loading && user) router.replace('/');
+    if (!loading && user) {
+      if (!user.phoneNumber) {
+        router.replace('/profile?edit=1&forcePhone=1');
+      } else {
+        router.replace('/');
+      }
+    }
   }, [user, loading, router]);
+
+  // 检测聚合登录是否可用
+  useEffect(() => {
+    api.get('/api/auth/aggregated/status').then((d: any) => setJuheReady(d.configured)).catch(() => setJuheReady(false));
+  }, []);
 
   const onSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setErr(''); setBusy(true);
     try {
       await login(account, password);
-      router.replace('/');
+      // 登录成功后由 useEffect 中的 user 变化处理跳转
     } catch (e: any) {
       setErr(e.message);
     } finally {
@@ -35,8 +49,9 @@ export default function LoginPage() {
     }
   };
 
-  const oauth = (provider: string) => {
-    window.location.href = `${OAUTH_BASE}/api/auth/oauth/${provider}`;
+  const startAggregated = (type: string) => {
+    setShowAggregated(false);
+    window.location.href = `${OAUTH_BASE}/api/auth/oauth/aggregated/${type}`;
   };
 
   return (
@@ -112,20 +127,51 @@ export default function LoginPage() {
           <div className="flex-1 h-px bg-slate-200" />
         </div>
 
-        {/* 第三方登录 */}
-        <div className="flex justify-center gap-4">
-          {[
-            { key: 'github', label: 'GitHub', icon: '🐙' },
-            { key: 'google', label: 'Google', icon: '🔍' },
-            { key: 'wechat', label: '微信', icon: '💬' },
-            { key: 'qq', label: 'QQ', icon: '🐧' },
-          ].map(p => (
-            <button key={p.key} onClick={() => oauth(p.key)} className="flex flex-col items-center gap-1 text-slate-400 hover:text-slate-600" title={p.label}>
-              <span className="text-2xl">{p.icon}</span>
-            </button>
-          ))}
+        {/* 聚合登录 */}
+        <div className="flex justify-center">
+          <button
+            onClick={() => setShowAggregated(true)}
+            className="flex items-center gap-2 rounded-full border border-slate-200 bg-white px-6 py-2.5 text-sm text-slate-700 shadow-sm hover:bg-slate-50 transition"
+          >
+            <svg className="h-5 w-5 text-blue-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
+              <path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83" strokeLinecap="round"/>
+            </svg>
+            第三方快捷登录
+          </button>
         </div>
       </div>
+
+      {/* 聚合登录选择面板 */}
+      {showAggregated && (
+        <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/50" onClick={() => setShowAggregated(false)}>
+          <div className="w-full max-w-md rounded-t-3xl bg-white p-5 pb-8" onClick={e => e.stopPropagation()}>
+            <div className="mx-auto mb-4 h-1 w-10 rounded-full bg-slate-200" />
+            <h3 className="mb-1 text-center text-lg font-bold text-slate-900">选择登录方式</h3>
+            <p className="mb-5 text-center text-xs text-slate-400">
+              {juheReady ? '通过聚合云一键授权登录' : '聚合登录暂未配置, 请联系管理员'}
+            </p>
+            <div className="grid grid-cols-4 gap-3">
+              {JUHE_TYPES.map(p => (
+                <button
+                  key={p.type}
+                  disabled={!juheReady}
+                  onClick={() => startAggregated(p.type)}
+                  className="flex flex-col items-center gap-1.5 rounded-xl py-3 text-slate-600 hover:bg-slate-50 disabled:opacity-40"
+                >
+                  <span className="text-2xl">{p.icon}</span>
+                  <span className="text-xs">{p.label}</span>
+                </button>
+              ))}
+            </div>
+            <button
+              onClick={() => setShowAggregated(false)}
+              className="mt-6 w-full rounded-xl bg-slate-100 py-3 text-sm text-slate-600"
+            >
+              取消
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

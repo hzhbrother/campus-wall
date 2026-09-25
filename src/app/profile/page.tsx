@@ -1,10 +1,11 @@
 'use client';
 
-import { useEffect, useState, useCallback } from 'react';
-import { useRouter } from 'next/navigation';
+import { Suspense, useEffect, useState, useCallback } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { useAuth } from '@/lib/auth-context';
 import { api } from '@/lib/api';
 import { UserRole, PostStatus } from '@prisma/client';
+import { COUNTRY_CODES, getCountryByCode, validatePhone } from '@/lib/country-codes';
 
 type Tab = 'overview' | 'posts' | 'moderation' | 'comments' | 'orders' | 'users' | 'notifications' | 'settings' | 'agreement';
 type View = 'home' | 'admin' | 'edit' | Tab;
@@ -1037,16 +1038,23 @@ function AgreementManager() {
   );
 }
 
-// ---------- 个人资料编辑 ----------
-function EditProfile({ user, onSaved }: { user: any; onSaved: () => void }) {
+// ---------- 个人资料编辑 (列表样式) ----------
+function EditProfile({ user, onSaved, forcePhone = false }: { user: any; onSaved: () => void; forcePhone?: boolean }) {
+  const { logout } = useAuth();
+  const router = useRouter();
   const [nickname, setNickname] = useState(user?.nickname || '');
   const [realName, setRealName] = useState(user?.realName || '');
+  const [countryCode, setCountryCode] = useState(user?.countryCode || '+86');
+  const [phoneNumber, setPhoneNumber] = useState(user?.phoneNumber || '');
   const [grade, setGrade] = useState(user?.grade || '');
   const [className, setClassName] = useState(user?.className || '');
   const [remark, setRemark] = useState(user?.remark || '');
   const [avatar, setAvatar] = useState(user?.avatar || '');
   const [saving, setSaving] = useState(false);
   const [msg, setMsg] = useState('');
+  const [phoneError, setPhoneError] = useState('');
+  const [showCountryPicker, setShowCountryPicker] = useState(false);
+  const [editingField, setEditingField] = useState<string | null>(null);
 
   const handleAvatarFile = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -1056,68 +1064,208 @@ function EditProfile({ user, onSaved }: { user: any; onSaved: () => void }) {
     reader.readAsDataURL(file);
   };
 
-  const save = async () => {
-    setSaving(true); setMsg('');
-    try { await api.patch('/api/users/me', { nickname, realName, grade, className, remark, avatar }); setMsg('已保存'); onSaved(); }
-    catch (e: any) { setMsg(e.message); } finally { setSaving(false); }
-  };
-
   const classOptions = grade ? CLASS_LIST : [];
 
+  const save = async () => {
+    setMsg(''); setPhoneError('');
+    // 手机号校验 (强制模式下必填)
+    if (forcePhone || phoneNumber) {
+      const v = validatePhone(countryCode, phoneNumber);
+      if (!v.ok) { setPhoneError(v.message || '手机号格式不正确'); return; }
+    }
+    setSaving(true);
+    try {
+      await api.patch('/api/users/me', {
+        nickname, realName, countryCode, phoneNumber: phoneNumber || '',
+        grade, className, remark, avatar,
+      });
+      setMsg('已保存');
+      onSaved();
+    } catch (e: any) { setMsg(e.message); } finally { setSaving(false); }
+  };
+
+  const country = getCountryByCode(countryCode);
+
+  // ---- 行组件 (左标签 + 右值/箭头) ----
+  const Row = ({ label, children, onClick, border = true }: { label: string; children: React.ReactNode; onClick?: () => void; border?: boolean }) => (
+    <div
+      className={`flex items-center justify-between px-1 py-3.5 ${border ? 'border-b border-gray-100' : ''} ${onClick ? 'cursor-pointer hover:bg-gray-50' : ''}`}
+      onClick={onClick}
+    >
+      <span className="text-[15px] text-gray-800">{label}</span>
+      <div className="flex items-center gap-1">{children}</div>
+    </div>
+  );
+
+  const Arrow = () => (
+    <svg className="h-4 w-4 text-gray-300" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="m9 18 6-6-6-6" strokeLinecap="round" strokeLinejoin="round"/></svg>
+  );
+
   return (
-    <div className="space-y-4">
-      <div className="flex items-center gap-4">
-        <div className="flex h-16 w-16 items-center justify-center overflow-hidden rounded-full bg-gradient-to-br from-indigo-500 to-purple-600 text-2xl font-bold text-white">
-          {avatar ? <img src={avatar} alt="" className="h-full w-full object-cover" /> : (nickname[0] || 'U').toUpperCase()}
-        </div>
-        <div className="flex gap-2">
-          <label className="cursor-pointer rounded-lg bg-blue-50 px-3 py-1.5 text-xs text-blue-600 hover:bg-blue-100">
-            选择文件
+    <div>
+      {/* 头像行 */}
+      <div className="flex items-center justify-between py-4 border-b border-gray-100">
+        <span className="text-[15px] text-gray-800">头像</span>
+        <div className="relative">
+          <div className="h-14 w-14 overflow-hidden rounded-full bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center text-white text-xl font-bold">
+            {avatar ? <img src={avatar} alt="" className="h-full w-full object-cover" /> : (nickname[0] || 'U').toUpperCase()}
+          </div>
+          <label className="absolute -bottom-1 -right-1 cursor-pointer rounded-full bg-blue-500 p-1 text-white shadow">
+            <svg className="h-3 w-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M12 20h9M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z" strokeLinecap="round" strokeLinejoin="round"/></svg>
             <input type="file" accept="image/*" className="hidden" onChange={handleAvatarFile} />
           </label>
-          <label className="cursor-pointer rounded-lg bg-purple-50 px-3 py-1.5 text-xs text-purple-600 hover:bg-purple-100">
-            拍照
-            <input type="file" accept="image/*" capture="user" className="hidden" onChange={handleAvatarFile} />
-          </label>
         </div>
       </div>
-      <div>
-        <label className="mb-1 block text-sm font-medium text-gray-700">账号名</label>
-        <input value={nickname} onChange={e => setNickname(e.target.value)} className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm" />
+
+      {/* 强制模式提示 */}
+      {forcePhone && (
+        <p className="mt-3 text-xs text-orange-500">为保障账号安全, 请先完善手机号信息</p>
+      )}
+
+      {/* 昵称 */}
+      <Row label="昵称">
+        <input
+          value={nickname}
+          onChange={e => setNickname(e.target.value)}
+          className="w-32 text-right text-[15px] text-gray-900 outline-none"
+          placeholder="请输入昵称"
+        />
+      </Row>
+
+      {/* 手机号 (区号 + 号码) */}
+      <div className="border-b border-gray-100 py-3.5">
+        <div className="flex items-center justify-between">
+          <span className="text-[15px] text-gray-800">
+            手机号{forcePhone && <span className="ml-1 text-red-500">*</span>}
+          </span>
+          <div className="flex items-center gap-2">
+            {/* 区号选择 */}
+            <button
+              type="button"
+              onClick={() => setShowCountryPicker(true)}
+              className="flex items-center gap-0.5 text-[15px] text-gray-900"
+            >
+              {country.code}
+              <svg className="h-3 w-3 text-gray-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="m6 9 6 6 6-6" strokeLinecap="round" strokeLinejoin="round"/></svg>
+            </button>
+            <input
+              type="tel"
+              inputMode="numeric"
+              value={phoneNumber}
+              onChange={e => { setPhoneNumber(e.target.value.replace(/\D/g, '')); setPhoneError(''); }}
+              className="w-28 text-right text-[15px] text-gray-900 outline-none"
+              placeholder={forcePhone ? '请输入手机号' : '选填'}
+              maxLength={Math.max(...country.lengths)}
+            />
+          </div>
+        </div>
+        {phoneError && <p className="mt-1 text-right text-xs text-red-500">{phoneError}</p>}
       </div>
-      <div>
-        <label className="mb-1 block text-sm font-medium text-gray-700">真实姓名</label>
-        <input value={realName} onChange={e => setRealName(e.target.value)} className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm" />
-      </div>
-      <div className="grid grid-cols-2 gap-3">
-        <div>
-          <label className="mb-1 block text-sm font-medium text-gray-700">年级</label>
-          <select value={grade} onChange={e => setGrade(e.target.value)} className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm">
+
+      {/* 真实姓名 */}
+      <Row label="真实姓名">
+        <input
+          value={realName}
+          onChange={e => setRealName(e.target.value)}
+          className="w-32 text-right text-[15px] text-gray-900 outline-none"
+          placeholder="选填"
+        />
+      </Row>
+
+      {/* 年级 */}
+      <Row label="年级" onClick={() => setEditingField(editingField === 'grade' ? null : 'grade')}>
+        <span className={`text-[15px] ${grade ? 'text-gray-900' : 'text-gray-400'}`}>{grade || '不填写'}</span>
+        <Arrow />
+      </Row>
+      {editingField === 'grade' && (
+        <div className="px-1 py-2 border-b border-gray-100">
+          <select value={grade} onChange={e => { setGrade(e.target.value); setClassName(''); setEditingField(null); }}
+            className="w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm">
             <option value="">不填写</option>
             {GRADES.map(g => <option key={g} value={g}>{g}</option>)}
           </select>
         </div>
-        <div>
-          <label className="mb-1 block text-sm font-medium text-gray-700">班级</label>
-          <select value={className} onChange={e => setClassName(e.target.value)} disabled={!grade} className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm disabled:opacity-50">
+      )}
+
+      {/* 班级 */}
+      <Row label="班级" onClick={() => grade && setEditingField(editingField === 'class' ? null : 'class')}>
+        <span className={`text-[15px] ${className ? 'text-gray-900' : 'text-gray-400'}`}>{className || (grade ? '请选择' : '不填写')}</span>
+        {grade && <Arrow />}
+      </Row>
+      {editingField === 'class' && grade && (
+        <div className="px-1 py-2 border-b border-gray-100">
+          <select value={className} onChange={e => { setClassName(e.target.value); setEditingField(null); }}
+            className="w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm">
             <option value="">不填写</option>
             {classOptions.map(c => <option key={c} value={c}>{c}</option>)}
           </select>
         </div>
+      )}
+
+      {/* 备注 (个人简介) */}
+      <div className="py-3.5">
+        <div className="mb-2 text-[15px] text-gray-800">个人简介</div>
+        <textarea
+          value={remark}
+          onChange={e => setRemark(e.target.value.slice(0, 200))}
+          rows={3}
+          className="w-full resize-none rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm outline-none focus:border-blue-400"
+          placeholder="介绍一下自己吧..."
+        />
+        <div className="mt-1 text-right text-xs text-gray-400">{remark.length}/200</div>
       </div>
-      <div>
-        <label className="mb-1 block text-sm font-medium text-gray-700">备注</label>
-        <textarea value={remark} onChange={e => setRemark(e.target.value)} rows={2} className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm" />
-      </div>
-      {msg && <p className="text-sm text-green-600">{msg}</p>}
-      <button onClick={save} disabled={saving} className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white disabled:opacity-50">{saving ? '保存中…' : '保存'}</button>
+
+      {msg && <p className={`text-sm ${msg.includes('成功') || msg.includes('已保存') ? 'text-green-600' : 'text-red-500'}`}>{msg}</p>}
+
+      {/* 保存按钮 */}
+      <button
+        onClick={save}
+        disabled={saving}
+        className="mt-2 w-full rounded-full bg-blue-500 py-3.5 text-[15px] font-medium text-white hover:bg-blue-600 disabled:opacity-50"
+      >
+        {saving ? '保存中…' : '保存'}
+      </button>
+
+      {/* 退出登录 (非强制模式显示) */}
+      {!forcePhone && (
+        <button
+          onClick={() => { if (confirm('确定退出登录吗？')) { logout(); router.push('/'); } }}
+          className="mt-3 w-full rounded-full border border-red-400 py-3.5 text-[15px] font-medium text-red-500 hover:bg-red-50"
+        >
+          退出登录
+        </button>
+      )}
+
+      {/* 区号选择面板 */}
+      {showCountryPicker && (
+        <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/50" onClick={() => setShowCountryPicker(false)}>
+          <div className="max-h-[70vh] w-full max-w-md overflow-y-auto rounded-t-3xl bg-white p-5 pb-8" onClick={e => e.stopPropagation()}>
+            <div className="mx-auto mb-4 h-1 w-10 rounded-full bg-slate-200" />
+            <h3 className="mb-4 text-center text-lg font-bold text-slate-900">选择国家/地区</h3>
+            <div className="space-y-1">
+              {COUNTRY_CODES.map(c => (
+                <button
+                  key={c.code}
+                  onClick={() => { setCountryCode(c.code); setShowCountryPicker(false); setPhoneError(''); }}
+                  className={`flex w-full items-center justify-between rounded-lg px-4 py-3 text-left ${c.code === countryCode ? 'bg-blue-50 text-blue-600' : 'hover:bg-gray-50'}`}
+                >
+                  <span className="text-sm text-gray-800">{c.name}</span>
+                  <span className="text-sm text-gray-500">{c.code}</span>
+                </button>
+              ))}
+            </div>
+            <button onClick={() => setShowCountryPicker(false)} className="mt-4 w-full rounded-xl bg-slate-100 py-3 text-sm text-slate-600">取消</button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
 
 // ---------- 主页面 ----------
-export default function ProfilePage() {
+function ProfilePageInner() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { user, loading, logout, refreshUser } = useAuth();
   const [view, setView] = useState<View>('home');
   const [adminTab, setAdminTab] = useState<Tab>('overview');
@@ -1126,6 +1274,14 @@ export default function ProfilePage() {
 
   const isAdmin = user?.role === UserRole.ADMIN || user?.role === UserRole.SUPER_ADMIN;
   const isSuper = user?.role === UserRole.SUPER_ADMIN;
+  const forcePhone = searchParams.get('forcePhone') === '1';
+
+  // URL 带 edit=1 时直接进入编辑模式 (用于强制填写手机号)
+  useEffect(() => {
+    if (searchParams.get('edit') === '1' && view === 'home') {
+      setView('edit');
+    }
+  }, [searchParams, view]);
 
   if (loading) return <div className="min-h-screen flex items-center justify-center text-gray-400">加载中…</div>;
 
@@ -1178,12 +1334,18 @@ export default function ProfilePage() {
   if (view === 'edit' && user) {
     return (
       <div className="space-y-4">
-        <button onClick={() => setView('home')} className="flex items-center gap-1 text-sm text-gray-500">
-          <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="m15 18-6-6 6-6" strokeLinecap="round" strokeLinejoin="round"/></svg>
-          返回
-        </button>
+        {!forcePhone && (
+          <button onClick={() => setView('home')} className="flex items-center gap-1 text-sm text-gray-500">
+            <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="m15 18-6-6 6-6" strokeLinecap="round" strokeLinejoin="round"/></svg>
+            返回
+          </button>
+        )}
         <div className="rounded-2xl bg-white p-5 shadow-sm">
-          <EditProfile user={user} onSaved={() => { refreshUser?.(); setView('home'); }} />
+          <EditProfile
+            user={user}
+            forcePhone={forcePhone}
+            onSaved={() => { refreshUser?.(); if (!forcePhone) setView('home'); else router.push('/'); }}
+          />
         </div>
       </div>
     );
@@ -1296,6 +1458,14 @@ export default function ProfilePage() {
       {/* 通知设置弹窗 */}
       {showNotifModal && <NotificationSettingsModal onClose={() => setShowNotifModal(false)} />}
     </div>
+  );
+}
+
+export default function ProfilePage() {
+  return (
+    <Suspense fallback={<div className="min-h-screen flex items-center justify-center text-gray-400">加载中…</div>}>
+      <ProfilePageInner />
+    </Suspense>
   );
 }
 
