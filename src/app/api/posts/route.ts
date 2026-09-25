@@ -66,7 +66,7 @@ export async function POST(req: NextRequest) {
       title: z.string().min(2).max(100),
       content: z.string().min(2).max(5000),
       category: z.enum([...categories] as [string, ...string[]]),
-      images: z.array(z.string()).optional(),
+      images: z.array(z.string().max(3 * 1024 * 1024)).max(9).optional(),
       isAnonymous: z.boolean().optional(),
     });
 

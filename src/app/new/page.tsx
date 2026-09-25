@@ -8,6 +8,34 @@ import { api } from '@/lib/api';
 const CATEGORIES = ['校园', '失物招领', '二手交易', '表白墙', '寻物启事', '招聘兼职', '求助问答'];
 const MAX_LEN = 1000;
 
+// 客户端图片压缩: 缩放至最大边 1280px, JPEG 质量 0.7, 返回 base64
+function compressImage(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onerror = () => reject(new Error('读取失败'));
+    reader.onload = () => {
+      const img = new Image();
+      img.onerror = () => reject(new Error('图片加载失败'));
+      img.onload = () => {
+        const MAX = 1280;
+        let { width, height } = img;
+        if (width > MAX || height > MAX) {
+          if (width >= height) { height = Math.round(height * (MAX / width)); width = MAX; }
+          else { width = Math.round(width * (MAX / height)); height = MAX; }
+        }
+        const canvas = document.createElement('canvas');
+        canvas.width = width; canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        if (!ctx) { resolve(reader.result as string); return; }
+        ctx.drawImage(img, 0, 0, width, height);
+        resolve(canvas.toDataURL('image/jpeg', 0.7));
+      };
+      img.src = reader.result as string;
+    };
+    reader.readAsDataURL(file);
+  });
+}
+
 export default function NewPostPage() {
   const { user, loading } = useAuth();
   const router = useRouter();
@@ -29,9 +57,14 @@ export default function NewPostPage() {
     const files = e.target.files;
     if (!files) return;
     Array.from(files).forEach(file => {
-      const reader = new FileReader();
-      reader.onload = () => setImages(prev => [...prev, reader.result as string]);
-      reader.readAsDataURL(file);
+      // 单文件最大 10MB
+      if (file.size > 10 * 1024 * 1024) {
+        setErr(`图片 ${file.name} 超过 10MB, 请压缩后上传`);
+        return;
+      }
+      compressImage(file).then(dataUrl => {
+        setImages(prev => [...prev, dataUrl]);
+      }).catch(() => setErr(`图片 ${file.name} 处理失败`));
     });
     e.target.value = '';
   };
