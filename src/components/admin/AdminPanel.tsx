@@ -1062,11 +1062,6 @@ function SiteSettings() {
               <textarea value={cfg.sensitive_words || ''} onChange={e => set('sensitive_words', e.target.value)} rows={2} className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm" placeholder="广告,诈骗,违规" />
               <p className="text-xs text-gray-400 mt-1">标题或内容包含敏感词时将无法发布</p>
             </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">关于我们（页面内容，支持换行）</label>
-              <textarea value={cfg.about_content || ''} onChange={e => set('about_content', e.target.value)} rows={6} className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm" placeholder="欢迎来到校园墙！&#10;这里是面向校园的信息交流平台…" />
-              <p className="text-xs text-gray-400 mt-1">将显示在「关于校园墙」页面</p>
-            </div>
           </div>
         </div>
 
@@ -1082,6 +1077,7 @@ function SiteSettings() {
 function AgreementManager() {
   const [agreement, setAgreement] = useState('');
   const [privacy, setPrivacy] = useState('');
+  const [about, setAbout] = useState('');
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [msg, setMsg] = useState('');
@@ -1091,6 +1087,7 @@ function AgreementManager() {
       .then(d => {
         setAgreement(d.agreement_content || '');
         setPrivacy(d.privacy_content || '');
+        setAbout(d.about_content || '');
       })
       .catch(console.error)
       .finally(() => setLoading(false));
@@ -1099,7 +1096,7 @@ function AgreementManager() {
   const save = async () => {
     setSaving(true); setMsg('');
     try {
-      await api.patch('/api/admin/site-config', { agreement_content: agreement, privacy_content: privacy });
+      await api.patch('/api/admin/site-config', { agreement_content: agreement, privacy_content: privacy, about_content: about });
       setMsg('保存成功');
     } catch (e: any) { setMsg(e.message); } finally { setSaving(false); }
   };
@@ -1108,10 +1105,25 @@ function AgreementManager() {
 
   return (
     <div>
-      <SectionTitle title="协议管理" desc="编辑用户协议与隐私政策内容，支持纯文本格式" />
+      <SectionTitle title="协议管理" desc="编辑关于我们、用户协议与隐私政策内容，支持纯文本格式" />
       {msg && <div className={`mb-3 text-sm ${msg.includes('成功') ? 'text-green-600' : 'text-red-500'}`}>{msg}</div>}
 
       <div className="space-y-5">
+        <div className="rounded-xl border border-gray-100 p-4">
+          <div className="flex items-center justify-between mb-2">
+            <h3 className="font-semibold text-gray-900">ℹ️ 关于我们</h3>
+            <span className="text-xs text-gray-400">{about.length} 字</span>
+          </div>
+          <textarea
+            value={about}
+            onChange={e => setAbout(e.target.value)}
+            rows={8}
+            className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm leading-relaxed"
+            placeholder="请输入关于我们页面的内容..."
+          />
+          <p className="text-xs text-gray-400 mt-1">将显示在「关于校园墙」页面，支持换行</p>
+        </div>
+
         <div className="rounded-xl border border-gray-100 p-4">
           <div className="flex items-center justify-between mb-2">
             <h3 className="font-semibold text-gray-900">📄 用户协议</h3>
@@ -1141,7 +1153,7 @@ function AgreementManager() {
         </div>
 
         <button onClick={save} disabled={saving} className="w-full rounded-lg bg-blue-600 py-2.5 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50">
-          {saving ? '保存中…' : '保存协议'}
+          {saving ? '保存中…' : '保存'}
         </button>
       </div>
     </div>
