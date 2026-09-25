@@ -9,6 +9,7 @@ interface BanRecord {
   id: string;
   reason: string;
   durationDays: number;
+  durationHours?: number;
   bannedUntil: string | null;
   isPermanent: boolean;
   createdAt: string;
@@ -97,7 +98,7 @@ export default function BanAppealPage() {
                   <span className="text-xs text-gray-400">{fmtDate(r.createdAt)}</span>
                 </div>
                 <div className="mt-2 space-y-1 text-sm text-gray-700">
-                  <div><span className="text-gray-400">封禁类型: </span>{r.isPermanent ? '永久封禁' : `临时封禁 ${r.durationDays} 天`}</div>
+                  <div><span className="text-gray-400">封禁类型: </span>{r.isPermanent ? '永久封禁' : `临时封禁 ${r.durationDays} 天${r.durationHours ? ' ' + r.durationHours + ' 小时' : ''}`}</div>
                   <div><span className="text-gray-400">封禁原因: </span>{r.reason || '未填写'}</div>
                   <div><span className="text-gray-400">到期时间: </span>{r.isPermanent ? '永久' : fmtDate(r.bannedUntil)}</div>
                   {r.liftedAt && <div><span className="text-gray-400">解封时间: </span>{fmtDate(r.liftedAt)} ({r.liftedReason || ''})</div>}

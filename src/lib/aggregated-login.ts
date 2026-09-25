@@ -2,26 +2,24 @@
 // 文档: https://www.juhedenglu.cn/help/developer.html
 // 只需一对 JUHE_APP_ID / JUHE_APP_KEY, 即可接入 QQ/微信/微博/支付宝/百度/抖音/华为/小米/Google/GitHub 等
 
-import { AccountProvider } from '@prisma/client';
-
 const JUHE_APP_ID = process.env.JUHE_APP_ID || '';
 const JUHE_APP_KEY = process.env.JUHE_APP_KEY || '';
 const JUHE_API = 'https://open.juhedenglu.cn/connect.php';
 
-// 聚合登录支持的类型
+// 聚合登录支持的类型 (provider 对应 AccountProvider 枚举值)
 export const JUHE_TYPES = [
-  { type: 'qq',        label: 'QQ',      icon: '🐧', provider: AccountProvider.QQ },
-  { type: 'wx',        label: '微信',    icon: '💬', provider: AccountProvider.WECHAT },
-  { type: 'sina',      label: '微博',    icon: '🌐', provider: AccountProvider.WEIBO },
-  { type: 'alipay',    label: '支付宝',  icon: '💰', provider: AccountProvider.ALIPAY },
-  { type: 'baidu',     label: '百度',    icon: '🐾', provider: AccountProvider.BAIDU },
-  { type: 'douyin',    label: '抖音',    icon: '🎵', provider: AccountProvider.DOUYIN },
-  { type: 'huawei',    label: '华为',    icon: '📱', provider: AccountProvider.HUAWEI },
-  { type: 'xiaomi',    label: '小米',    icon: '📲', provider: AccountProvider.QQ },
-  { type: 'gitee',     label: 'Gitee',   icon: '🐙', provider: AccountProvider.GITHUB },
-  { type: 'github',    label: 'GitHub',  icon: '🐱', provider: AccountProvider.GITHUB },
-  { type: 'google',    label: 'Google',  icon: '🔍', provider: AccountProvider.GOOGLE },
-  { type: 'microsoft', label: '微软',    icon: '🪟', provider: AccountProvider.GOOGLE },
+  { type: 'qq',        label: 'QQ',      icon: '🐧', provider: 'QQ' },
+  { type: 'wx',        label: '微信',    icon: '💬', provider: 'WECHAT' },
+  { type: 'sina',      label: '微博',    icon: '🌐', provider: 'WEIBO' },
+  { type: 'alipay',    label: '支付宝',  icon: '💰', provider: 'ALIPAY' },
+  { type: 'baidu',     label: '百度',    icon: '🐾', provider: 'BAIDU' },
+  { type: 'douyin',    label: '抖音',    icon: '🎵', provider: 'DOUYIN' },
+  { type: 'huawei',    label: '华为',    icon: '📱', provider: 'HUAWEI' },
+  { type: 'xiaomi',    label: '小米',    icon: '📲', provider: 'QQ' },
+  { type: 'gitee',     label: 'Gitee',   icon: '🐙', provider: 'GITHUB' },
+  { type: 'github',    label: 'GitHub',  icon: '🐱', provider: 'GITHUB' },
+  { type: 'google',    label: 'Google',  icon: '🔍', provider: 'GOOGLE' },
+  { type: 'microsoft', label: '微软',    icon: '🪟', provider: 'GOOGLE' },
 ] as const;
 
 export function isAggregatedLoginConfigured(): boolean {

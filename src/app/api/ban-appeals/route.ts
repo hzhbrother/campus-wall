@@ -39,6 +39,27 @@ export async function POST(req: NextRequest) {
         images: dto.images || [],
       },
     });
+
+    // 通知所有管理员: 有新的封禁申诉待审核
+    const { createNotification } = await import('@/lib/notification-service');
+    const { NotificationType, UserRole } = await import('@prisma/client');
+    const submitTime = new Date().toLocaleString('zh-CN');
+    await createNotification({
+      targetRole: UserRole.SUPER_ADMIN,
+      type: NotificationType.SYSTEM,
+      title: '新的封禁申诉待审核',
+      content: `用户「${me.nickname || me.email || '匿名'}」于 ${submitTime} 提交了封禁申诉。\n申诉原因: ${dto.reason}\n点击查看详情并审核。`,
+      link: '/profile?tab=appeals',
+    });
+    // 同时通知普通管理员
+    await createNotification({
+      targetRole: UserRole.ADMIN,
+      type: NotificationType.SYSTEM,
+      title: '新的封禁申诉待审核',
+      content: `用户「${me.nickname || me.email || '匿名'}」于 ${submitTime} 提交了封禁申诉。\n申诉原因: ${dto.reason}\n点击查看详情并审核。`,
+      link: '/profile?tab=appeals',
+    });
+
     return NextResponse.json(appeal);
   } catch (e: any) {
     if (e?.name === 'ZodError') return NextResponse.json({ message: e.errors?.[0]?.message || '参数错误' }, { status: 400 });

@@ -113,13 +113,19 @@ export async function getScoreChartData(userId: string, days = 30): Promise<{ da
 }
 
 // 记录违规并扣分
+// pointsDeducted: 自定义扣分 (5-100), 不传则按违规类型默认扣分
 export async function recordViolation(
   userId: string,
   type: string,
   reason: string,
-  relatedPostId?: string
+  relatedPostId?: string,
+  pointsDeducted?: number
 ): Promise<{ newScore: number; deducted: number }> {
-  const points = VIOLATION_POINTS[type] || 10;
+  // 自定义扣分优先, 否则按违规类型默认扣分; 限制在 5-100 之间
+  const defaultPoints = VIOLATION_POINTS[type] || 10;
+  const points = pointsDeducted != null
+    ? Math.min(100, Math.max(5, Math.round(pointsDeducted)))
+    : defaultPoints;
   await prisma.violationRecord.create({
     data: { userId, type: type as any, reason, pointsDeducted: points, relatedPostId },
   });

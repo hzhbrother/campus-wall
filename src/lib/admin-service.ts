@@ -192,12 +192,25 @@ export async function updateUser(userId: string, data: {
   return updated;
 }
 
-// 封禁用户 (durationDays = 0 表示永久封禁)
-export async function banUser(userId: string, durationDays: number, reason: string, actorId: string, violationType: string = 'OTHER') {
+// 封禁用户
+// durationDays = 0 且 durationHours = 0 表示永久封禁
+// pointsDeducted: 自定义扣分 (5-100), 不传则按违规类型默认扣分
+export async function banUser(
+  userId: string,
+  durationDays: number,
+  reason: string,
+  actorId: string,
+  violationType: string = 'OTHER',
+  options?: { durationHours?: number; pointsDeducted?: number }
+) {
+  const durationHours = options?.durationHours || 0;
+  const pointsDeducted = options?.pointsDeducted;
+
   const user = await prisma.user.findUnique({ where: { id: userId } });
   if (!user) throw new Error('用户不存在');
-  const isPermanent = durationDays <= 0;
-  const bannedUntil = isPermanent ? null : new Date(Date.now() + durationDays * 24 * 60 * 60 * 1000);
+  const isPermanent = durationDays <= 0 && durationHours <= 0;
+  const totalMs = (durationDays * 24 + durationHours) * 60 * 60 * 1000;
+  const bannedUntil = isPermanent ? null : new Date(Date.now() + totalMs);
   const data: any = { banReason: reason || null };
   if (isPermanent) {
     data.status = UserStatus.BANNED;
@@ -214,6 +227,7 @@ export async function banUser(userId: string, durationDays: number, reason: stri
       userId,
       reason: reason || '',
       durationDays,
+      durationHours,
       bannedUntil,
       isPermanent,
     },
@@ -222,22 +236,29 @@ export async function banUser(userId: string, durationDays: number, reason: stri
   // 同步创建违规记录并扣除诚信分
   const { recordViolation, VIOLATION_POINTS } = await import('@/lib/credibility-service');
   const vLabel = violationTypeLabel(violationType);
-  const points = VIOLATION_POINTS[violationType] || 10;
-  const { newScore } = await recordViolation(userId, violationType, `${reason || vLabel}（封禁${isPermanent ? '永久' : durationDays + '天'}）`);
+  const { newScore, deducted } = await recordViolation(
+    userId,
+    violationType,
+    `${reason || vLabel}（封禁${isPermanent ? '永久' : (durationDays > 0 ? durationDays + '天' : '') + (durationHours > 0 ? durationHours + '小时' : '')}）`,
+    undefined,
+    pointsDeducted
+  );
 
   // 发送封禁通知到铃铛 (直接说明违规原因 + 扣除信用分)
   const { createNotification } = await import('@/lib/notification-service');
   const { NotificationType } = await import('@prisma/client');
-  const banDurationText = isPermanent ? '永久封禁' : `封禁 ${durationDays} 天`;
+  const banDurationText = isPermanent
+    ? '永久封禁'
+    : `封禁 ${durationDays > 0 ? durationDays + ' 天' : ''}${durationHours > 0 ? ' ' + durationHours + ' 小时' : ''}`.trim();
   await createNotification({
     userId,
     type: NotificationType.BAN,
     title: '账号违规通知',
-    content: `您的账号已违规: 因「${vLabel}」${reason ? '（' + reason + '）' : ''}, 扣除诚信分 ${points} 分, 当前诚信分 ${newScore} 分。\n处罚措施: ${banDurationText}。\n如有异议, 可点击下方进行申诉。`,
+    content: `您的账号已违规: 因「${vLabel}」${reason ? '（' + reason + '）' : ''}, 扣除诚信分 ${deducted} 分, 当前诚信分 ${newScore} 分。\n处罚措施: ${banDurationText}。\n如有异议, 可点击下方进行申诉。`,
     link: '/profile/ban-appeal',
   });
 
-  await audit(actorId, 'BAN_USER', userId, isPermanent ? '永久封禁' : `封禁${durationDays}天`);
+  await audit(actorId, 'BAN_USER', userId, isPermanent ? '永久封禁' : `封禁${durationDays}天${durationHours}小时`);
   return updated;
 }
 

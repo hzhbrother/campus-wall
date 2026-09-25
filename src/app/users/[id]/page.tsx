@@ -167,17 +167,25 @@ export default function UserProfilePage() {
           <span className="rounded-full bg-blue-50 px-2.5 py-0.5 text-xs text-blue-500">墙龄 {wallDays} 天</span>
         </div>
 
-        {/* 获赞统计 */}
-        <div className="mt-4 border-t border-gray-100 pt-3">
-          <div className="flex items-baseline gap-1">
-            <span className="text-xl font-bold text-gray-900">{counts.likesReceived}</span>
-            <span className="text-sm text-gray-400">获赞</span>
+        {/* 统计: 帖子 / 评论 / 获赞 */}
+        <div className="mt-4 grid grid-cols-3 border-t border-gray-100 pt-3">
+          <div className="flex flex-col items-center">
+            <span className="text-lg font-bold text-gray-900">{counts.posts}</span>
+            <span className="text-xs text-gray-400">帖子</span>
+          </div>
+          <div className="flex flex-col items-center">
+            <span className="text-lg font-bold text-gray-900">{counts.comments}</span>
+            <span className="text-xs text-gray-400">评论</span>
+          </div>
+          <div className="flex flex-col items-center">
+            <span className="text-lg font-bold text-gray-900">{counts.likesReceived}</span>
+            <span className="text-xs text-gray-400">获赞</span>
           </div>
         </div>
       </div>
 
       {/* 帖子 / 评论 Tab */}
-      <div className="sticky top-0 z-10 bg-white">
+      <div className="sticky top-14 z-10 bg-white/95 backdrop-blur border-b border-gray-100">
         <div className="flex">
           {(['posts', 'comments'] as const).map(t => (
             <button
@@ -196,7 +204,13 @@ export default function UserProfilePage() {
       <div className="bg-gray-50 min-h-[200px]">
         {tab === 'posts' ? (
           posts.length === 0 ? (
-            <div className="py-16 text-center text-gray-400">还没有发布过帖子</div>
+            <div className="py-20 flex flex-col items-center gap-2 text-gray-400">
+              <svg className="h-12 w-12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" strokeLinecap="round" strokeLinejoin="round"/>
+                <path d="M14 2v6h6" strokeLinecap="round" strokeLinejoin="round"/>
+              </svg>
+              <span className="text-sm">还没有发布过帖子</span>
+            </div>
           ) : (
             <div className="space-y-2 p-3">
               {posts.map(p => (
@@ -217,7 +231,12 @@ export default function UserProfilePage() {
           )
         ) : (
           comments.length === 0 ? (
-            <div className="py-16 text-center text-gray-400">还没有发表过评论</div>
+            <div className="py-20 flex flex-col items-center gap-2 text-gray-400">
+              <svg className="h-12 w-12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+                <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" strokeLinecap="round" strokeLinejoin="round"/>
+              </svg>
+              <span className="text-sm">还没有发表过评论</span>
+            </div>
           ) : (
             <div className="space-y-2 p-3">
               {comments.map(c => (

@@ -9,6 +9,7 @@ out/
 dist/
 build/
 next-env.d.ts
+tsconfig.tsbuildinfo
 
 # env (保留 .env.example, 提交; 真实 .env 排除)
 .env

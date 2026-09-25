@@ -292,6 +292,7 @@ model BanRecord {
   userId       String
   reason       String    // 封禁原因
   durationDays Int       // 封禁天数 (0=永久)
+  durationHours Int      @default(0) // 封禁小时数 (0-23)
   bannedUntil  DateTime? // 封禁到期时间 (永久封禁为 null)
   isPermanent  Boolean   @default(false)
   createdAt    DateTime  @default(now())
