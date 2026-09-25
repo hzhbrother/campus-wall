@@ -6,7 +6,7 @@ import { useAuth } from '@/lib/auth-context';
 import { api } from '@/lib/api';
 import { UserRole, PostStatus } from '@prisma/client';
 
-type Tab = 'overview' | 'posts' | 'moderation' | 'comments' | 'orders' | 'users';
+type Tab = 'overview' | 'posts' | 'moderation' | 'comments' | 'orders' | 'users' | 'notifications' | 'settings';
 type View = 'home' | 'admin' | 'edit' | Tab;
 
 // ---------- 通用 UI ----------
@@ -565,6 +565,174 @@ function EditUserModal({ user, onClose, onSaved, isSuper }: { user: any; onClose
   );
 }
 
+// ---------- 通知发布 (管理员) ----------
+function NotificationSender() {
+  const [title, setTitle] = useState('');
+  const [content, setContent] = useState('');
+  const [target, setTarget] = useState('ALL');
+  const [role, setRole] = useState('STUDENT');
+  const [sendEmail, setSendEmail] = useState(false);
+  const [type, setType] = useState('ANNOUNCE');
+  const [sending, setSending] = useState(false);
+  const [msg, setMsg] = useState('');
+
+  const send = async () => {
+    if (!title.trim() || !content.trim()) { setMsg('请填写标题和内容'); return; }
+    setSending(true); setMsg('');
+    try {
+      const body: any = { title, content, target, type, sendEmail };
+      if (target === 'ROLE') body.role = role;
+      await api.post('/api/admin/notifications', body);
+      setMsg('通知发送成功！');
+      setTitle(''); setContent('');
+    } catch (e: any) { setMsg(e.message); } finally { setSending(false); }
+  };
+
+  return (
+    <div>
+      <SectionTitle title="发布通知" desc="向用户推送站内通知，可选同时发送邮件" />
+      {msg && <div className={`mb-3 text-sm ${msg.includes('成功') ? 'text-green-600' : 'text-red-500'}`}>{msg}</div>}
+      <div className="space-y-3">
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">通知类型</label>
+          <select value={type} onChange={e => setType(e.target.value)} className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm">
+            <option value="ANNOUNCE">公告</option>
+            <option value="SYSTEM">系统通知</option>
+            <option value="POST">帖子通知</option>
+          </select>
+        </div>
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">标题</label>
+          <input value={title} onChange={e => setTitle(e.target.value)} className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm" placeholder="通知标题" />
+        </div>
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">内容</label>
+          <textarea value={content} onChange={e => setContent(e.target.value)} rows={5} className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm" placeholder="通知正文" />
+        </div>
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">发送对象</label>
+          <div className="flex gap-4">
+            <label className="flex items-center gap-1.5 text-sm">
+              <input type="radio" checked={target === 'ALL'} onChange={() => setTarget('ALL')} /> 全体用户
+            </label>
+            <label className="flex items-center gap-1.5 text-sm">
+              <input type="radio" checked={target === 'ROLE'} onChange={() => setTarget('ROLE')} /> 按角色
+            </label>
+          </div>
+          {target === 'ROLE' && (
+            <select value={role} onChange={e => setRole(e.target.value)} className="mt-2 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm">
+              <option value="STUDENT">学生</option>
+              <option value="TEACHER">教师</option>
+              <option value="ADMIN">管理员</option>
+            </select>
+          )}
+        </div>
+        <label className="flex items-center gap-2 text-sm">
+          <input type="checkbox" checked={sendEmail} onChange={e => setSendEmail(e.target.checked)} />
+          同时发送邮件通知（需配置 SMTP）
+        </label>
+        <button onClick={send} disabled={sending} className="w-full rounded-lg bg-blue-600 py-2.5 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50">
+          {sending ? '发送中…' : '发送通知'}
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// ---------- 站点设置 (管理员) ----------
+function SiteSettings() {
+  const [cfg, setCfg] = useState<Record<string, string>>({});
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [msg, setMsg] = useState('');
+
+  useEffect(() => {
+    api.get('/api/admin/site-config').then(setCfg).catch(console.error).finally(() => setLoading(false));
+  }, []);
+
+  const set = (k: string, v: string) => setCfg({ ...cfg, [k]: v });
+
+  const save = async () => {
+    setSaving(true); setMsg('');
+    try { await api.patch('/api/admin/site-config', cfg); setMsg('保存成功'); }
+    catch (e: any) { setMsg(e.message); } finally { setSaving(false); }
+  };
+
+  if (loading) return <p className="py-6 text-center text-gray-400">加载中…</p>;
+
+  return (
+    <div>
+      <SectionTitle title="站点设置" desc="站点信息与 SMTP 邮件配置" />
+      {msg && <div className={`mb-3 text-sm ${msg.includes('成功') ? 'text-green-600' : 'text-red-500'}`}>{msg}</div>}
+
+      <div className="space-y-5">
+        {/* 站点信息 */}
+        <div>
+          <h3 className="font-semibold text-gray-900 mb-3">站点信息</h3>
+          <div className="space-y-3">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">站点名称</label>
+              <input value={cfg.site_name || ''} onChange={e => set('site_name', e.target.value)} className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm" placeholder="校园墙" />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">站点描述</label>
+              <input value={cfg.site_desc || ''} onChange={e => set('site_desc', e.target.value)} className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm" placeholder="校园信息交流平台" />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">站点 Logo URL</label>
+              <input value={cfg.site_logo || ''} onChange={e => set('site_logo', e.target.value)} className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm" placeholder="https://..." />
+            </div>
+          </div>
+        </div>
+
+        {/* SMTP */}
+        <div>
+          <h3 className="font-semibold text-gray-900 mb-3">SMTP 邮件配置</h3>
+          <div className="space-y-3">
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">SMTP 服务器</label>
+                <input value={cfg.smtp_host || ''} onChange={e => set('smtp_host', e.target.value)} className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm" placeholder="smtp.qq.com" />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">端口</label>
+                <input value={cfg.smtp_port || ''} onChange={e => set('smtp_port', e.target.value)} className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm" placeholder="465" />
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">邮箱账号</label>
+                <input value={cfg.smtp_user || ''} onChange={e => set('smtp_user', e.target.value)} className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm" placeholder="xxx@qq.com" />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">授权码/密码</label>
+                <input type="password" value={cfg.smtp_pass || ''} onChange={e => set('smtp_pass', e.target.value)} className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm" placeholder="授权码" />
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">发件人</label>
+                <input value={cfg.smtp_from || ''} onChange={e => set('smtp_from', e.target.value)} className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm" placeholder="校园墙 <xxx@qq.com>" />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">SSL</label>
+                <select value={cfg.smtp_secure || 'true'} onChange={e => set('smtp_secure', e.target.value)} className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm">
+                  <option value="true">开启 (465)</option>
+                  <option value="false">关闭 (587)</option>
+                </select>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <button onClick={save} disabled={saving} className="w-full rounded-lg bg-blue-600 py-2.5 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50">
+          {saving ? '保存中…' : '保存设置'}
+        </button>
+      </div>
+    </div>
+  );
+}
+
 // ---------- 个人资料编辑 ----------
 function EditProfile({ user, onSaved }: { user: any; onSaved: () => void }) {
   const [nickname, setNickname] = useState(user?.nickname || '');
@@ -649,6 +817,8 @@ export default function ProfilePage() {
   const { user, loading, logout, refreshUser } = useAuth();
   const [view, setView] = useState<View>('home');
   const [adminTab, setAdminTab] = useState<Tab>('overview');
+  const [showPwdModal, setShowPwdModal] = useState(false);
+  const [showNotifModal, setShowNotifModal] = useState(false);
 
   const isAdmin = user?.role === UserRole.ADMIN || user?.role === UserRole.SUPER_ADMIN;
   const isSuper = user?.role === UserRole.SUPER_ADMIN;
@@ -666,6 +836,8 @@ export default function ProfilePage() {
       { key: 'comments', label: '评论管理' },
       { key: 'orders', label: '支付明细' },
       { key: 'users', label: '用户管理' },
+      { key: 'notifications', label: '通知发布' },
+      { key: 'settings', label: '站点设置' },
     ];
     const tab = view === 'admin' ? adminTab : view;
     return (
@@ -689,6 +861,8 @@ export default function ProfilePage() {
           {tab === 'comments' && <CommentsTab />}
           {tab === 'orders' && <OrdersTab />}
           {tab === 'users' && <UsersTab isSuper={isSuper} />}
+          {tab === 'notifications' && <NotificationSender />}
+          {tab === 'settings' && <SiteSettings />}
         </div>
       </div>
     );
@@ -712,6 +886,8 @@ export default function ProfilePage() {
   // ---- 首页视图 ----
   const menuItems = [
     { key: 'homepage', label: '我的主页', icon: '🏠' },
+    { key: 'password', label: '修改密码', icon: '🔑' },
+    { key: 'notif-settings', label: '通知设置', icon: '🔔' },
     { key: 'blacklist', label: '拉黑名单', icon: '🚫' },
     { key: 'feedback', label: '意见反馈', icon: '💬' },
     ...(isAdmin ? [{ key: 'admin', label: '管理后台', icon: '⚙️' }] : []),
@@ -723,6 +899,8 @@ export default function ProfilePage() {
   const handleMenu = (key: string) => {
     if (key === 'admin') { setView('admin'); return; }
     if (key === 'homepage') { router.push(`/users/${user?.id}`); return; }
+    if (key === 'password') { setShowPwdModal(true); return; }
+    if (key === 'notif-settings') { setShowNotifModal(true); return; }
     alert(`「${menuItems.find(m => m.key === key)?.label}」功能开发中…`);
   };
 
@@ -802,6 +980,108 @@ export default function ProfilePage() {
           退出登录
         </button>
       )}
+
+      {/* 修改密码弹窗 */}
+      {showPwdModal && <ChangePasswordModal onClose={() => setShowPwdModal(false)} />}
+
+      {/* 通知设置弹窗 */}
+      {showNotifModal && <NotificationSettingsModal onClose={() => setShowNotifModal(false)} />}
+    </div>
+  );
+}
+
+// ---------- 修改密码弹窗 ----------
+function ChangePasswordModal({ onClose }: { onClose: () => void }) {
+  const [oldPwd, setOldPwd] = useState('');
+  const [newPwd, setNewPwd] = useState('');
+  const [confirmPwd, setConfirmPwd] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [msg, setMsg] = useState('');
+
+  const submit = async () => {
+    if (newPwd !== confirmPwd) { setMsg('两次输入的密码不一致'); return; }
+    if (newPwd.length < 6) { setMsg('密码至少6位'); return; }
+    setBusy(true); setMsg('');
+    try {
+      await api.post('/api/users/me/change-password', { oldPassword: oldPwd, newPassword: newPwd });
+      setMsg('密码修改成功');
+      setTimeout(onClose, 1000);
+    } catch (e: any) { setMsg(e.message); } finally { setBusy(false); }
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" onClick={onClose}>
+      <div className="w-full max-w-sm rounded-2xl bg-white p-5" onClick={e => e.stopPropagation()}>
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="text-lg font-bold text-gray-900">修改密码</h3>
+          <button onClick={onClose} className="text-gray-400">✕</button>
+        </div>
+        {msg && <p className={`mb-3 text-sm ${msg.includes('成功') ? 'text-green-600' : 'text-red-500'}`}>{msg}</p>}
+        <div className="space-y-3">
+          <input type="password" value={oldPwd} onChange={e => setOldPwd(e.target.value)} placeholder="原密码" className="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm" />
+          <input type="password" value={newPwd} onChange={e => setNewPwd(e.target.value)} placeholder="新密码 (至少6位)" className="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm" />
+          <input type="password" value={confirmPwd} onChange={e => setConfirmPwd(e.target.value)} placeholder="确认新密码" className="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm" />
+        </div>
+        <div className="mt-4 flex gap-2">
+          <button onClick={submit} disabled={busy} className="flex-1 rounded-lg bg-blue-600 py-2.5 text-sm font-medium text-white disabled:opacity-50">{busy ? '提交中…' : '确认修改'}</button>
+          <button onClick={onClose} className="flex-1 rounded-lg bg-gray-100 py-2.5 text-sm text-gray-700">取消</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ---------- 通知设置弹窗 ----------
+function NotificationSettingsModal({ onClose }: { onClose: () => void }) {
+  const [settings, setSettings] = useState<any>(null);
+  const [saving, setSaving] = useState(false);
+  const [msg, setMsg] = useState('');
+
+  useEffect(() => {
+    api.get('/api/users/me/notification-settings').then(setSettings).catch(console.error);
+  }, []);
+
+  const toggle = (k: string) => {
+    if (!settings) return;
+    setSettings({ ...settings, [k]: !settings[k] });
+  };
+
+  const save = async () => {
+    setSaving(true); setMsg('');
+    try { await api.patch('/api/users/me/notification-settings', settings); setMsg('保存成功'); }
+    catch (e: any) { setMsg(e.message); } finally { setSaving(false); }
+  };
+
+  const items = [
+    { key: 'emailNotify', label: '邮件通知', desc: '通过邮件接收通知' },
+    { key: 'systemNotify', label: '系统通知', desc: '站内系统消息' },
+    { key: 'commentNotify', label: '评论通知', desc: '有人回复你的帖子' },
+    { key: 'likeNotify', label: '点赞通知', desc: '有人点赞你的帖子' },
+  ];
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" onClick={onClose}>
+      <div className="w-full max-w-sm rounded-2xl bg-white p-5" onClick={e => e.stopPropagation()}>
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="text-lg font-bold text-gray-900">通知设置</h3>
+          <button onClick={onClose} className="text-gray-400">✕</button>
+        </div>
+        {msg && <p className={`mb-3 text-sm ${msg.includes('成功') ? 'text-green-600' : 'text-red-500'}`}>{msg}</p>}
+        {!settings ? <p className="py-4 text-center text-sm text-gray-400">加载中…</p> : (
+          <div className="space-y-2">
+            {items.map(it => (
+              <label key={it.key} className="flex items-center justify-between rounded-lg border border-gray-100 p-3">
+                <div>
+                  <div className="text-sm font-medium text-gray-900">{it.label}</div>
+                  <div className="text-xs text-gray-400">{it.desc}</div>
+                </div>
+                <input type="checkbox" checked={settings[it.key]} onChange={() => toggle(it.key)} className="h-5 w-5" />
+              </label>
+            ))}
+          </div>
+        )}
+        <button onClick={save} disabled={saving} className="mt-4 w-full rounded-lg bg-blue-600 py-2.5 text-sm font-medium text-white disabled:opacity-50">{saving ? '保存中…' : '保存'}</button>
+      </div>
     </div>
   );
 }

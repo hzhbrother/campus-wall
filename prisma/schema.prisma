@@ -55,6 +55,20 @@ enum OrderStatus {
   REFUNDED // 已退款
 }
 
+enum NotificationType {
+  SYSTEM   // 系统通知
+  POST     // 帖子相关 (审核结果等)
+  COMMENT  // 评论回复
+  LIKE     // 点赞
+  ANNOUNCE // 公告
+}
+
+enum NotificationTarget {
+  ALL      // 全体用户
+  ROLE     // 按角色
+  USERS    // 指定用户
+}
+
 // ---- 模型 ----
 
 model User {
@@ -79,6 +93,8 @@ model User {
   likes        Like[]
   orders       Order[]
   auditLogs    AuditLog[]
+  notifications Notification[]
+  notificationSettings NotificationSetting?
 
   @@index([email])
   @@index([role])
@@ -190,4 +206,43 @@ model AuditLog {
 
   @@index([actorId])
   @@index([createdAt])
+}
+
+// ---- 通知系统 ----
+
+model Notification {
+  id        String           @id @default(cuid())
+  userId    String?          // null = 广播通知 (ALL)
+  type      NotificationType @default(SYSTEM)
+  title     String
+  content   String
+  isRead    Boolean          @default(false)
+  link      String?          // 跳转链接
+  createdAt DateTime         @default(now())
+
+  user      User?            @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, isRead])
+  @@index([createdAt])
+}
+
+// 用户通知偏好设置
+model NotificationSetting {
+  id              String  @id @default(cuid())
+  userId          String  @unique
+  emailNotify     Boolean @default(true)   // 邮件通知
+  systemNotify    Boolean @default(true)   // 系统站内通知
+  commentNotify   Boolean @default(true)   // 评论通知
+  likeNotify      Boolean @default(true)   // 点赞通知
+  updatedAt       DateTime @updatedAt
+
+  user            User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+// ---- 站点配置 (键值对存储, 含 SMTP 等) ----
+
+model SiteConfig {
+  key       String   @id
+  value     String
+  updatedAt DateTime @updatedAt
 }
