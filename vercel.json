@@ -3,7 +3,7 @@
   "framework": "nextjs",
   "buildCommand": "npm run build",
   "installCommand": "npm install",
-  "regions": ["hkg1"],
+  "regions": ["iad1"],
   "functions": {
     "src/app/api/**/route.ts": {
       "maxDuration": 30
