@@ -5,11 +5,12 @@ import Link from 'next/link';
 import { api } from '@/lib/api';
 import { PostCard, PostListItem } from '@/components/PostCard';
 
-const CATEGORIES = ['校园', '失物招领', '二手交易', '表白墙', '寻物启事', '招聘兼职', '求助问答'];
+const DEFAULT_CATEGORIES = ['校园', '失物招领', '二手交易', '表白墙', '寻物启事', '招聘兼职', '求助问答'];
 
 export default function HomePage() {
   const [items, setItems] = useState<PostListItem[]>([]);
   const [hotItems, setHotItems] = useState<PostListItem[]>([]);
+  const [categories, setCategories] = useState<string[]>(DEFAULT_CATEGORIES);
   const [category, setCategory] = useState<string>('');
   const [q, setQ] = useState('');
   const [searchOpen, setSearchOpen] = useState(false);
@@ -37,6 +38,13 @@ export default function HomePage() {
       .catch(() => {});
   }, []);
 
+  // 加载分类 (从站点配置读取)
+  useEffect(() => {
+    api.get<string[]>('/api/posts/categories')
+      .then(cats => setCategories(cats.length ? cats : DEFAULT_CATEGORIES))
+      .catch(() => {});
+  }, []);
+
   useEffect(() => { load(); }, [load]);
 
   return (
@@ -51,7 +59,7 @@ export default function HomePage() {
         >
           推荐
         </button>
-        {CATEGORIES.map((c) => (
+        {categories.map((c) => (
           <button
             key={c}
             onClick={() => setCategory(c === category ? '' : c)}

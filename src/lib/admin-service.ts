@@ -6,7 +6,7 @@ import { prisma } from '@/lib/prisma';
 // 违规类型标签映射
 export const VIOLATION_TYPE_LABEL: Record<string, string> = {
   SPAM: '垃圾广告', ABUSE: '辱骂攻击', PORN: '色情低俗',
-  ILLEGAL: '违法违规', PLAGIARISM: '抄袭侵权', OTHER: '其他违规',
+  ILLEGAL: '违法违规', PLAGIARISM: '抄袭侵权',
 };
 
 export function violationTypeLabel(type: string): string {
@@ -184,7 +184,7 @@ export async function banUser(
   durationDays: number,
   reason: string,
   actorId: string,
-  violationType: string = 'OTHER',
+  violationType: string = 'SPAM',
   options?: { durationHours?: number; pointsDeducted?: number }
 ) {
   const durationHours = options?.durationHours || 0;

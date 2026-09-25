@@ -167,7 +167,6 @@ const REJECT_VIOLATION_TYPES = [
   { value: 'PORN', label: '色情低俗', points: 30 },
   { value: 'ILLEGAL', label: '违法违规', points: 50 },
   { value: 'PLAGIARISM', label: '抄袭侵权', points: 15 },
-  { value: 'OTHER', label: '其他违规', points: 10 },
 ];
 
 function ModerationTab() {
@@ -175,7 +174,7 @@ function ModerationTab() {
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState('');
   const [reason, setReason] = useState('');
-  const [violationType, setViolationType] = useState('OTHER');
+  const [violationType, setViolationType] = useState('SPAM');
   const [rejectId, setRejectId] = useState<string | null>(null);
 
   const load = () => {
@@ -188,7 +187,7 @@ function ModerationTab() {
   const approve = async (id: string) => { try { await api.post(`/api/admin/posts/${id}/approve`); load(); } catch (e: any) { setErr(e.message); } };
   const reject = async (id: string) => {
     if (!reason.trim()) { alert('请输入拒绝理由'); return; }
-    try { await api.post(`/api/admin/posts/${id}/reject`, { reason, violationType }); setRejectId(null); setReason(''); setViolationType('OTHER'); load(); } catch (e: any) { setErr(e.message); }
+    try { await api.post(`/api/admin/posts/${id}/reject`, { reason, violationType }); setRejectId(null); setReason(''); setViolationType('SPAM'); load(); } catch (e: any) { setErr(e.message); }
   };
 
   return (
@@ -558,7 +557,6 @@ const BAN_OPTIONS = [
   { days: 7, label: '7 天', color: 'bg-cyan-500 hover:bg-cyan-600 text-white' },
   { days: 14, label: '14 天', color: 'bg-teal-500 hover:bg-teal-600 text-white' },
   { days: 30, label: '30 天', color: 'bg-green-500 hover:bg-green-600 text-white' },
-  { days: -1, label: '自定义', color: 'bg-violet-500 hover:bg-violet-600 text-white' },
   { days: 0, label: '永久', color: 'bg-red-800 hover:bg-red-900 text-white' },
 ];
 
@@ -568,17 +566,17 @@ const VIOLATION_TYPES = [
   { value: 'PORN', label: '色情低俗', points: 30 },
   { value: 'ILLEGAL', label: '违法违规', points: 50 },
   { value: 'PLAGIARISM', label: '抄袭侵权', points: 15 },
-  { value: 'OTHER', label: '其他违规', points: 10 },
 ];
 
 function BanUserModal({ user, onClose, onDone }: { user: any; onClose: () => void; onDone: () => void }) {
-  const [selected, setSelected] = useState<number | null>(null);
+  const [selected, setSelected] = useState<number | null>(1);
   const [reason, setReason] = useState('');
-  const [violationType, setViolationType] = useState('OTHER');
+  const [violationType, setViolationType] = useState('SPAM');
   const [confirm, setConfirm] = useState(false);
   const [saving, setSaving] = useState(false);
   const [err, setErr] = useState('');
   // 自定义时长
+  const [useCustomDuration, setUseCustomDuration] = useState(false);
   const [customDays, setCustomDays] = useState(0);
   const [customHours, setCustomHours] = useState(0);
   // 自定义扣分
@@ -589,8 +587,8 @@ function BanUserModal({ user, onClose, onDone }: { user: any; onClose: () => voi
   const selectedVType = VIOLATION_TYPES.find(v => v.value === violationType);
 
   // 最终生效的封禁天数/小时/扣分
-  const isCustom = selected === -1;
   const isPermanent = selected === 0;
+  const isCustom = useCustomDuration;
   const finalDays = isCustom ? customDays : (selected || 0);
   const finalHours = isCustom ? customHours : 0;
   const finalPoints = useCustomPoints
@@ -603,12 +601,16 @@ function BanUserModal({ user, onClose, onDone }: { user: any; onClose: () => voi
       ? `${finalDays} 天 ${finalHours} 小时`
       : selectedOpt?.label || '';
 
-  const doBan = async () => {
-    if (selected === null) return;
+  const goConfirm = () => {
     if (isCustom && finalDays <= 0 && finalHours <= 0) {
       setErr('自定义时长至少需要 1 小时');
       return;
     }
+    setErr('');
+    setConfirm(true);
+  };
+
+  const doBan = async () => {
     setSaving(true); setErr('');
     try {
       await api.post(`/api/admin/users/${user.id}/ban`, {
@@ -629,7 +631,7 @@ function BanUserModal({ user, onClose, onDone }: { user: any; onClose: () => voi
 
   const handleSelect = (days: number) => {
     setSelected(days);
-    setConfirm(true);
+    setUseCustomDuration(false);
   };
 
   return (
@@ -696,43 +698,63 @@ function BanUserModal({ user, onClose, onDone }: { user: any; onClose: () => voi
               <label className="mb-2 block text-sm text-gray-600">选择封禁时长</label>
               <div className="grid grid-cols-3 gap-2">
                 {BAN_OPTIONS.map(o => (
-                  <button key={o.days} onClick={() => handleSelect(o.days)} className={`rounded-lg px-3 py-3 text-sm font-medium transition ${o.color}`}>{o.label}</button>
+                  <button
+                    key={o.days}
+                    onClick={() => handleSelect(o.days)}
+                    className={`rounded-lg px-3 py-3 text-sm font-medium transition ${selected === o.days && !useCustomDuration ? 'ring-2 ring-offset-2 ring-orange-400 ' : ''}${o.color}`}
+                  >
+                    {o.label}
+                  </button>
                 ))}
               </div>
-              {/* 自定义时长输入 */}
-              {isCustom && (
-                <div className="mt-3 rounded-lg border border-violet-200 bg-violet-50 p-3">
-                  <div className="flex items-center gap-3">
-                    <div className="flex items-center gap-1">
-                      <input
-                        type="number"
-                        min={0}
-                        max={3650}
-                        value={customDays}
-                        onChange={e => setCustomDays(Math.max(0, Number(e.target.value)))}
-                        className="w-16 rounded-lg border border-gray-300 px-2 py-1.5 text-sm text-center"
-                      />
-                      <span className="text-sm text-gray-600">天</span>
-                    </div>
-                    <div className="flex items-center gap-1">
-                      <input
-                        type="number"
-                        min={0}
-                        max={23}
-                        value={customHours}
-                        onChange={e => setCustomHours(Math.min(23, Math.max(0, Number(e.target.value))))}
-                        className="w-16 rounded-lg border border-gray-300 px-2 py-1.5 text-sm text-center"
-                      />
-                      <span className="text-sm text-gray-600">小时</span>
-                    </div>
+            </div>
+
+            {/* 自定义时长 */}
+            <div className="mb-4 rounded-lg border border-gray-200 p-3">
+              <label className="flex items-center gap-2 text-sm text-gray-600">
+                <input
+                  type="checkbox"
+                  checked={useCustomDuration}
+                  onChange={e => setUseCustomDuration(e.target.checked)}
+                  className="h-4 w-4"
+                />
+                自定义封禁时长
+                <span className="text-xs text-gray-400">(天 + 小时)</span>
+              </label>
+              {useCustomDuration && (
+                <div className="mt-2 flex flex-wrap items-center gap-3">
+                  <div className="flex items-center gap-1">
+                    <input
+                      type="number"
+                      min={0}
+                      max={3650}
+                      value={customDays}
+                      onChange={e => setCustomDays(Math.max(0, Number(e.target.value)))}
+                      className="w-16 rounded-lg border border-gray-300 px-2 py-1.5 text-sm text-center"
+                    />
+                    <span className="text-sm text-gray-600">天</span>
                   </div>
-                  <p className="mt-1.5 text-xs text-gray-400">天可填 0, 小时 0-23, 总时长需大于 0</p>
+                  <div className="flex items-center gap-1">
+                    <input
+                      type="number"
+                      min={0}
+                      max={23}
+                      value={customHours}
+                      onChange={e => setCustomHours(Math.min(23, Math.max(0, Number(e.target.value))))}
+                      className="w-16 rounded-lg border border-gray-300 px-2 py-1.5 text-sm text-center"
+                    />
+                    <span className="text-sm text-gray-600">小时</span>
+                  </div>
+                  <p className="w-full text-xs text-gray-400">天可填 0, 小时 0-23, 总时长需大于 0</p>
                 </div>
               )}
             </div>
 
             {err && <div className="mb-3 text-sm text-red-500">{err}</div>}
-            <button onClick={onClose} className="w-full rounded-lg bg-gray-100 py-2.5 text-sm text-gray-700 hover:bg-gray-200">取消</button>
+            <div className="flex gap-3">
+              <button onClick={onClose} className="flex-1 rounded-lg bg-gray-100 py-2.5 text-sm text-gray-700 hover:bg-gray-200">取消</button>
+              <button onClick={goConfirm} className="flex-1 rounded-lg bg-orange-500 py-2.5 text-sm font-medium text-white hover:bg-orange-600">确定</button>
+            </div>
           </>
         ) : (
           <>
@@ -1039,6 +1061,11 @@ function SiteSettings() {
               <label className="block text-sm font-medium text-gray-700 mb-1">敏感词过滤（逗号分隔）</label>
               <textarea value={cfg.sensitive_words || ''} onChange={e => set('sensitive_words', e.target.value)} rows={2} className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm" placeholder="广告,诈骗,违规" />
               <p className="text-xs text-gray-400 mt-1">标题或内容包含敏感词时将无法发布</p>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">关于我们（页面内容，支持换行）</label>
+              <textarea value={cfg.about_content || ''} onChange={e => set('about_content', e.target.value)} rows={6} className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm" placeholder="欢迎来到校园墙！&#10;这里是面向校园的信息交流平台…" />
+              <p className="text-xs text-gray-400 mt-1">将显示在「关于校园墙」页面</p>
             </div>
           </div>
         </div>

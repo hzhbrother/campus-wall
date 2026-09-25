@@ -10,8 +10,6 @@ import { errorResponse } from '@/lib/api-response';
 import { getSiteConfigBool, getSiteConfigValue, getPostCategories } from '@/lib/site-config';
 import { isUserBanned } from '@/lib/server-auth';
 
-const DEFAULT_CATEGORIES = ['校园', '失物招领', '二手交易', '表白墙', '寻物启事', '招聘兼职', '求助问答'];
-
 export async function GET(req: NextRequest) {
   try {
     const sp = new URL(req.url).searchParams;

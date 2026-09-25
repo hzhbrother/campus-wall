@@ -9,6 +9,7 @@ const PUBLIC_KEYS = [
   'allow_register', 'allow_anonymous', 'comment_enabled',
   'post_categories',
   'agreement_content', 'privacy_content',
+  'about_content',
 ];
 
 export async function GET() {

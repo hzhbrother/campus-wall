@@ -7,12 +7,12 @@ import { PostStatus, UserRole } from '@prisma/client';
 import { prisma } from '@/lib/prisma';
 import { getUserFromRequest, requireUser } from '@/lib/server-auth';
 import { errorResponse } from '@/lib/api-response';
+import { getPostCategories } from '@/lib/site-config';
 
-const CATEGORIES = ['校园', '失物招领', '二手交易', '表白墙', '寻物启事', '招聘兼职', '求助问答'];
 const UpdateSchema = z.object({
   title: z.string().max(100).optional(),
   content: z.string().max(5000).optional(),
-  category: z.enum(CATEGORIES as [string, ...string[]]).optional(),
+  category: z.string().optional(),
   images: z.array(z.string()).optional(),
   isAnonymous: z.boolean().optional(),
 });
@@ -59,6 +59,15 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
       return NextResponse.json({ message: '只能编辑自己的帖子' }, { status: 403 });
     }
     const dto = UpdateSchema.parse(await req.json());
+
+    // 校验分类是否在站点配置的分类列表中
+    if (dto.category) {
+      const categories = await getPostCategories();
+      if (!categories.includes(dto.category)) {
+        return NextResponse.json({ message: '分类不存在' }, { status: 400 });
+      }
+    }
+
     const updated = await prisma.post.update({ where: { id: params.id }, data: dto });
     return NextResponse.json(updated);
   } catch (e: any) {

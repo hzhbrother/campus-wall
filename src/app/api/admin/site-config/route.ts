@@ -16,6 +16,8 @@ const CONFIG_KEYS = [
   'post_categories', 'daily_post_limit', 'sensitive_words',
   // 协议内容
   'agreement_content', 'privacy_content',
+  // 关于我们
+  'about_content',
 ];
 
 export async function GET() {

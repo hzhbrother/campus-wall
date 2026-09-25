@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/auth-context';
 import { api } from '@/lib/api';
 
-const CATEGORIES = ['校园', '失物招领', '二手交易', '表白墙', '寻物启事', '招聘兼职', '求助问答'];
+const DEFAULT_CATEGORIES = ['校园', '失物招领', '二手交易', '表白墙', '寻物启事', '招聘兼职', '求助问答'];
 const MAX_LEN = 1000;
 
 // 客户端图片压缩: 缩放至最大边 1280px, JPEG 质量 0.7, 返回 base64
@@ -42,6 +42,7 @@ export default function NewPostPage() {
   const [content, setContent] = useState('');
   const [images, setImages] = useState<string[]>([]);
   const [category, setCategory] = useState('');
+  const [categories, setCategories] = useState<string[]>(DEFAULT_CATEGORIES);
   const [showCategory, setShowCategory] = useState(false);
   const [isAnonymous, setIsAnonymous] = useState(false);
   const [err, setErr] = useState('');
@@ -51,6 +52,13 @@ export default function NewPostPage() {
   useEffect(() => {
     if (!loading && !user) router.push('/login');
   }, [loading, user, router]);
+
+  // 加载分类 (从站点配置读取)
+  useEffect(() => {
+    api.get<string[]>('/api/posts/categories')
+      .then(cats => setCategories(cats.length ? cats : DEFAULT_CATEGORIES))
+      .catch(() => {});
+  }, []);
 
   const handleImage = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
@@ -201,7 +209,7 @@ export default function NewPostPage() {
           <div className="w-full max-w-[640px] rounded-t-2xl bg-white p-4 pb-8" onClick={e => e.stopPropagation()}>
             <h3 className="mb-3 text-center text-base font-medium text-slate-900">选择主题分类</h3>
             <div className="grid grid-cols-3 gap-2">
-              {CATEGORIES.map(c => (
+              {categories.map(c => (
                 <button
                   key={c}
                   onClick={() => { setCategory(c); setShowCategory(false); }}

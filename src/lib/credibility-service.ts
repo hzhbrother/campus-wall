@@ -12,7 +12,6 @@ export const VIOLATION_POINTS: Record<string, number> = {
   PORN: 30,        // 色情低俗
   ILLEGAL: 50,     // 违法违规
   PLAGIARISM: 15,  // 抄袭侵权
-  OTHER: 10,       // 其他
 };
 
 // 计算用户当前诚信分

@@ -16,6 +16,7 @@ export default function AboutPage() {
 
   const siteName = cfg.site_name || '校园墙';
   const siteDesc = cfg.site_desc || '校园信息交流平台';
+  const aboutContent = cfg.about_content || '';
 
   return (
     <div className="space-y-4">
@@ -35,21 +36,27 @@ export default function AboutPage() {
       <div className="rounded-2xl bg-white p-5 shadow-sm space-y-3 text-sm text-gray-700">
         <div>
           <h2 className="font-semibold text-gray-900 mb-1">关于我们</h2>
-          <p className="leading-relaxed">
-            {siteName} 是一个面向校园的信息交流平台，致力于为同学们提供失物招领、二手交易、表白墙、寻物启事、招聘兼职等便捷的信息服务。
-          </p>
+          {aboutContent ? (
+            <p className="leading-relaxed whitespace-pre-wrap">{aboutContent}</p>
+          ) : (
+            <p className="leading-relaxed">
+              {siteName} 是一个面向校园的信息交流平台，致力于为同学们提供失物招领、二手交易、表白墙、寻物启事、招聘兼职等便捷的信息服务。
+            </p>
+          )}
         </div>
-        <div>
-          <h2 className="font-semibold text-gray-900 mb-1">主要功能</h2>
-          <ul className="list-disc pl-5 space-y-1 leading-relaxed">
-            <li>发布与浏览校园各类信息</li>
-            <li>失物招领与寻物启事</li>
-            <li>二手交易市场</li>
-            <li>匿名表白墙</li>
-            <li>招聘兼职信息</li>
-            <li>评论互动与点赞</li>
-          </ul>
-        </div>
+        {!aboutContent && (
+          <div>
+            <h2 className="font-semibold text-gray-900 mb-1">主要功能</h2>
+            <ul className="list-disc pl-5 space-y-1 leading-relaxed">
+              <li>发布与浏览校园各类信息</li>
+              <li>失物招领与寻物启事</li>
+              <li>二手交易市场</li>
+              <li>匿名表白墙</li>
+              <li>招聘兼职信息</li>
+              <li>评论互动与点赞</li>
+            </ul>
+          </div>
+        )}
         {cfg.contact_email && (
           <div>
             <h2 className="font-semibold text-gray-900 mb-1">联系我们</h2>

@@ -17,7 +17,7 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
       durationDays,
       reason || '',
       me.id,
-      violationType || 'OTHER',
+      violationType || 'SPAM',
       { durationHours: durationHours || 0, pointsDeducted }
     );
     return NextResponse.json(user);
