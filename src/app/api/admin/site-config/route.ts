@@ -14,6 +14,8 @@ const CONFIG_KEYS = [
   'allow_register', 'post_requires_approval', 'allow_anonymous', 'email_notify_enabled', 'comment_enabled',
   // 内容设置
   'post_categories', 'daily_post_limit', 'sensitive_words',
+  // 协议内容
+  'agreement_content', 'privacy_content',
 ];
 
 export async function GET() {

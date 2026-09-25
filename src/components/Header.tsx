@@ -8,6 +8,8 @@ import { api } from '@/lib/api';
 export function Header() {
   const { user, loading } = useAuth();
   const [unread, setUnread] = useState(0);
+  const [siteName, setSiteName] = useState('校园墙');
+  const [siteLogo, setSiteLogo] = useState('');
 
   useEffect(() => {
     if (!user) return;
@@ -16,12 +18,25 @@ export function Header() {
       .catch(() => {});
   }, [user]);
 
+  useEffect(() => {
+    api.get<{ site_name?: string; site_logo?: string }>('/api/site-config')
+      .then(d => {
+        if (d.site_name) setSiteName(d.site_name);
+        if (d.site_logo) setSiteLogo(d.site_logo);
+      })
+      .catch(() => {});
+  }, []);
+
   return (
     <header className="sticky top-0 z-20 bg-white border-b border-slate-100">
       <div className="mx-auto h-14 flex items-center justify-between px-4" style={{ maxWidth: 640 }}>
         <div className="w-8" />
         <Link href="/" className="flex items-center gap-2 no-underline">
-          <span className="text-lg font-bold text-slate-900">校园墙</span>
+          {siteLogo ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={siteLogo} alt="" className="h-7 w-7 rounded object-contain" />
+          ) : null}
+          <span className="text-lg font-bold text-slate-900">{siteName}</span>
         </Link>
         <div className="flex items-center gap-3">
           {user && (

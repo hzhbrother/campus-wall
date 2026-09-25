@@ -6,7 +6,7 @@ import { useAuth } from '@/lib/auth-context';
 import { api } from '@/lib/api';
 import { UserRole, PostStatus } from '@prisma/client';
 
-type Tab = 'overview' | 'posts' | 'moderation' | 'comments' | 'orders' | 'users' | 'notifications' | 'settings';
+type Tab = 'overview' | 'posts' | 'moderation' | 'comments' | 'orders' | 'users' | 'notifications' | 'settings' | 'agreement';
 type View = 'home' | 'admin' | 'edit' | Tab;
 
 // ---------- 通用 UI ----------
@@ -823,6 +823,76 @@ function SiteSettings() {
   );
 }
 
+// ---------- 协议管理 (管理员) ----------
+function AgreementManager() {
+  const [agreement, setAgreement] = useState('');
+  const [privacy, setPrivacy] = useState('');
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [msg, setMsg] = useState('');
+
+  useEffect(() => {
+    api.get<Record<string, string>>('/api/admin/site-config')
+      .then(d => {
+        setAgreement(d.agreement_content || '');
+        setPrivacy(d.privacy_content || '');
+      })
+      .catch(console.error)
+      .finally(() => setLoading(false));
+  }, []);
+
+  const save = async () => {
+    setSaving(true); setMsg('');
+    try {
+      await api.patch('/api/admin/site-config', { agreement_content: agreement, privacy_content: privacy });
+      setMsg('保存成功');
+    } catch (e: any) { setMsg(e.message); } finally { setSaving(false); }
+  };
+
+  if (loading) return <p className="py-6 text-center text-gray-400">加载中…</p>;
+
+  return (
+    <div>
+      <SectionTitle title="协议管理" desc="编辑用户协议与隐私政策内容，支持纯文本格式" />
+      {msg && <div className={`mb-3 text-sm ${msg.includes('成功') ? 'text-green-600' : 'text-red-500'}`}>{msg}</div>}
+
+      <div className="space-y-5">
+        <div className="rounded-xl border border-gray-100 p-4">
+          <div className="flex items-center justify-between mb-2">
+            <h3 className="font-semibold text-gray-900">📄 用户协议</h3>
+            <span className="text-xs text-gray-400">{agreement.length} 字</span>
+          </div>
+          <textarea
+            value={agreement}
+            onChange={e => setAgreement(e.target.value)}
+            rows={16}
+            className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm leading-relaxed"
+            placeholder="请输入用户协议内容..."
+          />
+        </div>
+
+        <div className="rounded-xl border border-gray-100 p-4">
+          <div className="flex items-center justify-between mb-2">
+            <h3 className="font-semibold text-gray-900">🔒 隐私政策</h3>
+            <span className="text-xs text-gray-400">{privacy.length} 字</span>
+          </div>
+          <textarea
+            value={privacy}
+            onChange={e => setPrivacy(e.target.value)}
+            rows={16}
+            className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm leading-relaxed"
+            placeholder="请输入隐私政策内容..."
+          />
+        </div>
+
+        <button onClick={save} disabled={saving} className="w-full rounded-lg bg-blue-600 py-2.5 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50">
+          {saving ? '保存中…' : '保存协议'}
+        </button>
+      </div>
+    </div>
+  );
+}
+
 // ---------- 个人资料编辑 ----------
 function EditProfile({ user, onSaved }: { user: any; onSaved: () => void }) {
   const [nickname, setNickname] = useState(user?.nickname || '');
@@ -928,6 +998,7 @@ export default function ProfilePage() {
       { key: 'users', label: '用户管理' },
       { key: 'notifications', label: '通知发布' },
       { key: 'settings', label: '站点设置' },
+      { key: 'agreement', label: '协议管理' },
     ];
     const tab = view === 'admin' ? adminTab : view;
     return (
@@ -953,6 +1024,7 @@ export default function ProfilePage() {
           {tab === 'users' && <UsersTab isSuper={isSuper} />}
           {tab === 'notifications' && <NotificationSender />}
           {tab === 'settings' && <SiteSettings />}
+          {tab === 'agreement' && <AgreementManager />}
         </div>
       </div>
     );
@@ -991,6 +1063,9 @@ export default function ProfilePage() {
     if (key === 'homepage') { router.push(`/users/${user?.id}`); return; }
     if (key === 'password') { setShowPwdModal(true); return; }
     if (key === 'notif-settings') { setShowNotifModal(true); return; }
+    if (key === 'agreement') { router.push('/agreement'); return; }
+    if (key === 'privacy') { router.push('/privacy'); return; }
+    if (key === 'about') { router.push('/about'); return; }
     alert(`「${menuItems.find(m => m.key === key)?.label}」功能开发中…`);
   };
 

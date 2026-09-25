@@ -158,6 +158,13 @@ export default function RegisterPage() {
           <button type="submit" disabled={busy} className="w-full py-3 rounded-xl bg-blue-500 text-white font-medium hover:bg-blue-600 disabled:opacity-50 transition">
             {busy ? '注册中…' : '注册'}
           </button>
+
+          <p className="text-center text-xs text-slate-400 mt-3">
+            注册即表示同意
+            <Link href="/agreement" className="text-blue-500 mx-1">《用户协议》</Link>
+            和
+            <Link href="/privacy" className="text-blue-500 mx-1">《隐私政策》</Link>
+          </p>
         </form>
 
         <p className="text-center text-sm text-slate-500 mt-5">
