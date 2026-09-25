@@ -15,13 +15,9 @@ function CallbackInner() {
     const err = params.get('error');
     if (err) { setError(err); return; }
     if (!token) { setError('未收到登录凭据'); return; }
-    applyToken(token).then((user: any) => {
-      // 手机号为空则强制去资料页填写
-      if (!user?.phoneNumber) {
-        router.replace('/profile?edit=1&forcePhone=1');
-      } else {
-        router.push('/');
-      }
+    applyToken(token).then(() => {
+      // 跳转首页, 联系方式由全局浮窗强制完善
+      router.replace('/');
     });
   }, [params, applyToken, router]);
 

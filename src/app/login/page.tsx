@@ -20,15 +20,9 @@ export default function LoginPage() {
   const [showAggregated, setShowAggregated] = useState(false);
   const [juheReady, setJuheReady] = useState(false);
 
-  // 已登录则跳转首页 (若未填手机号则强制去资料页)
+  // 已登录则跳转首页 (联系方式由全局浮窗强制完善)
   useEffect(() => {
-    if (!loading && user) {
-      if (!user.phoneNumber) {
-        router.replace('/profile?edit=1&forcePhone=1');
-      } else {
-        router.replace('/');
-      }
-    }
+    if (!loading && user) router.replace('/');
   }, [user, loading, router]);
 
   // 检测聚合登录是否可用

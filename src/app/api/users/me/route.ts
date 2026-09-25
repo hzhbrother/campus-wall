@@ -11,6 +11,7 @@ const UpdateSchema = z.object({
   avatar: z.string().optional(),
   studentId: z.string().max(20).optional(),
   realName: z.string().max(32).optional().or(z.literal('')),
+  email: z.string().email('邮箱格式不正确').max(120).optional().or(z.literal('')),
   countryCode: z.string().max(8).optional().or(z.literal('')),
   phoneNumber: z.string().max(20).optional().or(z.literal('')),
   grade: z.string().max(20).optional().or(z.literal('')),
@@ -39,6 +40,10 @@ export async function PATCH(req: NextRequest) {
     return NextResponse.json(sanitize(user));
   } catch (e: any) {
     if (e?.name === 'ZodError') return NextResponse.json({ message: e.errors?.[0]?.message || '参数错误' }, { status: 400 });
+    // 邮箱唯一约束冲突
+    if (e?.code === 'P2002' && e?.meta?.target?.includes('email')) {
+      return NextResponse.json({ message: '该邮箱已被使用' }, { status: 409 });
+    }
     return errorResponse(e);
   }
 }

@@ -43,8 +43,8 @@ export default function RegisterPage() {
         password: form.password,
         remark: form.remark,
       });
-      // 注册成功后强制填写手机号
-      router.replace('/profile?edit=1&forcePhone=1');
+      // 注册成功后跳转首页 (联系方式由全局浮窗强制完善)
+      router.replace('/');
     } catch (e: any) {
       setErr(e.message);
     } finally {
