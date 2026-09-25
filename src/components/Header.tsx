@@ -24,7 +24,7 @@ export function Header() {
           ) : user ? (
             <div className="flex items-center gap-3">
               {isAdmin && (
-                <Link href="/admin" className="text-brand-600 no-underline">管理后台</Link>
+                <Link href="/profile" className="text-brand-600 no-underline">管理后台</Link>
               )}
               <Link href="/profile" className="text-slate-600 hover:text-brand-600 no-underline">
                 {user.nickname}

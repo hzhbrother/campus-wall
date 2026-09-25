@@ -54,6 +54,60 @@ export async function setPinned(postId: string, pinned: boolean, actorId: string
   return updated;
 }
 
+// 帖子管理：列出所有帖子（含作者、状态）
+export async function listPosts(page: number, pageSize: number, status?: PostStatus, kw?: string) {
+  const where: Prisma.PostWhereInput = {
+    ...(status ? { status } : {}),
+    ...(kw ? { OR: [{ title: { contains: kw } }, { content: { contains: kw } }] } : {}),
+  };
+  const [items, total] = await Promise.all([
+    prisma.post.findMany({
+      where,
+      orderBy: { createdAt: 'desc' },
+      skip: (page - 1) * pageSize,
+      take: pageSize,
+      include: { author: { select: { id: true, nickname: true, email: true } } },
+    }),
+    prisma.post.count({ where }),
+  ]);
+  return { items, total, page, pageSize };
+}
+
+// 评论管理：列出所有评论（含作者、所属帖子）
+export async function listComments(page: number, pageSize: number, kw?: string) {
+  const where: Prisma.CommentWhereInput = {
+    ...(kw ? { content: { contains: kw } } : {}),
+  };
+  const [items, total] = await Promise.all([
+    prisma.comment.findMany({
+      where,
+      orderBy: { createdAt: 'desc' },
+      skip: (page - 1) * pageSize,
+      take: pageSize,
+      include: {
+        author: { select: { id: true, nickname: true, email: true } },
+        post: { select: { id: true, title: true } },
+      },
+    }),
+    prisma.comment.count({ where }),
+  ]);
+  return { items, total, page, pageSize };
+}
+
+// 支付明细：列出所有订单（含用户、支付方式、金额、时间）
+export async function listOrders(page: number, pageSize: number) {
+  const [items, total] = await Promise.all([
+    prisma.order.findMany({
+      orderBy: { createdAt: 'desc' },
+      skip: (page - 1) * pageSize,
+      take: pageSize,
+      include: { user: { select: { id: true, nickname: true, email: true } } },
+    }),
+    prisma.order.count(),
+  ]);
+  return { items, total, page, pageSize };
+}
+
 export async function listUsers(page: number, pageSize: number, role?: UserRole, kw?: string) {
   const where: Prisma.UserWhereInput = {
     ...(role ? { role } : {}),
