@@ -16,6 +16,7 @@ export interface ReqUser {
   email: string | null;
   role: UserRole;
   nickname: string;
+  bannedUntil: Date | null;
 }
 
 const SECRET = process.env.JWT_SECRET || 'dev-secret-change-me';
@@ -41,7 +42,7 @@ export async function getUserFromRequest(req: Request | NextRequest): Promise<Re
   if (!payload) return null;
   const user = await prisma.user.findUnique({ where: { id: payload.sub } });
   if (!user || user.status === UserStatus.BANNED) return null;
-  return { id: user.id, email: user.email, role: user.role, nickname: user.nickname };
+  return { id: user.id, email: user.email, role: user.role, nickname: user.nickname, bannedUntil: user.bannedUntil };
 }
 
 class HttpError extends Error {
@@ -76,4 +77,24 @@ export function sanitize<T extends Record<string, any>>(user: T): Partial<T> {
   if (!user) return user;
   const { password, ...rest } = user;
   return rest as Partial<T>;
+}
+
+// 判断用户是否处于临时封禁期 (bannedUntil 在未来)
+export function isUserBanned(user: { bannedUntil?: Date | string | null } | null): boolean {
+  if (!user?.bannedUntil) return false;
+  const until = typeof user.bannedUntil === 'string' ? new Date(user.bannedUntil) : user.bannedUntil;
+  return until.getTime() > Date.now();
+}
+
+// 计算封禁剩余时间文本
+export function getBanRemainText(user: { bannedUntil?: Date | string | null } | null): string {
+  if (!user?.bannedUntil) return '';
+  const until = typeof user.bannedUntil === 'string' ? new Date(user.bannedUntil) : user.bannedUntil;
+  const diff = until.getTime() - Date.now();
+  if (diff <= 0) return '已解禁';
+  const days = Math.floor(diff / (24 * 60 * 60 * 1000));
+  const hours = Math.floor((diff % (24 * 60 * 60 * 1000)) / (60 * 60 * 1000));
+  if (days > 0) return `距离解禁还有 ${days} 天 ${hours} 小时`;
+  const mins = Math.floor((diff % (60 * 60 * 1000)) / (60 * 1000));
+  return `距离解禁还有 ${hours} 小时 ${mins} 分钟`;
 }

@@ -95,7 +95,7 @@ export default function PostDetailPage({ params }: { params: { id: string } }) {
 
       {/* 打赏/置顶 */}
       <div className="flex gap-2">
-        <button className="btn-ghost text-sm flex-1" onClick={() => pay('PIN')}>📌 置顶推广 (¥5)</button>
+        <button className="btn-ghost text-sm flex-1" onClick={() => pay('PIN')}>📌 置顶推广 (¥1)</button>
         <button className="btn-ghost text-sm flex-1" onClick={() => { const a = prompt('打赏金额(元)'); if (a) pay('REWARD', Math.round(Number(a) * 100)); }}>☕ 打赏作者</button>
       </div>
 

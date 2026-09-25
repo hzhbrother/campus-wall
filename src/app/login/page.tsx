@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useAuth } from '@/lib/auth-context';
@@ -9,7 +9,7 @@ import { api } from '@/lib/api';
 const OAUTH_BASE = process.env.NEXT_PUBLIC_API_BASE || '';
 
 export default function LoginPage() {
-  const { login } = useAuth();
+  const { login, user, loading } = useAuth();
   const router = useRouter();
   const [account, setAccount] = useState('');
   const [password, setPassword] = useState('');
@@ -17,12 +17,17 @@ export default function LoginPage() {
   const [err, setErr] = useState('');
   const [busy, setBusy] = useState(false);
 
+  // 已登录则跳转首页
+  useEffect(() => {
+    if (!loading && user) router.replace('/');
+  }, [user, loading, router]);
+
   const onSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setErr(''); setBusy(true);
     try {
       await login(account, password);
-      router.push('/');
+      router.replace('/');
     } catch (e: any) {
       setErr(e.message);
     } finally {

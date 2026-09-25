@@ -11,6 +11,8 @@ export interface AuthUser {
   nickname: string;
   avatar?: string | null;
   role: Role;
+  bannedUntil?: string | null;
+  banReason?: string | null;
   _count?: { posts: number; comments: number; likes: number };
 }
 

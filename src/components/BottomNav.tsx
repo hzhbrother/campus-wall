@@ -3,12 +3,22 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useAuth } from '@/lib/auth-context';
+import { api } from '@/lib/api';
+import { useEffect, useState } from 'react';
 
 export function BottomNav() {
   const pathname = usePathname();
   const { user } = useAuth();
+  const [unread, setUnread] = useState(0);
 
   const isActive = (path: string) => pathname === path;
+
+  useEffect(() => {
+    if (!user) { setUnread(0); return; }
+    api.get<{ count: number }>('/api/notifications/unread-count')
+      .then(d => setUnread(d.count))
+      .catch(() => {});
+  }, [user]);
 
   return (
     <>
@@ -34,12 +44,17 @@ export function BottomNav() {
             <span className="text-xs">首页</span>
           </Link>
 
-          <span className="flex flex-col items-center gap-0.5 text-slate-400 cursor-not-allowed">
+          <Link href={user ? '/notifications' : '/login'} className={`relative flex flex-col items-center gap-0.5 no-underline ${pathname?.startsWith('/notifications') ? 'text-blue-500' : 'text-slate-400'}`}>
             <svg className="h-6 w-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
               <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" strokeLinecap="round" strokeLinejoin="round"/>
             </svg>
+            {unread > 0 && (
+              <span className="absolute -top-1 right-2 min-w-[16px] h-4 px-1 rounded-full bg-red-500 text-white text-[10px] flex items-center justify-center">
+                {unread > 99 ? '99+' : unread}
+              </span>
+            )}
             <span className="text-xs">消息</span>
-          </span>
+          </Link>
 
           <Link href={user ? '/profile' : '/login'} className={`flex flex-col items-center gap-0.5 no-underline ${pathname?.startsWith('/profile') ? 'text-blue-500' : 'text-slate-400'}`}>
             <svg className="h-6 w-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">

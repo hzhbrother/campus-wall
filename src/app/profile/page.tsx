@@ -371,6 +371,8 @@ function UsersTab({ isSuper }: { isSuper: boolean }) {
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState('');
   const [editUser, setEditUser] = useState<any>(null);
+  const [banUser, setBanUser] = useState<any>(null);
+  const [deleteTarget, setDeleteTarget] = useState<any>(null);
   const pageSize = 10;
 
   const load = useCallback(() => {
@@ -384,8 +386,15 @@ function UsersTab({ isSuper }: { isSuper: boolean }) {
   useEffect(load, [load]);
 
   const roleLabel: Record<string, string> = { USER: '用户', STUDENT: '学生', TEACHER: '教师', ADMIN: '管理员', SUPER_ADMIN: '超级管理员' };
-  const statusLabel: Record<string, string> = { NORMAL: '正常', GRADUATED: '毕业生', BANNED: '封禁' };
-  const statusColor: Record<string, string> = { NORMAL: 'bg-green-100 text-green-700', GRADUATED: 'bg-amber-100 text-amber-700', BANNED: 'bg-red-100 text-red-700' };
+  const statusLabel: Record<string, string> = { NORMAL: '正常', GRADUATED: '毕业生', BANNED: '永久封禁' };
+  const statusColor: Record<string, string> = { NORMAL: 'bg-green-100 text-green-700', GRADUATED: 'bg-amber-100 text-amber-700', BANNED: 'bg-red-600 text-white' };
+
+  const isBanned = (u: any) => u.bannedUntil && new Date(u.bannedUntil).getTime() > Date.now();
+  const banInfo = (u: any) => {
+    if (u.status === 'BANNED') return '永久封禁';
+    if (isBanned(u)) return `临时封禁至 ${new Date(u.bannedUntil).toLocaleDateString()}`;
+    return '';
+  };
 
   return (
     <div>
@@ -416,9 +425,17 @@ function UsersTab({ isSuper }: { isSuper: boolean }) {
                   <p className="mt-0.5 text-xs text-gray-400">
                     {u.realName ? u.realName + ' · ' : ''}{u.grade || ''}{u.className || ''}{u.email ? ' · ' + u.email : ''} · 帖子 {u._count?.posts}
                   </p>
+                  {banInfo(u) && <p className="mt-0.5 text-xs text-red-500 font-medium">{banInfo(u)}{u.banReason ? ' · ' + u.banReason : ''}</p>}
                 </div>
               </div>
-              <button onClick={() => setEditUser(u)} className="rounded-lg bg-blue-50 px-4 py-1.5 text-xs text-blue-600 hover:bg-blue-100">编辑</button>
+              <div className="flex items-center gap-2">
+                {isBanned(u) && (
+                  <button onClick={() => api.del(`/api/admin/users/${u.id}/ban`).then(() => load()).catch(e => setErr(e.message))} className="rounded-lg bg-green-50 px-3 py-1.5 text-xs text-green-600 hover:bg-green-100">解封</button>
+                )}
+                <button onClick={() => setBanUser(u)} className="rounded-lg bg-orange-50 px-3 py-1.5 text-xs text-orange-600 hover:bg-orange-100">封禁</button>
+                <button onClick={() => setDeleteTarget(u)} className="rounded-lg bg-red-50 px-3 py-1.5 text-xs text-red-600 hover:bg-red-100">删除</button>
+                <button onClick={() => setEditUser(u)} className="rounded-lg bg-blue-50 px-4 py-1.5 text-xs text-blue-600 hover:bg-blue-100">编辑</button>
+              </div>
             </div>
           ))}
         </div>
@@ -432,6 +449,8 @@ function UsersTab({ isSuper }: { isSuper: boolean }) {
       )}
 
       {editUser && <EditUserModal user={editUser} onClose={() => setEditUser(null)} onSaved={load} isSuper={isSuper} />}
+      {banUser && <BanUserModal user={banUser} onClose={() => setBanUser(null)} onDone={load} />}
+      {deleteTarget && <DeleteConfirmModal user={deleteTarget} onClose={() => setDeleteTarget(null)} onDone={load} />}
     </div>
   );
 }
@@ -559,6 +578,131 @@ function EditUserModal({ user, onClose, onSaved, isSuper }: { user: any; onClose
         <div className="mt-5 flex gap-2">
           <button onClick={save} disabled={saving} className="flex-1 rounded-lg bg-blue-600 py-2.5 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50">{saving ? '保存中…' : '保存'}</button>
           <button onClick={onClose} className="flex-1 rounded-lg bg-gray-100 py-2.5 text-sm text-gray-700 hover:bg-gray-200">取消</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ---------- 封禁用户弹窗 ----------
+const BAN_OPTIONS = [
+  { days: 7, label: '7 天', color: 'bg-blue-500 hover:bg-blue-600 text-white' },
+  { days: 14, label: '14 天', color: 'bg-cyan-500 hover:bg-cyan-600 text-white' },
+  { days: 30, label: '30 天', color: 'bg-teal-500 hover:bg-teal-600 text-white' },
+  { days: 60, label: '60 天', color: 'bg-green-500 hover:bg-green-600 text-white' },
+  { days: 365, label: '1 年', color: 'bg-amber-500 hover:bg-amber-600 text-white' },
+  { days: 730, label: '2 年', color: 'bg-orange-500 hover:bg-orange-600 text-white' },
+  { days: 1825, label: '5 年', color: 'bg-red-400 hover:bg-red-500 text-white' },
+  { days: 3650, label: '10 年', color: 'bg-red-500 hover:bg-red-600 text-white' },
+  { days: 0, label: '永久', color: 'bg-red-800 hover:bg-red-900 text-white' },
+];
+
+function BanUserModal({ user, onClose, onDone }: { user: any; onClose: () => void; onDone: () => void }) {
+  const [selected, setSelected] = useState<number | null>(null);
+  const [reason, setReason] = useState('');
+  const [confirm, setConfirm] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [err, setErr] = useState('');
+
+  const selectedOpt = BAN_OPTIONS.find(o => o.days === selected);
+
+  const doBan = async () => {
+    if (selected === null) return;
+    setSaving(true); setErr('');
+    try {
+      await api.post(`/api/admin/users/${user.id}/ban`, { durationDays: selected, reason });
+      onDone();
+      onClose();
+    } catch (e: any) {
+      setErr(e.message);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  // 首次选择后进入确认弹窗
+  const handleSelect = (days: number) => {
+    setSelected(days);
+    setConfirm(true);
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" onClick={onClose}>
+      <div className="w-full max-w-lg rounded-2xl bg-white p-6 shadow-2xl" onClick={e => e.stopPropagation()}>
+        {!confirm ? (
+          <>
+            <h3 className="text-lg font-bold text-gray-900 mb-1">封禁用户</h3>
+            <p className="text-sm text-gray-500 mb-4">正在封禁: <span className="font-semibold text-gray-700">{user.nickname}</span></p>
+            <div className="mb-4">
+              <label className="mb-1.5 block text-sm text-gray-600">封禁原因 (可选)</label>
+              <input value={reason} onChange={e => setReason(e.target.value)} placeholder="例如: 恶意刷屏、发布违规内容..." className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm" />
+            </div>
+            <div className="mb-4">
+              <label className="mb-2 block text-sm text-gray-600">选择封禁时长</label>
+              <div className="grid grid-cols-3 gap-2">
+                {BAN_OPTIONS.map(o => (
+                  <button key={o.days} onClick={() => handleSelect(o.days)} className={`rounded-lg px-3 py-3 text-sm font-medium transition ${o.color}`}>{o.label}</button>
+                ))}
+              </div>
+            </div>
+            {err && <div className="mb-3 text-sm text-red-500">{err}</div>}
+            <button onClick={onClose} className="w-full rounded-lg bg-gray-100 py-2.5 text-sm text-gray-700 hover:bg-gray-200">取消</button>
+          </>
+        ) : (
+          <>
+            <h3 className="text-lg font-bold text-gray-900 mb-4">确认封禁</h3>
+            <div className="mb-5 rounded-xl bg-gray-50 p-4 text-center">
+              <p className="text-sm text-gray-500">确定封禁用户</p>
+              <p className="mt-1 font-bold text-gray-900">{user.nickname}</p>
+              <p className="mt-2 text-sm text-gray-500">封禁时间为</p>
+              <p className={`mt-1 text-2xl font-bold ${selected === 0 ? 'text-red-800' : 'text-orange-600'}`}>{selectedOpt?.label}</p>
+              {selected === 0 && <p className="mt-2 text-xs text-red-600">永久封禁后该用户将无法登录</p>}
+              {selected !== 0 && <p className="mt-2 text-xs text-gray-500">封禁期间用户可浏览内容, 但不能发帖、评论、点赞</p>}
+            </div>
+            {err && <div className="mb-3 text-sm text-red-500">{err}</div>}
+            <div className="flex gap-3">
+              <button onClick={() => setConfirm(false)} className="flex-1 rounded-lg bg-gray-100 py-2.5 text-sm text-gray-700 hover:bg-gray-200">返回</button>
+              <button onClick={doBan} disabled={saving} className={`flex-1 rounded-lg py-2.5 text-sm font-medium text-white ${selected === 0 ? 'bg-red-800 hover:bg-red-900' : 'bg-orange-500 hover:bg-orange-600'} disabled:opacity-50`}>
+                {saving ? '封禁中...' : '确定封禁'}
+              </button>
+            </div>
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ---------- 删除用户确认弹窗 ----------
+function DeleteConfirmModal({ user, onClose, onDone }: { user: any; onClose: () => void; onDone: () => void }) {
+  const [saving, setSaving] = useState(false);
+  const [err, setErr] = useState('');
+
+  const doDelete = async () => {
+    setSaving(true); setErr('');
+    try {
+      await api.del(`/api/admin/users/${user.id}`);
+      onDone();
+      onClose();
+    } catch (e: any) {
+      setErr(e.message);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" onClick={onClose}>
+      <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl" onClick={e => e.stopPropagation()}>
+        <h3 className="text-lg font-bold text-gray-900 mb-2">确认删除</h3>
+        <p className="text-sm text-gray-600 mb-1">确定要删除用户 <span className="font-semibold text-gray-900">{user.nickname}</span> 吗？</p>
+        <p className="text-xs text-red-500 mb-5">删除后不可恢复, 该用户的所有帖子、评论、点赞等数据将被一并删除。</p>
+        {err && <div className="mb-3 text-sm text-red-500">{err}</div>}
+        <div className="flex gap-3">
+          <button onClick={onClose} className="flex-1 rounded-lg bg-gray-100 py-2.5 text-sm text-gray-700 hover:bg-gray-200">取消</button>
+          <button onClick={doDelete} disabled={saving} className="flex-1 rounded-lg bg-red-600 py-2.5 text-sm font-medium text-white hover:bg-red-700 disabled:opacity-50">
+            {saving ? '删除中...' : '确定删除'}
+          </button>
         </div>
       </div>
     </div>
@@ -1039,7 +1183,7 @@ export default function ProfilePage() {
           返回
         </button>
         <div className="rounded-2xl bg-white p-5 shadow-sm">
-          <EditProfile user={user} onSaved={() => { refreshUser?.(); }} />
+          <EditProfile user={user} onSaved={() => { refreshUser?.(); setView('home'); }} />
         </div>
       </div>
     );

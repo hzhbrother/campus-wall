@@ -119,7 +119,7 @@ export async function listUsers(page: number, pageSize: number, role?: UserRole,
       orderBy: { createdAt: 'desc' },
       skip: (page - 1) * pageSize,
       take: pageSize,
-      select: { id: true, email: true, nickname: true, realName: true, avatar: true, role: true, status: true, grade: true, className: true, remark: true, createdAt: true, _count: { select: { posts: true } } },
+      select: { id: true, email: true, nickname: true, realName: true, avatar: true, role: true, status: true, grade: true, className: true, remark: true, bannedUntil: true, banReason: true, createdAt: true, _count: { select: { posts: true } } },
     }),
     prisma.user.count({ where }),
   ]);
@@ -157,6 +157,46 @@ export async function updateUser(userId: string, data: {
   const updated = await prisma.user.update({ where: { id: userId }, data });
   await audit(actorId, 'UPDATE_USER', userId);
   return updated;
+}
+
+// 封禁用户 (durationDays = 0 表示永久封禁)
+export async function banUser(userId: string, durationDays: number, reason: string, actorId: string) {
+  const user = await prisma.user.findUnique({ where: { id: userId } });
+  if (!user) throw new Error('用户不存在');
+  const data: any = { banReason: reason || null };
+  if (durationDays <= 0) {
+    // 永久封禁: status=BANNED, bannedUntil=null
+    data.status = UserStatus.BANNED;
+    data.bannedUntil = null;
+  } else {
+    // 临时封禁: bannedUntil = now + days, status 保持 NORMAL (可登录但受限)
+    data.status = UserStatus.NORMAL;
+    data.bannedUntil = new Date(Date.now() + durationDays * 24 * 60 * 60 * 1000);
+  }
+  const updated = await prisma.user.update({ where: { id: userId }, data });
+  await audit(actorId, 'BAN_USER', userId, durationDays <= 0 ? '永久封禁' : `封禁${durationDays}天`);
+  return updated;
+}
+
+// 解封用户
+export async function unbanUser(userId: string, actorId: string) {
+  const user = await prisma.user.findUnique({ where: { id: userId } });
+  if (!user) throw new Error('用户不存在');
+  const updated = await prisma.user.update({
+    where: { id: userId },
+    data: { status: UserStatus.NORMAL, bannedUntil: null, banReason: null },
+  });
+  await audit(actorId, 'UNBAN_USER', userId);
+  return updated;
+}
+
+// 删除用户 (级联删除)
+export async function deleteUser(userId: string, actorId: string) {
+  const user = await prisma.user.findUnique({ where: { id: userId } });
+  if (!user) throw new Error('用户不存在');
+  await prisma.user.delete({ where: { id: userId } });
+  await audit(actorId, 'DELETE_USER', userId, `nickname=${user.nickname}`);
+  return { ok: true };
 }
 
 async function audit(actorId: string, action: string, target: string, detail?: string) {

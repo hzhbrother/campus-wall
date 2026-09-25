@@ -1,9 +1,10 @@
 // PATCH /api/admin/users/:id  管理员编辑用户资料 (ADMIN+)
+// DELETE /api/admin/users/:id 删除用户 (ADMIN+)
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import { UserRole, UserStatus } from '@prisma/client';
 import { requireRole } from '@/lib/server-auth';
-import { updateUser } from '@/lib/admin-service';
+import { updateUser, deleteUser } from '@/lib/admin-service';
 import { errorResponse } from '@/lib/api-response';
 
 const Schema = z.object({
@@ -31,6 +32,15 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
     return NextResponse.json(await updateUser(params.id, data, me.id));
   } catch (e: any) {
     if (e?.name === 'ZodError') return NextResponse.json({ message: e.errors?.[0]?.message || '参数错误' }, { status: 400 });
+    return errorResponse(e);
+  }
+}
+
+export async function DELETE(req: NextRequest, { params }: { params: { id: string } }) {
+  try {
+    const me = await requireRole(req, UserRole.ADMIN, UserRole.SUPER_ADMIN);
+    return NextResponse.json(await deleteUser(params.id, me.id));
+  } catch (e) {
     return errorResponse(e);
   }
 }

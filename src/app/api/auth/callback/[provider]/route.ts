@@ -39,7 +39,7 @@ export async function GET(req: NextRequest, { params }: { params: { provider: st
     let linked = false;
     if (account) {
       user = await prisma.user.findUnique({ where: { id: account.userId } });
-      if (user?.status === UserStatus.BANNED) return feError('账号已被封禁');
+      if (user?.status === UserStatus.BANNED) return feError('您的账号被永久封禁, 请联系管理员');
       linked = true;
     } else if (profile.email) {
       user = await prisma.user.findUnique({ where: { email: profile.email } });

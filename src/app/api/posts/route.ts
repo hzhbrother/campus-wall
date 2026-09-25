@@ -8,6 +8,7 @@ import { prisma } from '@/lib/prisma';
 import { getUserFromRequest } from '@/lib/server-auth';
 import { errorResponse } from '@/lib/api-response';
 import { getSiteConfigBool, getSiteConfigValue, getPostCategories } from '@/lib/site-config';
+import { isUserBanned } from '@/lib/server-auth';
 
 const DEFAULT_CATEGORIES = ['校园', '失物招领', '二手交易', '表白墙', '寻物启事', '招聘兼职', '求助问答'];
 
@@ -18,9 +19,11 @@ export async function GET(req: NextRequest) {
     const pageSize = Math.min(50, Math.max(1, Number(sp.get('pageSize') || 10)));
     const category = sp.get('category') || undefined;
     const q = sp.get('q') || undefined;
+    const authorId = sp.get('authorId') || undefined;
     const where: Prisma.PostWhereInput = {
       status: PostStatus.APPROVED,
       ...(category ? { category } : {}),
+      ...(authorId ? { authorId } : {}),
       ...(q
         ? { OR: [
             { title: { contains: q, mode: 'insensitive' } },
@@ -48,6 +51,7 @@ export async function POST(req: NextRequest) {
   try {
     const me = await getUserFromRequest(req);
     if (!me) return NextResponse.json({ message: '未登录' }, { status: 401 });
+    if (isUserBanned(me)) return NextResponse.json({ message: '账号已被封禁, 暂不能发帖' }, { status: 403 });
 
     // 读取站点配置
     const [categories, allowAnonymous, requiresApproval, dailyLimit, sensitiveWords] = await Promise.all([

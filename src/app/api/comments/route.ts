@@ -6,6 +6,7 @@ import { prisma } from '@/lib/prisma';
 import { requireUser } from '@/lib/server-auth';
 import { errorResponse } from '@/lib/api-response';
 import { getSiteConfigBool } from '@/lib/site-config';
+import { isUserBanned } from '@/lib/server-auth';
 
 const CreateSchema = z.object({
   postId: z.string(),
@@ -36,6 +37,7 @@ export async function POST(req: NextRequest) {
     if (!commentEnabled) return NextResponse.json({ message: '站点已关闭评论功能' }, { status: 403 });
 
     const me = await requireUser(req);
+    if (isUserBanned(me)) return NextResponse.json({ message: '账号已被封禁, 暂不能评论' }, { status: 403 });
     const dto = CreateSchema.parse(await req.json());
     const post = await prisma.post.findUnique({ where: { id: dto.postId } });
     if (!post) return NextResponse.json({ message: '帖子不存在' }, { status: 404 });

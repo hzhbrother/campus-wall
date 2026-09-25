@@ -1,18 +1,30 @@
-// POST /api/admin/users/:id/status  设置用户状态 (ADMIN+)
+// POST /api/admin/users/:id/ban  封禁用户 (ADMIN+)
 import { NextRequest, NextResponse } from 'next/server';
-import { UserRole, UserStatus } from '@prisma/client';
+import { UserRole } from '@prisma/client';
 import { requireRole } from '@/lib/server-auth';
-import { setStatus } from '@/lib/admin-service';
+import { banUser, unbanUser } from '@/lib/admin-service';
 import { errorResponse } from '@/lib/api-response';
 
 export async function POST(req: NextRequest, { params }: { params: { id: string } }) {
   try {
     const me = await requireRole(req, UserRole.ADMIN, UserRole.SUPER_ADMIN);
-    const { status } = await req.json().catch(() => ({}));
-    if (!['NORMAL', 'GRADUATED', 'BANNED'].includes(status)) {
-      return NextResponse.json({ message: '非法状态' }, { status: 400 });
+    const { durationDays, reason } = await req.json().catch(() => ({}));
+    if (typeof durationDays !== 'number') {
+      return NextResponse.json({ message: '缺少封禁时长' }, { status: 400 });
     }
-    return NextResponse.json(await setStatus(params.id, status as UserStatus, me.id));
+    const user = await banUser(params.id, durationDays, reason || '', me.id);
+    return NextResponse.json(user);
+  } catch (e) {
+    return errorResponse(e);
+  }
+}
+
+// DELETE /api/admin/users/:id/ban  解封用户
+export async function DELETE(req: NextRequest, { params }: { params: { id: string } }) {
+  try {
+    const me = await requireRole(req, UserRole.ADMIN, UserRole.SUPER_ADMIN);
+    const user = await unbanUser(params.id, me.id);
+    return NextResponse.json(user);
   } catch (e) {
     return errorResponse(e);
   }

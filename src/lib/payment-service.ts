@@ -7,7 +7,7 @@ import type { NextRequest } from 'next/server';
 
 // 各订单类型的默认定价 (分)
 const PRICE_PRESET: Record<OrderType, number> = {
-  PIN: 500,   // 置顶推广 5 元
+  PIN: 100,   // 置顶推广 1 元
   VIP: 990,   // 会员订阅 9.9 元/月
   REWARD: 0,  // 打赏: 由前端传入
 };

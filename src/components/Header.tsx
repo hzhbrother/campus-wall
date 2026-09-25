@@ -7,16 +7,28 @@ import { api } from '@/lib/api';
 
 export function Header() {
   const { user, loading } = useAuth();
-  const [unread, setUnread] = useState(0);
   const [siteName, setSiteName] = useState('校园墙');
   const [siteLogo, setSiteLogo] = useState('');
+  const [banRemain, setBanRemain] = useState('');
 
+  // 封禁倒计时
   useEffect(() => {
-    if (!user) return;
-    api.get<{ count: number }>('/api/notifications/unread-count')
-      .then(d => setUnread(d.count))
-      .catch(() => {});
-  }, [user]);
+    if (!user?.bannedUntil) { setBanRemain(''); return; }
+    const calc = () => {
+      const until = new Date(user.bannedUntil).getTime();
+      const diff = until - Date.now();
+      if (diff <= 0) { setBanRemain(''); return; }
+      const days = Math.floor(diff / (24 * 60 * 60 * 1000));
+      const hours = Math.floor((diff % (24 * 60 * 60 * 1000)) / (60 * 60 * 1000));
+      const mins = Math.floor((diff % (60 * 60 * 1000)) / (60 * 1000));
+      if (days > 0) setBanRemain(`距离解禁还有 ${days} 天 ${hours} 小时`);
+      else if (hours > 0) setBanRemain(`距离解禁还有 ${hours} 小时 ${mins} 分钟`);
+      else setBanRemain(`距离解禁还有 ${mins} 分钟`);
+    };
+    calc();
+    const t = setInterval(calc, 60000);
+    return () => clearInterval(t);
+  }, [user?.bannedUntil]);
 
   useEffect(() => {
     api.get<{ site_name?: string; site_logo?: string }>('/api/site-config')
@@ -29,6 +41,12 @@ export function Header() {
 
   return (
     <header className="sticky top-0 z-20 bg-white border-b border-slate-100">
+      {banRemain && (
+        <div className="bg-red-500 text-white text-center text-xs py-1.5 px-3">
+          <span className="font-semibold">账号封禁中</span> · {banRemain}
+          {user?.banReason ? ` · 原因: ${user.banReason}` : ''} · 封禁期间无法发帖、评论、点赞
+        </div>
+      )}
       <div className="mx-auto h-14 flex items-center justify-between px-4" style={{ maxWidth: 640 }}>
         <div className="w-8" />
         <Link href="/" className="flex items-center gap-2 no-underline">
@@ -39,19 +57,6 @@ export function Header() {
           <span className="text-lg font-bold text-slate-900">{siteName}</span>
         </Link>
         <div className="flex items-center gap-3">
-          {user && (
-            <Link href="/notifications" className="relative no-underline text-slate-500">
-              <svg className="h-6 w-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
-                <path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9" strokeLinecap="round" strokeLinejoin="round"/>
-                <path d="M10.3 21a1.94 1.94 0 0 0 3.4 0" strokeLinecap="round" strokeLinejoin="round"/>
-              </svg>
-              {unread > 0 && (
-                <span className="absolute -top-1 -right-1 min-w-[16px] h-4 px-1 rounded-full bg-red-500 text-white text-[10px] flex items-center justify-center">
-                  {unread > 99 ? '99+' : unread}
-                </span>
-              )}
-            </Link>
-          )}
           <div className="w-8 flex items-center justify-end">
             {loading ? (
               <span className="text-slate-300">…</span>

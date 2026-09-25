@@ -28,6 +28,13 @@ async function request<T>(path: string, opts: RequestInit = {}): Promise<T> {
   const data = text ? JSON.parse(text) : null;
 
   if (!res.ok) {
+    // 401: token 失效, 清除登录态并跳转登录页
+    if (res.status === 401 && typeof window !== 'undefined') {
+      localStorage.removeItem('cw_token');
+      if (!window.location.pathname.startsWith('/login')) {
+        window.location.href = '/login';
+      }
+    }
     const message = data?.message || (Array.isArray(data?.message) ? data.message[0] : `请求失败 (${res.status})`);
     throw new ApiError(message, res.status);
   }

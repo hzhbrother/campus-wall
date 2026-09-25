@@ -22,8 +22,9 @@ export async function POST(req: NextRequest) {
     if (!user || !user.password) {
       return NextResponse.json({ message: '账号或密码错误' }, { status: 401 });
     }
+    // 永久封禁 (status=BANNED) 不允许登录
     if (user.status === UserStatus.BANNED) {
-      return NextResponse.json({ message: '账号已被封禁, 请联系管理员' }, { status: 401 });
+      return NextResponse.json({ message: '您的账号被永久封禁, 请联系管理员', banned: true, permanent: true }, { status: 403 });
     }
     const ok = await bcrypt.compare(dto.password, user.password);
     if (!ok) return NextResponse.json({ message: '账号或密码错误' }, { status: 401 });
