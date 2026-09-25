@@ -11,6 +11,7 @@ export interface AuthUser {
   nickname: string;
   avatar?: string | null;
   role: Role;
+  _count?: { posts: number; comments: number; likes: number };
 }
 
 interface AuthCtx {
@@ -20,6 +21,7 @@ interface AuthCtx {
   register: (data: { email: string; password: string; nickname: string; studentId?: string }) => Promise<void>;
   applyToken: (token: string) => Promise<void>;
   logout: () => void;
+  refreshUser: () => Promise<void>;
 }
 
 const Ctx = createContext<AuthCtx>(null as any);
@@ -70,7 +72,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   return (
-    <Ctx.Provider value={{ user, loading, login, register, applyToken, logout }}>
+    <Ctx.Provider value={{ user, loading, login, register, applyToken, logout, refreshUser: fetchMe }}>
       {children}
     </Ctx.Provider>
   );

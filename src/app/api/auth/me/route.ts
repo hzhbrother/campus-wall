@@ -8,7 +8,10 @@ export async function GET(req: NextRequest) {
   try {
     const me = await getUserFromRequest(req);
     if (!me) return Response.json(null, { status: 200 });
-    const user = await prisma.user.findUnique({ where: { id: me.id } });
+    const user = await prisma.user.findUnique({
+      where: { id: me.id },
+      include: { _count: { select: { posts: true, comments: true, likes: true } } },
+    });
     return Response.json(user ? sanitize(user) : null);
   } catch (e) {
     return errorResponse(e);

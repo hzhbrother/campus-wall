@@ -15,7 +15,10 @@ const UpdateSchema = z.object({
 export async function GET(req: NextRequest) {
   try {
     const me = await requireUser(req);
-    const user = await prisma.user.findUnique({ where: { id: me.id } });
+    const user = await prisma.user.findUnique({
+      where: { id: me.id },
+      include: { _count: { select: { posts: true, comments: true, likes: true } } },
+    });
     return NextResponse.json(sanitize(user));
   } catch (e) {
     return errorResponse(e);
