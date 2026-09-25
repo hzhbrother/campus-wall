@@ -17,8 +17,8 @@ export interface AuthUser {
 interface AuthCtx {
   user: AuthUser | null;
   loading: boolean;
-  login: (email: string, password: string) => Promise<void>;
-  register: (data: { email: string; password: string; nickname: string; studentId?: string }) => Promise<void>;
+  login: (account: string, password: string) => Promise<void>;
+  register: (data: { nickname: string; password: string; realName?: string; grade?: string; className?: string; remark?: string }) => Promise<void>;
   applyToken: (token: string) => Promise<void>;
   logout: () => void;
   refreshUser: () => Promise<void>;
@@ -54,13 +54,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     await fetchMe();
   }, [fetchMe]);
 
-  const login = useCallback(async (email: string, password: string) => {
-    const res = await api.post<{ token: string; user: AuthUser }>('/api/auth/login', { email, password });
+  const login = useCallback(async (account: string, password: string) => {
+    const res = await api.post<{ token: string; user: AuthUser }>('/api/auth/login', { account, password });
     localStorage.setItem('cw_token', res.token);
     setUser(res.user);
   }, []);
 
-  const register = useCallback(async (data: { email: string; password: string; nickname: string; studentId?: string }) => {
+  const register = useCallback(async (data: { nickname: string; password: string; realName?: string; grade?: string; className?: string; remark?: string }) => {
     const res = await api.post<{ token: string; user: AuthUser }>('/api/auth/register', data);
     localStorage.setItem('cw_token', res.token);
     setUser(res.user);

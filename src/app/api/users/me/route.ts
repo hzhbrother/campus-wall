@@ -10,6 +10,10 @@ const UpdateSchema = z.object({
   nickname: z.string().max(32).optional(),
   avatar: z.string().optional(),
   studentId: z.string().max(20).optional(),
+  realName: z.string().max(32).optional().or(z.literal('')),
+  grade: z.string().max(20).optional().or(z.literal('')),
+  className: z.string().max(20).optional().or(z.literal('')),
+  remark: z.string().max(200).optional().or(z.literal('')),
 });
 
 export async function GET(req: NextRequest) {

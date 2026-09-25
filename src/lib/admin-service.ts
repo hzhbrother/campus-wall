@@ -1,5 +1,5 @@
 // 管理后台业务逻辑
-import { UserRole, PostStatus } from '@prisma/client';
+import { UserRole, UserStatus, PostStatus } from '@prisma/client';
 import { Prisma } from '@prisma/client';
 import { prisma } from '@/lib/prisma';
 
@@ -111,7 +111,7 @@ export async function listOrders(page: number, pageSize: number) {
 export async function listUsers(page: number, pageSize: number, role?: UserRole, kw?: string) {
   const where: Prisma.UserWhereInput = {
     ...(role ? { role } : {}),
-    ...(kw ? { OR: [{ nickname: { contains: kw } }, { email: { contains: kw } }] } : {}),
+    ...(kw ? { OR: [{ nickname: { contains: kw } }, { email: { contains: kw } }, { realName: { contains: kw } }] } : {}),
   };
   const [items, total] = await Promise.all([
     prisma.user.findMany({
@@ -119,7 +119,7 @@ export async function listUsers(page: number, pageSize: number, role?: UserRole,
       orderBy: { createdAt: 'desc' },
       skip: (page - 1) * pageSize,
       take: pageSize,
-      select: { id: true, email: true, nickname: true, avatar: true, role: true, banned: true, createdAt: true, _count: { select: { posts: true } } },
+      select: { id: true, email: true, nickname: true, realName: true, avatar: true, role: true, status: true, grade: true, className: true, remark: true, createdAt: true, _count: { select: { posts: true } } },
     }),
     prisma.user.count({ where }),
   ]);
@@ -134,11 +134,28 @@ export async function setRole(userId: string, role: UserRole, actorId: string) {
   return updated;
 }
 
-export async function setBanned(userId: string, banned: boolean, actorId: string) {
+export async function setStatus(userId: string, status: UserStatus, actorId: string) {
   const user = await prisma.user.findUnique({ where: { id: userId } });
   if (!user) throw new Error('用户不存在');
-  const updated = await prisma.user.update({ where: { id: userId }, data: { banned } });
-  await audit(actorId, banned ? 'BAN_USER' : 'UNBAN_USER', userId);
+  const updated = await prisma.user.update({ where: { id: userId }, data: { status } });
+  await audit(actorId, 'SET_STATUS', userId, `status=${status}`);
+  return updated;
+}
+
+// 管理员编辑用户资料
+export async function updateUser(userId: string, data: {
+  realName?: string;
+  grade?: string;
+  className?: string;
+  remark?: string;
+  avatar?: string;
+  status?: UserStatus;
+  role?: UserRole;
+}, actorId: string) {
+  const user = await prisma.user.findUnique({ where: { id: userId } });
+  if (!user) throw new Error('用户不存在');
+  const updated = await prisma.user.update({ where: { id: userId }, data });
+  await audit(actorId, 'UPDATE_USER', userId);
   return updated;
 }
 

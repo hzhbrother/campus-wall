@@ -1,15 +1,18 @@
-// POST /api/admin/users/:id/ban  封禁/解封 (ADMIN+)
+// POST /api/admin/users/:id/status  设置用户状态 (ADMIN+)
 import { NextRequest, NextResponse } from 'next/server';
-import { UserRole } from '@prisma/client';
+import { UserRole, UserStatus } from '@prisma/client';
 import { requireRole } from '@/lib/server-auth';
-import { setBanned } from '@/lib/admin-service';
+import { setStatus } from '@/lib/admin-service';
 import { errorResponse } from '@/lib/api-response';
 
 export async function POST(req: NextRequest, { params }: { params: { id: string } }) {
   try {
     const me = await requireRole(req, UserRole.ADMIN, UserRole.SUPER_ADMIN);
-    const { banned } = await req.json().catch(() => ({ banned: true }));
-    return NextResponse.json(await setBanned(params.id, banned ?? true, me.id));
+    const { status } = await req.json().catch(() => ({}));
+    if (!['NORMAL', 'GRADUATED', 'BANNED'].includes(status)) {
+      return NextResponse.json({ message: '非法状态' }, { status: 400 });
+    }
+    return NextResponse.json(await setStatus(params.id, status as UserStatus, me.id));
   } catch (e) {
     return errorResponse(e);
   }

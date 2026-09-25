@@ -3,6 +3,7 @@ import jwt from 'jsonwebtoken';
 import { NextRequest } from 'next/server';
 import { prisma } from './prisma';
 import type { UserRole } from '@prisma/client';
+import { UserStatus } from '@prisma/client';
 
 export interface JwtPayload {
   sub: string;
@@ -39,7 +40,7 @@ export async function getUserFromRequest(req: Request | NextRequest): Promise<Re
   const payload = verifyToken(token);
   if (!payload) return null;
   const user = await prisma.user.findUnique({ where: { id: payload.sub } });
-  if (!user || user.banned) return null;
+  if (!user || user.status === UserStatus.BANNED) return null;
   return { id: user.id, email: user.email, role: user.role, nickname: user.nickname };
 }
 

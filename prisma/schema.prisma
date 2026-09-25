@@ -14,9 +14,17 @@ datasource db {
 // ---- 枚举 ----
 
 enum UserRole {
-  USER        // 普通用户
+  USER        // 兼容旧数据
+  STUDENT     // 学生
+  TEACHER     // 教师
   ADMIN       // 管理员 (校内运营)
   SUPER_ADMIN // 超级管理员
+}
+
+enum UserStatus {
+  NORMAL     // 正常访问
+  GRADUATED  // 毕业生
+  BANNED     // 封禁
 }
 
 enum AccountProvider {
@@ -54,10 +62,14 @@ model User {
   email        String?          @unique // OAuth-only 用户可为空
   password     String?          // 本地密码 hash, OAuth 用户为空
   nickname     String
+  realName     String?          // 真实姓名
   avatar       String?
   studentId    String?          // 学号 (可选实名)
-  role         UserRole         @default(USER)
-  banned       Boolean          @default(false)
+  grade        String?          // 年级
+  className    String?          // 班级
+  remark       String?          // 备注
+  role         UserRole         @default(STUDENT)
+  status       UserStatus       @default(NORMAL)
   createdAt    DateTime         @default(now())
   updatedAt    DateTime         @updatedAt
 
@@ -70,6 +82,7 @@ model User {
 
   @@index([email])
   @@index([role])
+  @@index([status])
 }
 
 // 第三方账号绑定 (一个用户可绑定多个平台)

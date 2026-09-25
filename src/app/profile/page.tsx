@@ -370,6 +370,7 @@ function UsersTab({ isSuper }: { isSuper: boolean }) {
   const [q, setQ] = useState('');
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState('');
+  const [editUser, setEditUser] = useState<any>(null);
   const pageSize = 10;
 
   const load = useCallback(() => {
@@ -382,40 +383,42 @@ function UsersTab({ isSuper }: { isSuper: boolean }) {
   }, [page, role, q]);
   useEffect(load, [load]);
 
-  const changeRole = async (id: string, r: UserRole) => { if (!confirm(`确认将该用户角色设为 ${r}？`)) return; try { await api.patch(`/api/admin/users/${id}/role`, { role: r }); load(); } catch (e: any) { setErr(e.message); } };
-  const toggleBan = async (u: any) => { try { await api.post(`/api/admin/users/${u.id}/ban`, { banned: !u.banned }); load(); } catch (e: any) { setErr(e.message); } };
-  const roleLabel: Record<string, string> = { USER: '普通用户', ADMIN: '管理员', SUPER_ADMIN: '超级管理员' };
+  const roleLabel: Record<string, string> = { USER: '用户', STUDENT: '学生', TEACHER: '教师', ADMIN: '管理员', SUPER_ADMIN: '超级管理员' };
+  const statusLabel: Record<string, string> = { NORMAL: '正常', GRADUATED: '毕业生', BANNED: '封禁' };
+  const statusColor: Record<string, string> = { NORMAL: 'bg-green-100 text-green-700', GRADUATED: 'bg-amber-100 text-amber-700', BANNED: 'bg-red-100 text-red-700' };
 
   return (
     <div>
-      <SectionTitle title="用户管理" desc={isSuper ? '管理所有用户的角色与封禁状态' : '查看用户列表；角色分配仅限超级管理员'} />
+      <SectionTitle title="用户管理" desc="编辑用户资料、状态与身份" />
       <div className="mb-4 flex flex-wrap gap-3">
         <select value={role} onChange={e => { setRole(e.target.value); setPage(1); }} className="rounded-lg border border-gray-300 px-3 py-2 text-sm">
-          <option value="">全部角色</option><option value="USER">普通用户</option><option value="ADMIN">管理员</option><option value="SUPER_ADMIN">超级管理员</option>
+          <option value="">全部身份</option>
+          <option value="STUDENT">学生</option><option value="TEACHER">教师</option>
+          <option value="ADMIN">管理员</option><option value="SUPER_ADMIN">超级管理员</option>
         </select>
-        <input value={q} onChange={e => { setQ(e.target.value); setPage(1); }} placeholder="搜索昵称/邮箱" className="flex-1 min-w-[180px] rounded-lg border border-gray-300 px-3 py-2 text-sm" />
+        <input value={q} onChange={e => { setQ(e.target.value); setPage(1); }} placeholder="搜索昵称/姓名/邮箱" className="flex-1 min-w-[180px] rounded-lg border border-gray-300 px-3 py-2 text-sm" />
       </div>
       {err && <div className="mb-3 text-sm text-red-500">{err}</div>}
       {loading ? <p className="py-6 text-center text-gray-400">加载中…</p> : (
         <div className="space-y-3">
           {users.map((u: any) => (
             <div key={u.id} className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-gray-200 bg-white p-4">
-              <div>
-                <div className="flex items-center gap-2">
-                  <span className="font-semibold text-gray-900">{u.nickname || u.email}</span>
-                  <span className="rounded bg-blue-100 px-1.5 py-0.5 text-xs text-blue-700">{roleLabel[u.role] || u.role}</span>
-                  {u.banned && <span className="rounded bg-red-100 px-1.5 py-0.5 text-xs text-red-700">已封禁</span>}
+              <div className="flex items-center gap-3">
+                <div className="h-10 w-10 shrink-0 overflow-hidden rounded-full bg-gradient-to-br from-indigo-400 to-purple-500 flex items-center justify-center text-white font-medium">
+                  {u.avatar ? <img src={u.avatar} alt="" className="h-full w-full object-cover" /> : (u.nickname || 'U')[0].toUpperCase()}
                 </div>
-                <p className="mt-0.5 text-xs text-gray-400">{u.email} · 注册于 {fmtDate(u.createdAt)} · 帖子 {u._count?.posts}</p>
+                <div>
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="font-semibold text-gray-900">{u.nickname}</span>
+                    <span className="rounded bg-blue-100 px-1.5 py-0.5 text-xs text-blue-700">{roleLabel[u.role] || u.role}</span>
+                    <span className={`rounded px-1.5 py-0.5 text-xs ${statusColor[u.status] || 'bg-gray-100'}`}>{statusLabel[u.status] || u.status}</span>
+                  </div>
+                  <p className="mt-0.5 text-xs text-gray-400">
+                    {u.realName ? u.realName + ' · ' : ''}{u.grade || ''}{u.className || ''}{u.email ? ' · ' + u.email : ''} · 帖子 {u._count?.posts}
+                  </p>
+                </div>
               </div>
-              <div className="flex flex-wrap gap-2">
-                {isSuper && u.role !== 'SUPER_ADMIN' && (
-                  <select defaultValue={u.role} onChange={e => changeRole(u.id, e.target.value as UserRole)} className="rounded-lg border border-gray-300 px-2 py-1 text-xs">
-                    <option value="USER">普通用户</option><option value="ADMIN">管理员</option>
-                  </select>
-                )}
-                <button onClick={() => toggleBan(u)} className={`rounded-lg px-3 py-1 text-xs ${u.banned ? 'bg-green-50 text-green-600' : 'bg-red-50 text-red-600'}`}>{u.banned ? '解封' : '封禁'}</button>
-              </div>
+              <button onClick={() => setEditUser(u)} className="rounded-lg bg-blue-50 px-4 py-1.5 text-xs text-blue-600 hover:bg-blue-100">编辑</button>
             </div>
           ))}
         </div>
@@ -427,6 +430,137 @@ function UsersTab({ isSuper }: { isSuper: boolean }) {
           <button onClick={() => setPage(p => p + 1)} disabled={page * pageSize >= total} className="rounded-lg border border-gray-300 px-3 py-1.5 text-sm disabled:opacity-40">下一页</button>
         </div>
       )}
+
+      {editUser && <EditUserModal user={editUser} onClose={() => setEditUser(null)} onSaved={load} isSuper={isSuper} />}
+    </div>
+  );
+}
+
+// ---------- 编辑用户弹窗 ----------
+const GRADES = ['高一', '高二', '高三', '初一', '初二', '初三'];
+const CLASS_LIST = ['1班', '2班', '3班', '4班', '5班', '6班', '7班', '8班', '9班', '10班'];
+
+function EditUserModal({ user, onClose, onSaved, isSuper }: { user: any; onClose: () => void; onSaved: () => void; isSuper: boolean }) {
+  const [realName, setRealName] = useState(user.realName || '');
+  const [grade, setGrade] = useState(user.grade || '');
+  const [className, setClassName] = useState(user.className || '');
+  const [remark, setRemark] = useState(user.remark || '');
+  const [status, setStatus] = useState(user.status || 'NORMAL');
+  const [role, setRole] = useState(user.role || 'STUDENT');
+  const [avatar, setAvatar] = useState(user.avatar || '');
+  const [saving, setSaving] = useState(false);
+  const [err, setErr] = useState('');
+
+  const handleAvatarFile = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => setAvatar(reader.result as string);
+    reader.readAsDataURL(file);
+  };
+
+  const save = async () => {
+    setSaving(true); setErr('');
+    try {
+      await api.patch(`/api/admin/users/${user.id}`, { realName, grade, className, remark, status, role, avatar });
+      onSaved();
+      onClose();
+    } catch (e: any) { setErr(e.message); } finally { setSaving(false); }
+  };
+
+  const classOptions = grade ? CLASS_LIST : [];
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" onClick={onClose}>
+      <div className="w-full max-w-md rounded-2xl bg-white p-5 max-h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="text-lg font-bold text-gray-900">编辑用户</h3>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600">✕</button>
+        </div>
+
+        {err && <div className="mb-3 text-sm text-red-500">{err}</div>}
+
+        <div className="space-y-3">
+          {/* 头像 */}
+          <div className="flex items-center gap-4">
+            <div className="h-16 w-16 overflow-hidden rounded-full bg-gradient-to-br from-indigo-400 to-purple-500 flex items-center justify-center text-white text-xl font-bold">
+              {avatar ? <img src={avatar} alt="" className="h-full w-full object-cover" /> : (user.nickname || 'U')[0]}
+            </div>
+            <div className="flex gap-2">
+              <label className="cursor-pointer rounded-lg bg-blue-50 px-3 py-1.5 text-xs text-blue-600 hover:bg-blue-100">
+                选择文件
+                <input type="file" accept="image/*" className="hidden" onChange={handleAvatarFile} />
+              </label>
+              <label className="cursor-pointer rounded-lg bg-purple-50 px-3 py-1.5 text-xs text-purple-600 hover:bg-purple-100">
+                拍照
+                <input type="file" accept="image/*" capture="user" className="hidden" onChange={handleAvatarFile} />
+              </label>
+            </div>
+          </div>
+
+          {/* 账号名（不可编辑） */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">账号名</label>
+            <input value={user.nickname} disabled className="w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-500" />
+          </div>
+
+          {/* 真实姓名 */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">真实姓名</label>
+            <input value={realName} onChange={e => setRealName(e.target.value)} className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/40" placeholder="请输入真实姓名" />
+          </div>
+
+          {/* 年级 + 班级 */}
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">年级</label>
+              <select value={grade} onChange={e => setGrade(e.target.value)} className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm">
+                <option value="">不填写</option>
+                {GRADES.map(g => <option key={g} value={g}>{g}</option>)}
+              </select>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">班级</label>
+              <select value={className} onChange={e => setClassName(e.target.value)} disabled={!grade} className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm disabled:opacity-50">
+                <option value="">不填写</option>
+                {classOptions.map(c => <option key={c} value={c}>{c}</option>)}
+              </select>
+            </div>
+          </div>
+
+          {/* 状态 */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">访问状态</label>
+            <select value={status} onChange={e => setStatus(e.target.value)} className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm">
+              <option value="NORMAL">正常访问</option>
+              <option value="GRADUATED">毕业生</option>
+              <option value="BANNED">封禁</option>
+            </select>
+          </div>
+
+          {/* 身份 */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">身份</label>
+            <select value={role} onChange={e => setRole(e.target.value)} disabled={!isSuper && user.role === 'SUPER_ADMIN'} className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm disabled:opacity-50">
+              <option value="STUDENT">学生</option>
+              <option value="TEACHER">教师</option>
+              <option value="ADMIN">管理员</option>
+              {isSuper && <option value="SUPER_ADMIN">超级管理员</option>}
+            </select>
+          </div>
+
+          {/* 备注 */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">备注</label>
+            <textarea value={remark} onChange={e => setRemark(e.target.value)} rows={2} className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/40" placeholder="备注信息" />
+          </div>
+        </div>
+
+        <div className="mt-5 flex gap-2">
+          <button onClick={save} disabled={saving} className="flex-1 rounded-lg bg-blue-600 py-2.5 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50">{saving ? '保存中…' : '保存'}</button>
+          <button onClick={onClose} className="flex-1 rounded-lg bg-gray-100 py-2.5 text-sm text-gray-700 hover:bg-gray-200">取消</button>
+        </div>
+      </div>
     </div>
   );
 }
@@ -434,15 +568,29 @@ function UsersTab({ isSuper }: { isSuper: boolean }) {
 // ---------- 个人资料编辑 ----------
 function EditProfile({ user, onSaved }: { user: any; onSaved: () => void }) {
   const [nickname, setNickname] = useState(user?.nickname || '');
+  const [realName, setRealName] = useState(user?.realName || '');
+  const [grade, setGrade] = useState(user?.grade || '');
+  const [className, setClassName] = useState(user?.className || '');
+  const [remark, setRemark] = useState(user?.remark || '');
   const [avatar, setAvatar] = useState(user?.avatar || '');
   const [saving, setSaving] = useState(false);
   const [msg, setMsg] = useState('');
 
+  const handleAvatarFile = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => setAvatar(reader.result as string);
+    reader.readAsDataURL(file);
+  };
+
   const save = async () => {
     setSaving(true); setMsg('');
-    try { await api.patch('/api/users/me', { nickname, avatar }); setMsg('已保存'); onSaved(); }
+    try { await api.patch('/api/users/me', { nickname, realName, grade, className, remark, avatar }); setMsg('已保存'); onSaved(); }
     catch (e: any) { setMsg(e.message); } finally { setSaving(false); }
   };
+
+  const classOptions = grade ? CLASS_LIST : [];
 
   return (
     <div className="space-y-4">
@@ -450,18 +598,44 @@ function EditProfile({ user, onSaved }: { user: any; onSaved: () => void }) {
         <div className="flex h-16 w-16 items-center justify-center overflow-hidden rounded-full bg-gradient-to-br from-indigo-500 to-purple-600 text-2xl font-bold text-white">
           {avatar ? <img src={avatar} alt="" className="h-full w-full object-cover" /> : (nickname[0] || 'U').toUpperCase()}
         </div>
-        <div>
-          <p className="text-lg font-semibold text-gray-900">{user?.nickname || '用户'}</p>
-          <p className="text-sm text-gray-500">{user?.email}</p>
+        <div className="flex gap-2">
+          <label className="cursor-pointer rounded-lg bg-blue-50 px-3 py-1.5 text-xs text-blue-600 hover:bg-blue-100">
+            选择文件
+            <input type="file" accept="image/*" className="hidden" onChange={handleAvatarFile} />
+          </label>
+          <label className="cursor-pointer rounded-lg bg-purple-50 px-3 py-1.5 text-xs text-purple-600 hover:bg-purple-100">
+            拍照
+            <input type="file" accept="image/*" capture="user" className="hidden" onChange={handleAvatarFile} />
+          </label>
         </div>
       </div>
       <div>
-        <label className="mb-1 block text-sm font-medium text-gray-700">昵称</label>
+        <label className="mb-1 block text-sm font-medium text-gray-700">账号名</label>
         <input value={nickname} onChange={e => setNickname(e.target.value)} className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm" />
       </div>
       <div>
-        <label className="mb-1 block text-sm font-medium text-gray-700">头像 URL</label>
-        <input value={avatar} onChange={e => setAvatar(e.target.value)} className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm" />
+        <label className="mb-1 block text-sm font-medium text-gray-700">真实姓名</label>
+        <input value={realName} onChange={e => setRealName(e.target.value)} className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm" />
+      </div>
+      <div className="grid grid-cols-2 gap-3">
+        <div>
+          <label className="mb-1 block text-sm font-medium text-gray-700">年级</label>
+          <select value={grade} onChange={e => setGrade(e.target.value)} className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm">
+            <option value="">不填写</option>
+            {GRADES.map(g => <option key={g} value={g}>{g}</option>)}
+          </select>
+        </div>
+        <div>
+          <label className="mb-1 block text-sm font-medium text-gray-700">班级</label>
+          <select value={className} onChange={e => setClassName(e.target.value)} disabled={!grade} className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm disabled:opacity-50">
+            <option value="">不填写</option>
+            {classOptions.map(c => <option key={c} value={c}>{c}</option>)}
+          </select>
+        </div>
+      </div>
+      <div>
+        <label className="mb-1 block text-sm font-medium text-gray-700">备注</label>
+        <textarea value={remark} onChange={e => setRemark(e.target.value)} rows={2} className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm" />
       </div>
       {msg && <p className="text-sm text-green-600">{msg}</p>}
       <button onClick={save} disabled={saving} className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white disabled:opacity-50">{saving ? '保存中…' : '保存'}</button>

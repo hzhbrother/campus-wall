@@ -1,28 +1,32 @@
-// POST /api/auth/login  邮箱密码登录
+// POST /api/auth/login  账号名/邮箱 + 密码登录
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import bcrypt from 'bcryptjs';
+import { UserStatus } from '@prisma/client';
 import { prisma } from '@/lib/prisma';
 import { signToken, sanitize } from '@/lib/server-auth';
 import { errorResponse } from '@/lib/api-response';
 
 const Schema = z.object({
-  email: z.string().email(),
-  password: z.string().min(6),
+  account: z.string().min(1, '请输入账号名或邮箱'),
+  password: z.string().min(6, '密码至少6位'),
 });
 
 export async function POST(req: NextRequest) {
   try {
     const dto = Schema.parse(await req.json());
-    const user = await prisma.user.findUnique({ where: { email: dto.email } });
+    // 支持邮箱或昵称登录
+    const isEmail = dto.account.includes('@');
+    const where = isEmail ? { email: dto.account } : { nickname: dto.account };
+    const user = await prisma.user.findFirst({ where });
     if (!user || !user.password) {
-      return NextResponse.json({ message: '邮箱或密码错误' }, { status: 401 });
+      return NextResponse.json({ message: '账号或密码错误' }, { status: 401 });
     }
-    if (user.banned) {
+    if (user.status === UserStatus.BANNED) {
       return NextResponse.json({ message: '账号已被封禁, 请联系管理员' }, { status: 401 });
     }
     const ok = await bcrypt.compare(dto.password, user.password);
-    if (!ok) return NextResponse.json({ message: '邮箱或密码错误' }, { status: 401 });
+    if (!ok) return NextResponse.json({ message: '账号或密码错误' }, { status: 401 });
 
     const token = signToken({ sub: user.id, email: user.email, role: user.role });
     return NextResponse.json({ user: sanitize(user), token });

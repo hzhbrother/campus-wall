@@ -1,4 +1,4 @@
-// POST /api/auth/register  邮箱密码注册
+// POST /api/auth/register  账号名注册
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import bcrypt from 'bcryptjs';
@@ -8,10 +8,12 @@ import { signToken, sanitize } from '@/lib/server-auth';
 import { errorResponse } from '@/lib/api-response';
 
 const Schema = z.object({
-  email: z.string().email(),
-  password: z.string().min(6).max(64),
-  nickname: z.string().min(1).max(32),
-  studentId: z.string().max(20).optional(),
+  nickname: z.string().min(2, '账号名至少2位').max(32),
+  realName: z.string().max(32).optional().or(z.literal('')),
+  grade: z.string().max(20).optional().or(z.literal('')),
+  className: z.string().max(20).optional().or(z.literal('')),
+  password: z.string().min(6, '密码至少6位').max(64),
+  remark: z.string().max(200).optional().or(z.literal('')),
 });
 
 export async function POST(req: NextRequest) {
@@ -19,15 +21,23 @@ export async function POST(req: NextRequest) {
     const body = await req.json();
     const dto = Schema.parse(body);
 
-    const exists = await prisma.user.findUnique({ where: { email: dto.email } });
-    if (exists) return NextResponse.json({ message: '该邮箱已注册' }, { status: 409 });
+    // 账号名唯一
+    const exists = await prisma.user.findFirst({ where: { nickname: dto.nickname } });
+    if (exists) return NextResponse.json({ message: '该账号名已被使用' }, { status: 409 });
 
     const password = await bcrypt.hash(dto.password, 10);
     const user = await prisma.user.create({
-      data: { email: dto.email, password, nickname: dto.nickname, studentId: dto.studentId },
+      data: {
+        nickname: dto.nickname,
+        password,
+        realName: dto.realName || null,
+        grade: dto.grade || null,
+        className: dto.className || null,
+        remark: dto.remark || null,
+      },
     });
     await prisma.account.create({
-      data: { userId: user.id, provider: AccountProvider.LOCAL, providerUid: user.email! },
+      data: { userId: user.id, provider: AccountProvider.LOCAL, providerUid: user.nickname },
     });
 
     const token = signToken({ sub: user.id, email: user.email, role: user.role });

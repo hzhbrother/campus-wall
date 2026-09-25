@@ -1,6 +1,6 @@
 // GET /api/auth/callback/:provider  OAuth 回调, 换 token + 落库 + 跳回前端
 import { NextRequest, NextResponse } from 'next/server';
-import { AccountProvider } from '@prisma/client';
+import { AccountProvider, UserStatus } from '@prisma/client';
 import { prisma } from '@/lib/prisma';
 import { signToken, sanitize } from '@/lib/server-auth';
 import { fetchProfile } from '@/lib/oauth';
@@ -39,7 +39,7 @@ export async function GET(req: NextRequest, { params }: { params: { provider: st
     let linked = false;
     if (account) {
       user = await prisma.user.findUnique({ where: { id: account.userId } });
-      if (user?.banned) return feError('账号已被封禁');
+      if (user?.status === UserStatus.BANNED) return feError('账号已被封禁');
       linked = true;
     } else if (profile.email) {
       user = await prisma.user.findUnique({ where: { email: profile.email } });
