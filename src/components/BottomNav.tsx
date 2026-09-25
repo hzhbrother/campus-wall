@@ -12,7 +12,7 @@ export function BottomNav() {
 
   return (
     <nav className="fixed bottom-0 left-0 right-0 z-30 border-t border-slate-100 bg-white">
-      <div className="relative mx-auto flex items-center justify-around h-16" style={{ maxWidth: 640 }}>
+      <div className="relative mx-auto flex items-center justify-around h-16 max-w-[640px] md:max-w-4xl lg:max-w-5xl">
         <Link href="/" className={`flex flex-col items-center gap-0.5 no-underline ${isActive('/') ? 'text-blue-500' : 'text-slate-400'}`}>
           <svg className="h-6 w-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
             <path d="M3 9.5 12 3l9 6.5V20a1 1 0 0 1-1 1h-5v-6h-6v6H4a1 1 0 0 1-1-1V9.5Z" strokeLinecap="round" strokeLinejoin="round"/>

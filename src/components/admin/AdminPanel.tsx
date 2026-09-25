@@ -52,7 +52,7 @@ function OverviewTab() {
   return (
     <div>
       <SectionTitle title="数据概览" desc="平台核心运营数据" />
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
         {cards.map(c => (
           <div key={c.label} className="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm">
             <div className="text-sm text-gray-500">{c.label}</div>

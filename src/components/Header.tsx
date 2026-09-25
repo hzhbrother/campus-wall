@@ -56,7 +56,7 @@ export function Header() {
           {user?.banReason ? ` · 原因: ${user.banReason}` : ''} · 封禁期间无法发帖、评论
         </div>
       )}
-      <div className="mx-auto h-14 flex items-center justify-between px-4" style={{ maxWidth: 640 }}>
+      <div className="mx-auto h-14 flex items-center justify-between px-4 max-w-[640px] md:max-w-4xl lg:max-w-5xl">
         <div className="w-8" />
         <Link href="/" className="flex items-center gap-2 no-underline">
           {siteLogo ? (

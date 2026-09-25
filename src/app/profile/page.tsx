@@ -232,16 +232,21 @@ function ProfilePageInner() {
           <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="m15 18-6-6 6-6" strokeLinecap="round" strokeLinejoin="round"/></svg>
           返回
         </button>
-        <div className="flex flex-wrap gap-2">
-          {adminTabs.map(t => (
-            <button key={t.key} onClick={() => { setAdminTab(t.key); setView(t.key); }}
-              className={`px-3 py-1.5 rounded-full text-sm ${tab === t.key ? 'bg-slate-900 text-white' : 'bg-white text-gray-500 border border-gray-200'}`}>
-              {t.label}
-            </button>
-          ))}
-        </div>
-        <div className="rounded-2xl bg-white p-5 shadow-sm">
-          <AdminPanel tab={tab} isSuper={isSuper} />
+        {/* 移动端: 顶部横向标签; 桌面端: 左侧侧边栏 */}
+        <div className="flex flex-col md:flex-row md:gap-5">
+          {/* 侧边栏 (桌面端) / 横向标签 (移动端) */}
+          <div className="flex flex-row md:flex-col gap-2 md:w-40 md:shrink-0 overflow-x-auto no-scrollbar pb-1 md:pb-0">
+            {adminTabs.map(t => (
+              <button key={t.key} onClick={() => { setAdminTab(t.key); setView(t.key); }}
+                className={`shrink-0 px-3 py-1.5 rounded-full text-sm md:rounded-lg md:text-left ${tab === t.key ? 'bg-slate-900 text-white' : 'bg-white text-gray-500 border border-gray-200 hover:bg-gray-50'}`}>
+                {t.label}
+              </button>
+            ))}
+          </div>
+          {/* 内容区 */}
+          <div className="flex-1 min-w-0 rounded-2xl bg-white p-5 shadow-sm">
+            <AdminPanel tab={tab} isSuper={isSuper} />
+          </div>
         </div>
       </div>
     );
