@@ -1068,15 +1068,15 @@ function EditProfile({ user, onSaved, forcePhone = false }: { user: any; onSaved
 
   const save = async () => {
     setMsg(''); setPhoneError('');
-    // 手机号校验 (强制模式下必填)
-    if (forcePhone || phoneNumber) {
-      const v = validatePhone(countryCode, phoneNumber);
-      if (!v.ok) { setPhoneError(v.message || '手机号格式不正确'); return; }
-    }
+    // 真实姓名必填
+    if (!realName.trim()) { setMsg('请输入真实姓名'); return; }
+    // 手机号必填 (按区号位数校验)
+    const v = validatePhone(countryCode, phoneNumber);
+    if (!v.ok) { setPhoneError(v.message || '请输入手机号'); return; }
     setSaving(true);
     try {
       await api.patch('/api/users/me', {
-        nickname, realName, countryCode, phoneNumber: phoneNumber || '',
+        nickname, realName: realName.trim(), countryCode, phoneNumber,
         grade, className, remark, avatar,
       });
       setMsg('已保存');
@@ -1087,7 +1087,7 @@ function EditProfile({ user, onSaved, forcePhone = false }: { user: any; onSaved
   const country = getCountryByCode(countryCode);
 
   // ---- 行组件 (左标签 + 右值/箭头) ----
-  const Row = ({ label, children, onClick, border = true }: { label: string; children: React.ReactNode; onClick?: () => void; border?: boolean }) => (
+  const Row = ({ label, children, onClick, border = true }: { label: React.ReactNode; children: React.ReactNode; onClick?: () => void; border?: boolean }) => (
     <div
       className={`flex items-center justify-between px-1 py-3.5 ${border ? 'border-b border-gray-100' : ''} ${onClick ? 'cursor-pointer hover:bg-gray-50' : ''}`}
       onClick={onClick}
@@ -1119,7 +1119,7 @@ function EditProfile({ user, onSaved, forcePhone = false }: { user: any; onSaved
 
       {/* 强制模式提示 */}
       {forcePhone && (
-        <p className="mt-3 text-xs text-orange-500">为保障账号安全, 请先完善手机号信息</p>
+        <p className="mt-3 text-xs text-orange-500">为保障账号安全, 请先完善真实姓名和手机号信息</p>
       )}
 
       {/* 昵称 */}
@@ -1136,7 +1136,7 @@ function EditProfile({ user, onSaved, forcePhone = false }: { user: any; onSaved
       <div className="border-b border-gray-100 py-3.5">
         <div className="flex items-center justify-between">
           <span className="text-[15px] text-gray-800">
-            手机号{forcePhone && <span className="ml-1 text-red-500">*</span>}
+            手机号<span className="ml-1 text-red-500">*</span>
           </span>
           <div className="flex items-center gap-2">
             {/* 区号选择 */}
@@ -1154,7 +1154,7 @@ function EditProfile({ user, onSaved, forcePhone = false }: { user: any; onSaved
               value={phoneNumber}
               onChange={e => { setPhoneNumber(e.target.value.replace(/\D/g, '')); setPhoneError(''); }}
               className="w-28 text-right text-[15px] text-gray-900 outline-none"
-              placeholder={forcePhone ? '请输入手机号' : '选填'}
+              placeholder="请输入手机号"
               maxLength={Math.max(...country.lengths)}
             />
           </div>
@@ -1163,12 +1163,12 @@ function EditProfile({ user, onSaved, forcePhone = false }: { user: any; onSaved
       </div>
 
       {/* 真实姓名 */}
-      <Row label="真实姓名">
+      <Row label={<>真实姓名<span className="ml-1 text-red-500">*</span></>}>
         <input
           value={realName}
           onChange={e => setRealName(e.target.value)}
           className="w-32 text-right text-[15px] text-gray-900 outline-none"
-          placeholder="选填"
+          placeholder="请输入真实姓名"
         />
       </Row>
 
