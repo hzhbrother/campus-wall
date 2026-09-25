@@ -1,0 +1,93 @@
+// 管理后台业务逻辑
+import { UserRole, PostStatus } from '@prisma/client';
+import { Prisma } from '@prisma/client';
+import { prisma } from '@/lib/prisma';
+
+export async function stats() {
+  const [users, posts, pendingPosts, comments, paidOrders, revenueAgg] = await Promise.all([
+    prisma.user.count(),
+    prisma.post.count(),
+    prisma.post.count({ where: { status: PostStatus.PENDING } }),
+    prisma.comment.count(),
+    prisma.order.count({ where: { status: 'PAID' } }),
+    prisma.order.aggregate({ where: { status: 'PAID' }, _sum: { amount: true } }),
+  ]);
+  return { users, posts, pendingPosts, comments, paidOrders, revenueCents: revenueAgg._sum.amount || 0 };
+}
+
+export async function moderationQueue(page: number, pageSize: number) {
+  const where = { status: PostStatus.PENDING };
+  const [items, total] = await Promise.all([
+    prisma.post.findMany({
+      where,
+      orderBy: { createdAt: 'asc' },
+      skip: (page - 1) * pageSize,
+      take: pageSize,
+      include: { author: { select: { id: true, nickname: true, avatar: true } } },
+    }),
+    prisma.post.count({ where }),
+  ]);
+  return { items, total, page, pageSize };
+}
+
+export async function approve(postId: string, actorId: string) {
+  const post = await prisma.post.findUnique({ where: { id: postId } });
+  if (!post) throw new Error('帖子不存在');
+  const updated = await prisma.post.update({ where: { id: postId }, data: { status: PostStatus.APPROVED } });
+  await audit(actorId, 'APPROVE_POST', postId);
+  return updated;
+}
+
+export async function reject(postId: string, actorId: string, reason?: string) {
+  const post = await prisma.post.findUnique({ where: { id: postId } });
+  if (!post) throw new Error('帖子不存在');
+  const updated = await prisma.post.update({ where: { id: postId }, data: { status: PostStatus.REJECTED } });
+  await audit(actorId, 'REJECT_POST', postId, reason);
+  return updated;
+}
+
+export async function setPinned(postId: string, pinned: boolean, actorId: string) {
+  const post = await prisma.post.findUnique({ where: { id: postId } });
+  if (!post) throw new Error('帖子不存在');
+  const updated = await prisma.post.update({ where: { id: postId }, data: { pinned } });
+  await audit(actorId, pinned ? 'PIN_POST' : 'UNPIN_POST', postId);
+  return updated;
+}
+
+export async function listUsers(page: number, pageSize: number, role?: UserRole, kw?: string) {
+  const where: Prisma.UserWhereInput = {
+    ...(role ? { role } : {}),
+    ...(kw ? { OR: [{ nickname: { contains: kw } }, { email: { contains: kw } }] } : {}),
+  };
+  const [items, total] = await Promise.all([
+    prisma.user.findMany({
+      where,
+      orderBy: { createdAt: 'desc' },
+      skip: (page - 1) * pageSize,
+      take: pageSize,
+      select: { id: true, email: true, nickname: true, avatar: true, role: true, banned: true, createdAt: true, _count: { select: { posts: true } } },
+    }),
+    prisma.user.count({ where }),
+  ]);
+  return { items, total, page, pageSize };
+}
+
+export async function setRole(userId: string, role: UserRole, actorId: string) {
+  const user = await prisma.user.findUnique({ where: { id: userId } });
+  if (!user) throw new Error('用户不存在');
+  const updated = await prisma.user.update({ where: { id: userId }, data: { role } });
+  await audit(actorId, 'SET_ROLE', userId, `role=${role}`);
+  return updated;
+}
+
+export async function setBanned(userId: string, banned: boolean, actorId: string) {
+  const user = await prisma.user.findUnique({ where: { id: userId } });
+  if (!user) throw new Error('用户不存在');
+  const updated = await prisma.user.update({ where: { id: userId }, data: { banned } });
+  await audit(actorId, banned ? 'BAN_USER' : 'UNBAN_USER', userId);
+  return updated;
+}
+
+async function audit(actorId: string, action: string, target: string, detail?: string) {
+  await prisma.auditLog.create({ data: { actorId, action, target, detail } });
+}

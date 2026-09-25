@@ -1,0 +1,180 @@
+// 校园墙 Prisma schema
+// 数据库: PostgreSQL (Neon / 自建均可)
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DATABASE_URL")
+}
+
+// ---- 枚举 ----
+
+enum UserRole {
+  USER        // 普通用户
+  ADMIN       // 管理员 (校内运营)
+  SUPER_ADMIN // 超级管理员
+}
+
+enum AccountProvider {
+  LOCAL
+  GITHUB
+  GOOGLE
+  WECHAT
+  QQ
+  WEIBO
+}
+
+enum PostStatus {
+  PENDING   // 待审核
+  APPROVED  // 已通过
+  REJECTED  // 已驳回
+}
+
+enum OrderType {
+  PIN     // 帖子置顶推广
+  REWARD  // 打赏作者
+  VIP     // 会员订阅
+}
+
+enum OrderStatus {
+  PENDING // 待支付
+  PAID    // 已支付
+  FAILED  // 失败
+  REFUNDED // 已退款
+}
+
+// ---- 模型 ----
+
+model User {
+  id           String           @id @default(cuid())
+  email        String?          @unique // OAuth-only 用户可为空
+  password     String?          // 本地密码 hash, OAuth 用户为空
+  nickname     String
+  avatar       String?
+  studentId    String?          // 学号 (可选实名)
+  role         UserRole         @default(USER)
+  banned       Boolean          @default(false)
+  createdAt    DateTime         @default(now())
+  updatedAt    DateTime         @updatedAt
+
+  accounts     Account[]
+  posts        Post[]
+  comments     Comment[]
+  likes        Like[]
+  orders       Order[]
+  auditLogs    AuditLog[]
+
+  @@index([email])
+  @@index([role])
+}
+
+// 第三方账号绑定 (一个用户可绑定多个平台)
+model Account {
+  id             String           @id @default(cuid())
+  userId         String
+  provider       AccountProvider
+  providerUid    String           // 第三方用户唯一ID
+  rawProfile      Json?
+  createdAt      DateTime         @default(now())
+
+  user           User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerUid])
+  @@index([userId])
+}
+
+model Post {
+  id           String       @id @default(cuid())
+  authorId     String
+  title        String
+  content      String
+  category     String       @default("校园") // 校园/失物/二手/表白/招聘 等
+  images       String[]     @default([])
+  isAnonymous  Boolean      @default(false)
+  status       PostStatus   @default(PENDING)
+  pinned       Boolean      @default(false)
+  viewCount    Int          @default(0)
+  likeCount    Int          @default(0)
+  commentCount Int          @default(0)
+  createdAt    DateTime     @default(now())
+  updatedAt    DateTime     @updatedAt
+
+  author       User         @relation(fields: [authorId], references: [id], onDelete: Cascade)
+  comments     Comment[]
+  likes        Like[]
+  orders       Order[]      // 关联的置顶/打赏订单
+
+  @@index([authorId])
+  @@index([status, createdAt])
+  @@index([category])
+}
+
+model Comment {
+  id         String    @id @default(cuid())
+  postId     String
+  authorId   String
+  content    String
+  parentId   String?    // 支持楼中楼回复
+  createdAt  DateTime  @default(now())
+
+  post       Post      @relation(fields: [postId], references: [id], onDelete: Cascade)
+  author     User      @relation(fields: [authorId], references: [id], onDelete: Cascade)
+  parent     Comment?  @relation("CommentReply", fields: [parentId], references: [id], onDelete: SetNull)
+  replies    Comment[] @relation("CommentReply")
+
+  @@index([postId, createdAt])
+  @@index([authorId])
+}
+
+model Like {
+  id        String   @id @default(cuid())
+  postId    String
+  userId    String
+  createdAt DateTime @default(now())
+
+  post      Post     @relation(fields: [postId], references: [id], onDelete: Cascade)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([postId, userId])
+  @@index([userId])
+}
+
+model Order {
+  id              String       @id @default(cuid())
+  userId          String
+  postId          String?
+  type            OrderType
+  amount          Int          // 单位: 分
+  currency        String       @default("CNY")
+  status          OrderStatus @default(PENDING)
+  provider        String       @default("mock")
+  providerOrderNo String?
+  subject         String
+  createdAt       DateTime     @default(now())
+  paidAt          DateTime?
+
+  user            User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  post            Post?        @relation(fields: [postId], references: [id], onDelete: SetNull)
+
+  @@index([userId, createdAt])
+  @@index([status])
+  @@index([providerOrderNo])
+}
+
+model AuditLog {
+  id        String   @id @default(cuid())
+  actorId   String
+  action    String   // APPROVE_POST / BAN_USER / SET_ROLE ...
+  target    String
+  detail    String?
+  createdAt DateTime @default(now())
+
+  actor     User     @relation(fields: [actorId], references: [id], onDelete: SetNull)
+
+  @@index([actorId])
+  @@index([createdAt])
+}
