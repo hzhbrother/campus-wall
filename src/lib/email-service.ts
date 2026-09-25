@@ -7,26 +7,43 @@ export interface SmtpConfig {
   port: number;
   user: string;
   pass: string;
-  from: string;
+  from: string;       // 发件人显示 (Name <email> 或纯邮箱)
   secure: boolean;
 }
 
 // 从数据库读取 SMTP 配置
 export async function getSmtpConfig(): Promise<SmtpConfig | null> {
-  const keys = ['smtp_host', 'smtp_port', 'smtp_user', 'smtp_pass', 'smtp_from', 'smtp_secure'];
+  const keys = ['smtp_enabled', 'smtp_host', 'smtp_port', 'smtp_user', 'smtp_pass', 'smtp_from', 'smtp_from_name', 'smtp_from_email', 'smtp_secure'];
   const rows = await prisma.siteConfig.findMany({ where: { key: { in: keys } } });
   const map = new Map(rows.map(r => [r.key, r.value]));
+
+  // 邮件服务总开关
+  const enabled = map.get('smtp_enabled');
+  if (enabled === 'false') return null;
+
   const host = map.get('smtp_host');
   const port = map.get('smtp_port');
   const user = map.get('smtp_user');
   const pass = map.get('smtp_pass');
   if (!host || !port || !user || !pass) return null;
+
+  // 发件人: 优先 smtp_from_name + smtp_from_email, 其次 smtp_from, 最后 smtp_user
+  const fromName = map.get('smtp_from_name');
+  const fromEmail = map.get('smtp_from_email');
+  const fromLegacy = map.get('smtp_from');
+  let from: string;
+  if (fromEmail) {
+    from = fromName ? `${fromName} <${fromEmail}>` : fromEmail;
+  } else {
+    from = fromLegacy || user;
+  }
+
   return {
     host,
     port: parseInt(port, 10),
     user,
     pass,
-    from: map.get('smtp_from') || user,
+    from,
     secure: map.get('smtp_secure') === 'true',
   };
 }
@@ -58,7 +75,7 @@ export async function sendEmail(to: string, subject: string, html: string): Prom
   }
   const cfg = await getSmtpConfig();
   if (!cfg) {
-    console.warn('[email] SMTP 未配置, 跳过发送');
+    console.warn('[email] SMTP 未配置或未启用, 跳过发送');
     return false;
   }
   try {

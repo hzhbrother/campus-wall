@@ -251,6 +251,7 @@ function ProfilePageInner() {
       { key: 'users', label: '用户管理' },
       { key: 'appeals', label: '申诉审核' },
       { key: 'notifications', label: '通知发布' },
+      { key: 'email', label: '邮件配置' },
       { key: 'settings', label: '站点设置' },
       { key: 'agreement', label: '协议管理' },
     ];

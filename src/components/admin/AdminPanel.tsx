@@ -3,7 +3,7 @@
 import { useEffect, useState, useCallback } from 'react';
 import { api } from '@/lib/api';
 
-export type AdminTab = 'overview' | 'posts' | 'moderation' | 'comments' | 'users' | 'appeals' | 'notifications' | 'settings' | 'agreement';
+export type AdminTab = 'overview' | 'posts' | 'moderation' | 'comments' | 'users' | 'appeals' | 'notifications' | 'settings' | 'email' | 'agreement';
 
 // ---------- 通用 UI ----------
 function SectionTitle({ title, desc }: { title: string; desc?: string }) {
@@ -1050,7 +1050,8 @@ function NotificationSender() {
 }
 
 // ---------- 站点设置 (管理员) ----------
-function SiteSettings() {
+// ---------- 邮件配置 (独立页面) ----------
+function EmailSettings() {
   const [cfg, setCfg] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -1064,8 +1065,7 @@ function SiteSettings() {
   }, []);
 
   const set = (k: string, v: string) => setCfg({ ...cfg, [k]: v });
-  const bool = (k: string, def = true) => cfg[k] === undefined ? def : cfg[k] === 'true';
-  const setBool = (k: string, v: boolean) => set(k, String(v));
+  const enabled = cfg.smtp_enabled === undefined ? true : cfg.smtp_enabled === 'true';
 
   const save = async () => {
     setSaving(true); setMsg('');
@@ -1086,7 +1086,107 @@ function SiteSettings() {
 
   return (
     <div>
-      <SectionTitle title="站点设置" desc="站点信息、SMTP 邮件、功能开关与内容配置" />
+      <SectionTitle title="邮件配置" desc="配置 SMTP 邮件服务，用于密码重置、通知推送等" />
+      {msg && <div className={`mb-3 text-sm ${msg.includes('成功') ? 'text-green-600' : 'text-red-500'}`}>{msg}</div>}
+
+      <div className="space-y-5">
+        {/* 服务配置 */}
+        <div className="rounded-xl border border-gray-100 p-4">
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="font-semibold text-gray-900 flex items-center gap-2">
+              <span>🔌</span> 服务配置
+            </h3>
+            <label className="flex items-center gap-2 cursor-pointer">
+              <input type="checkbox" checked={enabled} onChange={e => set('smtp_enabled', String(e.target.checked))} className="h-5 w-5" />
+              <span className="text-sm text-gray-600">{enabled ? '已启用' : '已停用'}</span>
+            </label>
+          </div>
+
+          <div className="space-y-3">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">SMTP 服务器</label>
+              <input value={cfg.smtp_host || ''} onChange={e => set('smtp_host', e.target.value)} className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm" placeholder="smtp.163.com" />
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">端口</label>
+                <input value={cfg.smtp_port || ''} onChange={e => set('smtp_port', e.target.value)} className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm" placeholder="465" />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">加密方式</label>
+                <select value={cfg.smtp_secure || 'true'} onChange={e => set('smtp_secure', e.target.value)} className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm">
+                  <option value="true">SSL/TLS</option>
+                  <option value="false">不加密 (STARTTLS/587)</option>
+                </select>
+              </div>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">发件人账号</label>
+              <input value={cfg.smtp_user || ''} onChange={e => set('smtp_user', e.target.value)} className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm" placeholder="your-email@163.com" />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">授权码 / 密码</label>
+              <input type="password" value={cfg.smtp_pass || ''} onChange={e => set('smtp_pass', e.target.value)} className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm" placeholder="••••••••••••" />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">发件人邮箱 (FROM EMAIL)</label>
+              <input value={cfg.smtp_from_email || ''} onChange={e => set('smtp_from_email', e.target.value)} className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm" placeholder="通常与发件人账号一致" />
+              <p className="text-xs text-gray-400 mt-1">通常与发件人账号一致，部分服务商强制要求一致。</p>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">发件人姓名</label>
+              <input value={cfg.smtp_from_name || ''} onChange={e => set('smtp_from_name', e.target.value)} className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm" placeholder="校园墙" />
+            </div>
+          </div>
+        </div>
+
+        {/* 服务测试 */}
+        <div className="rounded-xl border border-gray-100 p-4">
+          <h3 className="font-semibold text-gray-900 mb-3 flex items-center gap-2">
+            <span>📤</span> 服务测试
+          </h3>
+          <div className="space-y-3">
+            <div className="flex gap-2">
+              <input value={testEmail} onChange={e => setTestEmail(e.target.value)} placeholder="输入收件邮箱测试" className="flex-1 rounded-lg border border-gray-300 px-3 py-2 text-sm" />
+              <button onClick={sendTest} disabled={testing || !enabled} className="rounded-lg bg-green-600 px-4 py-2 text-sm font-medium text-white disabled:opacity-50 hover:bg-green-700">{testing ? '发送中…' : '发送测试'}</button>
+            </div>
+            {testMsg && <p className={`text-xs ${testMsg.includes('成功') || testMsg.includes('已') ? 'text-green-600' : 'text-red-500'}`}>{testMsg}</p>}
+          </div>
+        </div>
+
+        <button onClick={save} disabled={saving} className="w-full rounded-lg bg-blue-600 py-2.5 text-sm font-medium text-white disabled:opacity-50 hover:bg-blue-700">
+          {saving ? '保存中…' : '保存配置'}
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function SiteSettings() {
+  const [cfg, setCfg] = useState<Record<string, string>>({});
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [msg, setMsg] = useState('');
+
+  useEffect(() => {
+    api.get('/api/admin/site-config').then(setCfg).catch(console.error).finally(() => setLoading(false));
+  }, []);
+
+  const set = (k: string, v: string) => setCfg({ ...cfg, [k]: v });
+  const bool = (k: string, def = true) => cfg[k] === undefined ? def : cfg[k] === 'true';
+  const setBool = (k: string, v: boolean) => set(k, String(v));
+
+  const save = async () => {
+    setSaving(true); setMsg('');
+    try { await api.patch('/api/admin/site-config', cfg); setMsg('保存成功'); }
+    catch (e: any) { setMsg(e.message); } finally { setSaving(false); }
+  };
+
+  if (loading) return <p className="py-6 text-center text-gray-400">加载中…</p>;
+
+  return (
+    <div>
+      <SectionTitle title="站点设置" desc="站点信息、功能开关与内容配置" />
       {msg && <div className={`mb-3 text-sm ${msg.includes('成功') ? 'text-green-600' : 'text-red-500'}`}>{msg}</div>}
 
       <div className="space-y-5">
@@ -1127,50 +1227,6 @@ function SiteSettings() {
                 <input value={cfg.site_icp || ''} onChange={e => set('site_icp', e.target.value)} className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm" placeholder="京ICP备xxxxxxxx号" />
               </div>
             </div>
-          </div>
-        </div>
-
-        <div className="rounded-xl border border-gray-100 p-4">
-          <h3 className="font-semibold text-gray-900 mb-3">📧 SMTP 邮件配置</h3>
-          <div className="space-y-3">
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">SMTP 服务器</label>
-                <input value={cfg.smtp_host || ''} onChange={e => set('smtp_host', e.target.value)} className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm" placeholder="smtp.qq.com" />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">端口</label>
-                <input value={cfg.smtp_port || ''} onChange={e => set('smtp_port', e.target.value)} className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm" placeholder="465" />
-              </div>
-            </div>
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">邮箱账号</label>
-                <input value={cfg.smtp_user || ''} onChange={e => set('smtp_user', e.target.value)} className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm" placeholder="xxx@qq.com" />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">授权码/密码</label>
-                <input type="password" value={cfg.smtp_pass || ''} onChange={e => set('smtp_pass', e.target.value)} className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm" placeholder="授权码" />
-              </div>
-            </div>
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">发件人</label>
-                <input value={cfg.smtp_from || ''} onChange={e => set('smtp_from', e.target.value)} className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm" placeholder="校园墙 <xxx@qq.com>" />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">SSL</label>
-                <select value={cfg.smtp_secure || 'true'} onChange={e => set('smtp_secure', e.target.value)} className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm">
-                  <option value="true">开启 (465)</option>
-                  <option value="false">关闭 (587)</option>
-                </select>
-              </div>
-            </div>
-            <div className="flex gap-2 pt-1">
-              <input value={testEmail} onChange={e => setTestEmail(e.target.value)} placeholder="输入收件邮箱测试" className="flex-1 rounded-lg border border-gray-300 px-3 py-2 text-sm" />
-              <button onClick={sendTest} disabled={testing} className="rounded-lg bg-green-600 px-4 py-2 text-sm font-medium text-white disabled:opacity-50">{testing ? '发送中…' : '发送测试'}</button>
-            </div>
-            {testMsg && <p className={`text-xs ${testMsg.includes('成功') || testMsg.includes('已') ? 'text-green-600' : 'text-red-500'}`}>{testMsg}</p>}
           </div>
         </div>
 
@@ -1489,6 +1545,7 @@ export function AdminPanel({ tab, isSuper }: { tab: AdminTab; isSuper: boolean }
     case 'appeals': return <BanAppealsTab />;
     case 'notifications': return <NotificationSender />;
     case 'settings': return <SiteSettings />;
+    case 'email': return <EmailSettings />;
     case 'agreement': return <AgreementManager />;
     default: return <OverviewTab />;
   }
