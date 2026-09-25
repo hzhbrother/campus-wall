@@ -38,7 +38,13 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
     }
     // 异步累加浏览量 (不阻塞返回)
     prisma.post.update({ where: { id: params.id }, data: { viewCount: { increment: 1 } } }).catch(() => {});
-    return NextResponse.json(post);
+    // 检查当前用户是否已收藏
+    const viewer = await getUserFromRequest(req);
+    let favorited = false;
+    if (viewer) {
+      favorited = (await prisma.favorite.count({ where: { userId: viewer.id, postId: params.id } })) > 0;
+    }
+    return NextResponse.json({ ...post, favorited });
   } catch (e) {
     return errorResponse(e);
   }

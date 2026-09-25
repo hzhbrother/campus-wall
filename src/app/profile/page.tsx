@@ -1354,9 +1354,12 @@ function ProfilePageInner() {
   // ---- 首页视图 ----
   const menuItems = [
     { key: 'homepage', label: '我的主页', icon: '🏠' },
+    { key: 'favorites', label: '我的收藏', icon: '⭐' },
     { key: 'password', label: '修改密码', icon: '🔑' },
     { key: 'notif-settings', label: '通知设置', icon: '🔔' },
     { key: 'blacklist', label: '拉黑名单', icon: '🚫' },
+    { key: 'violations', label: '违规记录', icon: '📋' },
+    { key: 'ban-appeal', label: '封禁申诉', icon: '✊' },
     { key: 'feedback', label: '意见反馈', icon: '💬' },
     ...(isAdmin ? [{ key: 'admin', label: '管理后台', icon: '⚙️' }] : []),
     { key: 'about', label: '关于校园墙', icon: 'ℹ️' },
@@ -1367,6 +1370,9 @@ function ProfilePageInner() {
   const handleMenu = (key: string) => {
     if (key === 'admin') { setView('admin'); return; }
     if (key === 'homepage') { router.push(`/users/${user?.id}`); return; }
+    if (key === 'favorites') { router.push('/profile/favorites'); return; }
+    if (key === 'violations') { router.push('/profile/violations'); return; }
+    if (key === 'ban-appeal') { router.push('/profile/ban-appeal'); return; }
     if (key === 'password') { setShowPwdModal(true); return; }
     if (key === 'notif-settings') { setShowNotifModal(true); return; }
     if (key === 'agreement') { router.push('/agreement'); return; }

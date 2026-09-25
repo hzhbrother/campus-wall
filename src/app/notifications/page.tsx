@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState, useCallback } from 'react';
+import { useRouter } from 'next/navigation';
 import { api } from '@/lib/api';
 
 interface Notification {
@@ -14,7 +15,7 @@ interface Notification {
 }
 
 const TYPE_LABEL: Record<string, string> = {
-  SYSTEM: '系统', POST: '帖子', COMMENT: '评论', LIKE: '点赞', ANNOUNCE: '公告',
+  SYSTEM: '系统', POST: '帖子', COMMENT: '评论', LIKE: '点赞', ANNOUNCE: '公告', BAN: '封禁',
 };
 const TYPE_COLOR: Record<string, string> = {
   SYSTEM: 'bg-blue-100 text-blue-700',
@@ -22,6 +23,7 @@ const TYPE_COLOR: Record<string, string> = {
   COMMENT: 'bg-green-100 text-green-700',
   LIKE: 'bg-red-100 text-red-700',
   ANNOUNCE: 'bg-amber-100 text-amber-700',
+  BAN: 'bg-red-100 text-red-700',
 };
 
 function fmtTime(iso: string) {
@@ -37,6 +39,7 @@ function fmtTime(iso: string) {
 }
 
 export default function NotificationsPage() {
+  const router = useRouter();
   const [items, setItems] = useState<Notification[]>([]);
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
@@ -128,7 +131,11 @@ export default function NotificationsPage() {
       ) : (
         <div className="space-y-2">
           {items.map(n => (
-            <div key={n.id} className={`bg-white rounded-2xl p-4 shadow-sm ${!n.isRead ? 'border-l-4 border-blue-500' : ''}`}>
+            <div
+              key={n.id}
+              className={`bg-white rounded-2xl p-4 shadow-sm ${!n.isRead ? 'border-l-4 border-blue-500' : ''} ${n.link ? 'cursor-pointer hover:bg-slate-50' : ''}`}
+              onClick={() => { if (n.link) { markRead(n.id); router.push(n.link); } }}
+            >
               <div className="flex items-start justify-between gap-3">
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 mb-1">
@@ -138,9 +145,10 @@ export default function NotificationsPage() {
                   </div>
                   <p className="text-sm text-slate-600 line-clamp-2 whitespace-pre-wrap">{n.content}</p>
                   <p className="mt-1.5 text-xs text-slate-400">{fmtTime(n.createdAt)}</p>
+                  {n.link && <p className="mt-1 text-xs text-blue-500">点击查看 →</p>}
                 </div>
                 {!n.isRead && (
-                  <button onClick={() => markRead(n.id)} className="shrink-0 text-xs text-slate-400 hover:text-blue-500">标为已读</button>
+                  <button onClick={(e) => { e.stopPropagation(); markRead(n.id); }} className="shrink-0 text-xs text-slate-400 hover:text-blue-500">标为已读</button>
                 )}
               </div>
             </div>

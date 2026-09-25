@@ -65,6 +65,22 @@ enum NotificationType {
   COMMENT  // 评论回复
   LIKE     // 点赞
   ANNOUNCE // 公告
+  BAN      // 封禁通知
+}
+
+enum AppealStatus {
+  PENDING   // 待处理
+  APPROVED  // 申诉通过(已解封)
+  REJECTED  // 申诉驳回
+}
+
+enum ViolationType {
+  SPAM        // 垃圾广告
+  ABUSE       // 辱骂攻击
+  PORN        // 色情低俗
+  ILLEGAL     // 违法违规
+  PLAGIARISM  // 抄袭侵权
+  OTHER       // 其他
 }
 
 enum NotificationTarget {
@@ -93,6 +109,7 @@ model User {
   status       UserStatus       @default(NORMAL)
   bannedUntil  DateTime?        // 封禁到期时间 (null=未临时封禁)
   banReason    String?          // 封禁原因
+  credibilityScore Int          @default(100) // 诚信分 (0-100)
   createdAt    DateTime         @default(now())
   updatedAt    DateTime         @updatedAt
 
@@ -100,8 +117,12 @@ model User {
   posts        Post[]
   comments     Comment[]
   likes        Like[]
+  favorites    Favorite[]
   orders       Order[]
   auditLogs    AuditLog[]
+  banRecords   BanRecord[]
+  appeals      BanAppeal[]
+  violations   ViolationRecord[]
   notifications Notification[]
   notificationSettings NotificationSetting?
 
@@ -144,6 +165,7 @@ model Post {
   author       User         @relation(fields: [authorId], references: [id], onDelete: Cascade)
   comments     Comment[]
   likes        Like[]
+  favorites    Favorite[]
   orders       Order[]      // 关联的置顶/打赏订单
 
   @@index([authorId])
@@ -246,6 +268,76 @@ model NotificationSetting {
   updatedAt       DateTime @updatedAt
 
   user            User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+// ---- 收藏 ----
+
+model Favorite {
+  id        String   @id @default(cuid())
+  userId    String
+  postId    String
+  createdAt DateTime @default(now())
+
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  post      Post     @relation(fields: [postId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, postId])
+  @@index([userId])
+}
+
+// ---- 封禁记录 ----
+
+model BanRecord {
+  id           String    @id @default(cuid())
+  userId       String
+  reason       String    // 封禁原因
+  durationDays Int       // 封禁天数 (0=永久)
+  bannedUntil  DateTime? // 封禁到期时间 (永久封禁为 null)
+  isPermanent  Boolean   @default(false)
+  createdAt    DateTime  @default(now())
+  liftedAt     DateTime? // 解封时间
+  liftedReason  String?  // 解封原因
+
+  user         User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  appeals      BanAppeal[]
+
+  @@index([userId, createdAt])
+}
+
+// ---- 封禁申诉 ----
+
+model BanAppeal {
+  id           String       @id @default(cuid())
+  userId       String
+  banRecordId  String
+  reason       String       // 申诉原因
+  content      String       // 申诉内容
+  images       String[]     @default([]) // 申诉图片 (压缩后 base64)
+  status       AppealStatus @default(PENDING)
+  reviewerNote String?      // 审核备注
+  createdAt    DateTime     @default(now())
+  reviewedAt   DateTime?
+
+  user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  banRecord    BanRecord    @relation(fields: [banRecordId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt])
+}
+
+// ---- 违规记录 (用于诚信分) ----
+
+model ViolationRecord {
+  id             String        @id @default(cuid())
+  userId         String
+  type           ViolationType @default(OTHER)
+  reason         String        // 违规原因描述
+  pointsDeducted Int           // 扣除的诚信分
+  relatedPostId  String?       // 关联帖子
+  createdAt      DateTime      @default(now())
+
+  user           User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt])
 }
 
 // ---- 站点配置 (键值对存储, 含 SMTP 等) ----

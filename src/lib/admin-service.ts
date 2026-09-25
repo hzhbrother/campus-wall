@@ -163,18 +163,41 @@ export async function updateUser(userId: string, data: {
 export async function banUser(userId: string, durationDays: number, reason: string, actorId: string) {
   const user = await prisma.user.findUnique({ where: { id: userId } });
   if (!user) throw new Error('用户不存在');
+  const isPermanent = durationDays <= 0;
+  const bannedUntil = isPermanent ? null : new Date(Date.now() + durationDays * 24 * 60 * 60 * 1000);
   const data: any = { banReason: reason || null };
-  if (durationDays <= 0) {
-    // 永久封禁: status=BANNED, bannedUntil=null
+  if (isPermanent) {
     data.status = UserStatus.BANNED;
     data.bannedUntil = null;
   } else {
-    // 临时封禁: bannedUntil = now + days, status 保持 NORMAL (可登录但受限)
     data.status = UserStatus.NORMAL;
-    data.bannedUntil = new Date(Date.now() + durationDays * 24 * 60 * 60 * 1000);
+    data.bannedUntil = bannedUntil;
   }
   const updated = await prisma.user.update({ where: { id: userId }, data });
-  await audit(actorId, 'BAN_USER', userId, durationDays <= 0 ? '永久封禁' : `封禁${durationDays}天`);
+
+  // 记录封禁记录
+  const banRecord = await prisma.banRecord.create({
+    data: {
+      userId,
+      reason: reason || '',
+      durationDays,
+      bannedUntil,
+      isPermanent,
+    },
+  });
+
+  // 发送封禁通知到铃铛
+  const { createNotification } = await import('@/lib/notification-service');
+  const { NotificationType } = await import('@prisma/client');
+  await createNotification({
+    userId,
+    type: NotificationType.BAN,
+    title: isPermanent ? '账号被永久封禁' : `账号被封禁 ${durationDays} 天`,
+    content: `封禁原因: ${reason || '未填写'}\n如有异议, 可点击下方按钮进行申诉。`,
+    link: '/profile/ban-appeal',
+  });
+
+  await audit(actorId, 'BAN_USER', userId, isPermanent ? '永久封禁' : `封禁${durationDays}天`);
   return updated;
 }
 
@@ -185,6 +208,20 @@ export async function unbanUser(userId: string, actorId: string) {
   const updated = await prisma.user.update({
     where: { id: userId },
     data: { status: UserStatus.NORMAL, bannedUntil: null, banReason: null },
+  });
+  // 标记最近一条封禁记录为已解封
+  await prisma.banRecord.updateMany({
+    where: { userId, liftedAt: null },
+    data: { liftedAt: new Date(), liftedReason: '管理员解封' },
+  });
+  // 发送解封通知
+  const { createNotification } = await import('@/lib/notification-service');
+  const { NotificationType } = await import('@prisma/client');
+  await createNotification({
+    userId,
+    type: NotificationType.SYSTEM,
+    title: '账号已解封',
+    content: '您的账号已解除封禁, 可正常使用发帖、评论等功能。',
   });
   await audit(actorId, 'UNBAN_USER', userId);
   return updated;

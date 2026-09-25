@@ -1,13 +1,13 @@
 // POST /api/posts/:id/like  点赞/取消 (toggle)
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
-import { requireUser, isUserBanned } from '@/lib/server-auth';
+import { requireUser } from '@/lib/server-auth';
 import { errorResponse } from '@/lib/api-response';
 
 export async function POST(req: NextRequest, { params }: { params: { id: string } }) {
   try {
     const me = await requireUser(req);
-    if (isUserBanned(me)) return NextResponse.json({ message: '账号已被封禁, 暂不能点赞' }, { status: 403 });
+    // 临时封禁用户仍可点赞, 永久封禁无法登录
     const post = await prisma.post.findUnique({ where: { id: params.id } });
     if (!post) return NextResponse.json({ message: '帖子不存在' }, { status: 404 });
 

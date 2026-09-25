@@ -11,6 +11,7 @@ interface PostDetail {
   id: string; title: string; content: string; category: string; images: string[];
   isAnonymous: boolean; status: string; pinned: boolean;
   viewCount: number; likeCount: number; commentCount: number;
+  favorited?: boolean;
   createdAt: string; author: Author; comments: Comment[];
 }
 
@@ -22,10 +23,13 @@ export default function PostDetailPage({ params }: { params: { id: string } }) {
   const [err, setErr] = useState('');
   const [comment, setComment] = useState('');
   const [busy, setBusy] = useState(false);
+  const [favorited, setFavorited] = useState(false);
 
   const load = async () => {
     try {
-      setPost(await api.get<PostDetail>(`/api/posts/${id}`));
+      const p = await api.get<PostDetail>(`/api/posts/${id}`);
+      setPost(p);
+      setFavorited(!!p.favorited);
     } catch (e: any) {
       setErr(e.message);
     }
@@ -37,6 +41,14 @@ export default function PostDetailPage({ params }: { params: { id: string } }) {
     try {
       const res = await api.post<{ liked: boolean; likeCount: number }>(`/api/posts/${id}/like`);
       setPost(p => p ? { ...p, likeCount: res.likeCount } : p);
+    } catch (e: any) { alert(e.message); }
+  };
+
+  const favorite = async () => {
+    if (!user) { router.push('/login'); return; }
+    try {
+      const res = await api.post<{ favorited: boolean }>(`/api/posts/${id}/favorite`);
+      setFavorited(res.favorited);
     } catch (e: any) { alert(e.message); }
   };
 
@@ -89,6 +101,9 @@ export default function PostDetailPage({ params }: { params: { id: string } }) {
             <button onClick={like} className="hover:text-red-500">❤ {post.likeCount}</button>
             <span>💬 {post.commentCount}</span>
             <span>👁 {post.viewCount}</span>
+            <button onClick={favorite} className={favorited ? 'text-yellow-500' : 'hover:text-yellow-500'}>
+              {favorited ? '★' : '☆'} 收藏
+            </button>
           </div>
         </div>
       </div>
