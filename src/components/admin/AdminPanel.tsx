@@ -820,76 +820,230 @@ function DeleteConfirmModal({ user, onClose, onDone }: { user: any; onClose: () 
   );
 }
 
-// ---------- 通知发布 (管理员) ----------
+// ---------- 通知发布 + 历史记录 (管理员) ----------
+interface NotifItem {
+  id: string;
+  title: string;
+  content: string;
+  type: string;
+  pinned: boolean;
+  createdAt: string;
+}
+
 function NotificationSender() {
   const [title, setTitle] = useState('');
   const [content, setContent] = useState('');
   const [target, setTarget] = useState('ALL');
   const [role, setRole] = useState('STUDENT');
   const [sendEmail, setSendEmail] = useState(false);
+  const [pinned, setPinned] = useState(false);
   const [type, setType] = useState('ANNOUNCE');
   const [sending, setSending] = useState(false);
   const [msg, setMsg] = useState('');
+
+  // 历史记录
+  const [history, setHistory] = useState<NotifItem[]>([]);
+  const [loadingHistory, setLoadingHistory] = useState(false);
+  const [editing, setEditing] = useState<NotifItem | null>(null);
+  const [editTitle, setEditTitle] = useState('');
+  const [editContent, setEditContent] = useState('');
+  const [editPinned, setEditPinned] = useState(false);
+  const [savingEdit, setSavingEdit] = useState(false);
+
+  const TYPE_OPTIONS = [
+    { value: 'ANNOUNCE', label: '📢 公告' },
+    { value: 'SYSTEM', label: '⚙️ 系统通知' },
+    { value: 'POST', label: '📝 帖子通知' },
+  ];
+
+  const loadHistory = useCallback(async () => {
+    setLoadingHistory(true);
+    try {
+      const res = await api.get<{ items: NotifItem[] }>('/api/admin/notifications');
+      setHistory(res.items);
+    } catch { /* ignore */ }
+    finally { setLoadingHistory(false); }
+  }, []);
+
+  useEffect(() => { loadHistory(); }, [loadHistory]);
 
   const send = async () => {
     if (!title.trim() || !content.trim()) { setMsg('请填写标题和内容'); return; }
     setSending(true); setMsg('');
     try {
-      const body: any = { title, content, target, type, sendEmail };
+      const body: any = { title, content, target, type, sendEmail, pinned };
       if (target === 'ROLE') body.role = role;
       await api.post('/api/admin/notifications', body);
       setMsg('通知发送成功！');
-      setTitle(''); setContent('');
+      setTitle(''); setContent(''); setPinned(false);
+      loadHistory();
     } catch (e: any) { setMsg(e.message); } finally { setSending(false); }
   };
 
+  const startEdit = (n: NotifItem) => {
+    setEditing(n); setEditTitle(n.title); setEditContent(n.content); setEditPinned(n.pinned);
+  };
+
+  const saveEdit = async () => {
+    if (!editing) return;
+    if (!editTitle.trim() || !editContent.trim()) return;
+    setSavingEdit(true);
+    try {
+      await api.patch(`/api/admin/notifications/${editing.id}`, { title: editTitle, content: editContent, pinned: editPinned });
+      setEditing(null);
+      loadHistory();
+    } catch (e: any) { alert(e.message); } finally { setSavingEdit(false); }
+  };
+
+  const del = async (n: NotifItem) => {
+    if (!confirm(`确定删除通知「${n.title}」吗？`)) return;
+    try {
+      await api.del(`/api/admin/notifications/${n.id}`);
+      loadHistory();
+    } catch (e: any) { alert(e.message); }
+  };
+
   return (
-    <div>
-      <SectionTitle title="发布通知" desc="向用户推送站内通知，可选同时发送邮件" />
-      {msg && <div className={`mb-3 text-sm ${msg.includes('成功') ? 'text-green-600' : 'text-red-500'}`}>{msg}</div>}
-      <div className="space-y-3">
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">通知类型</label>
-          <select value={type} onChange={e => setType(e.target.value)} className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm">
-            <option value="ANNOUNCE">公告</option>
-            <option value="SYSTEM">系统通知</option>
-            <option value="POST">帖子通知</option>
-          </select>
-        </div>
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">标题</label>
-          <input value={title} onChange={e => setTitle(e.target.value)} className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm" placeholder="通知标题" />
-        </div>
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">内容</label>
-          <textarea value={content} onChange={e => setContent(e.target.value)} rows={5} className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm" placeholder="通知正文" />
-        </div>
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">发送对象</label>
-          <div className="flex gap-4">
-            <label className="flex items-center gap-1.5 text-sm">
-              <input type="radio" checked={target === 'ALL'} onChange={() => setTarget('ALL')} /> 全体用户
+    <div className="space-y-6">
+      {/* 发布通知 */}
+      <div>
+        <SectionTitle title="发布通知" desc="向用户推送站内通知，可选同时发送邮件" />
+        {msg && <div className={`mb-3 text-sm ${msg.includes('成功') ? 'text-green-600' : 'text-red-500'}`}>{msg}</div>}
+        <div className="rounded-xl border border-gray-100 bg-white p-5 space-y-4">
+          {/* 通知类型 */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">通知类型</label>
+            <div className="grid grid-cols-3 gap-2">
+              {TYPE_OPTIONS.map(o => (
+                <button
+                  key={o.value}
+                  onClick={() => setType(o.value)}
+                  className={`rounded-lg border px-3 py-2 text-sm transition ${type === o.value ? 'border-blue-500 bg-blue-50 text-blue-600' : 'border-gray-200 text-gray-600 hover:border-blue-300'}`}
+                >
+                  {o.label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* 标题 */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1.5">标题</label>
+            <input value={title} onChange={e => setTitle(e.target.value)} className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400/40" placeholder="通知标题" />
+          </div>
+
+          {/* 内容 */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1.5">内容</label>
+            <textarea value={content} onChange={e => setContent(e.target.value)} rows={4} className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400/40" placeholder="通知正文" />
+          </div>
+
+          {/* 发送对象 */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">发送对象</label>
+            <div className="flex gap-3">
+              <button
+                onClick={() => setTarget('ALL')}
+                className={`flex-1 rounded-lg border px-3 py-2 text-sm transition ${target === 'ALL' ? 'border-blue-500 bg-blue-50 text-blue-600' : 'border-gray-200 text-gray-600 hover:border-blue-300'}`}
+              >
+                全体用户
+              </button>
+              <button
+                onClick={() => setTarget('ROLE')}
+                className={`flex-1 rounded-lg border px-3 py-2 text-sm transition ${target === 'ROLE' ? 'border-blue-500 bg-blue-50 text-blue-600' : 'border-gray-200 text-gray-600 hover:border-blue-300'}`}
+              >
+                按角色
+              </button>
+            </div>
+            {target === 'ROLE' && (
+              <select value={role} onChange={e => setRole(e.target.value)} className="mt-2 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm">
+                <option value="STUDENT">学生</option>
+                <option value="TEACHER">教师</option>
+                <option value="ADMIN">管理员</option>
+              </select>
+            )}
+          </div>
+
+          {/* 选项 */}
+          <div className="flex flex-wrap gap-4">
+            <label className="flex items-center gap-2 cursor-pointer text-sm text-gray-700">
+              <input type="checkbox" checked={pinned} onChange={e => setPinned(e.target.checked)} className="h-4 w-4 rounded border-gray-300 text-amber-500 focus:ring-amber-400" />
+              <span>⭐ 强调通知（置顶显示）</span>
             </label>
-            <label className="flex items-center gap-1.5 text-sm">
-              <input type="radio" checked={target === 'ROLE'} onChange={() => setTarget('ROLE')} /> 按角色
+            <label className="flex items-center gap-2 cursor-pointer text-sm text-gray-700">
+              <input type="checkbox" checked={sendEmail} onChange={e => setSendEmail(e.target.checked)} className="h-4 w-4 rounded border-gray-300 text-blue-500 focus:ring-blue-400" />
+              <span>📧 同时发送邮件（需配置 SMTP）</span>
             </label>
           </div>
-          {target === 'ROLE' && (
-            <select value={role} onChange={e => setRole(e.target.value)} className="mt-2 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm">
-              <option value="STUDENT">学生</option>
-              <option value="TEACHER">教师</option>
-              <option value="ADMIN">管理员</option>
-            </select>
-          )}
+
+          <button onClick={send} disabled={sending} className="w-full rounded-lg bg-blue-600 py-2.5 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50 transition">
+            {sending ? '发送中…' : '发送通知'}
+          </button>
         </div>
-        <label className="flex items-center gap-2 text-sm">
-          <input type="checkbox" checked={sendEmail} onChange={e => setSendEmail(e.target.checked)} />
-          同时发送邮件通知（需配置 SMTP）
-        </label>
-        <button onClick={send} disabled={sending} className="w-full rounded-lg bg-blue-600 py-2.5 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50">
-          {sending ? '发送中…' : '发送通知'}
-        </button>
       </div>
+
+      {/* 历史记录 */}
+      <div>
+        <SectionTitle title="通知历史记录" desc="查看、编辑或删除已发送的通知" />
+        {loadingHistory ? (
+          <p className="py-6 text-center text-gray-400 text-sm">加载中…</p>
+        ) : history.length === 0 ? (
+          <p className="py-6 text-center text-gray-400 text-sm">暂无通知记录</p>
+        ) : (
+          <div className="space-y-2">
+            {history.map(n => (
+              <div key={n.id} className={`rounded-xl border bg-white p-4 ${n.pinned ? 'border-amber-200 bg-amber-50/30' : 'border-gray-100'}`}>
+                <div className="flex items-start justify-between gap-3">
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 mb-1">
+                      {n.pinned && <span className="text-amber-500 text-xs">📌</span>}
+                      <span className="rounded bg-gray-100 px-1.5 py-0.5 text-xs text-gray-600">
+                        {TYPE_OPTIONS.find(o => o.value === n.type)?.label || n.type}
+                      </span>
+                      <span className="font-semibold text-sm text-gray-900 truncate">{n.title}</span>
+                    </div>
+                    <p className="text-sm text-gray-600 line-clamp-2 whitespace-pre-wrap">{n.content}</p>
+                    <p className="mt-1 text-xs text-gray-400">{new Date(n.createdAt).toLocaleString('zh-CN')}</p>
+                  </div>
+                  <div className="flex shrink-0 gap-2">
+                    <button onClick={() => startEdit(n)} className="rounded-lg bg-gray-100 px-3 py-1.5 text-xs text-gray-600 hover:bg-gray-200">编辑</button>
+                    <button onClick={() => del(n)} className="rounded-lg bg-red-50 px-3 py-1.5 text-xs text-red-600 hover:bg-red-100">删除</button>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* 编辑弹窗 */}
+      {editing && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" onClick={() => setEditing(null)}>
+          <div className="w-full max-w-lg rounded-2xl bg-white p-6 shadow-2xl" onClick={e => e.stopPropagation()}>
+            <h3 className="text-lg font-bold text-gray-900 mb-4">编辑通知</h3>
+            <div className="space-y-3">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">标题</label>
+                <input value={editTitle} onChange={e => setEditTitle(e.target.value)} className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm" />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">内容</label>
+                <textarea value={editContent} onChange={e => setEditContent(e.target.value)} rows={5} className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm" />
+              </div>
+              <label className="flex items-center gap-2 text-sm text-gray-700">
+                <input type="checkbox" checked={editPinned} onChange={e => setEditPinned(e.target.checked)} className="h-4 w-4 rounded border-gray-300 text-amber-500" />
+                ⭐ 强调通知（置顶显示）
+              </label>
+            </div>
+            <div className="mt-5 flex gap-3">
+              <button onClick={() => setEditing(null)} className="flex-1 rounded-lg bg-gray-100 py-2.5 text-sm text-gray-700 hover:bg-gray-200">取消</button>
+              <button onClick={saveEdit} disabled={savingEdit} className="flex-1 rounded-lg bg-blue-600 py-2.5 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50">
+                {savingEdit ? '保存中…' : '保存'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -1061,6 +1215,11 @@ function SiteSettings() {
               <label className="block text-sm font-medium text-gray-700 mb-1">敏感词过滤（逗号分隔）</label>
               <textarea value={cfg.sensitive_words || ''} onChange={e => set('sensitive_words', e.target.value)} rows={2} className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm" placeholder="广告,诈骗,违规" />
               <p className="text-xs text-gray-400 mt-1">标题或内容包含敏感词时将无法发布</p>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">首页滚动公告</label>
+              <input value={cfg.announcement_text || ''} onChange={e => set('announcement_text', e.target.value)} className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm" placeholder="欢迎来到校园墙！请文明发言..." />
+              <p className="text-xs text-gray-400 mt-1">显示在首页顶部的滚动公告栏</p>
             </div>
           </div>
         </div>

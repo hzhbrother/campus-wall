@@ -8,6 +8,7 @@ const PUBLIC_KEYS = [
   'site_name', 'site_desc', 'site_logo', 'site_url', 'site_icp', 'contact_email', 'site_keywords',
   'allow_register', 'allow_anonymous', 'comment_enabled',
   'post_categories',
+  'announcement_text',
   'agreement_content', 'privacy_content',
   'about_content',
 ];
@@ -23,5 +24,6 @@ export async function GET() {
   if (!map.allow_anonymous) map.allow_anonymous = 'true';
   if (!map.comment_enabled) map.comment_enabled = 'true';
   if (!map.post_categories) map.post_categories = '校园,失物招领,二手交易,表白墙,寻物启事,招聘兼职,求助问答';
+  if (!map.announcement_text) map.announcement_text = '欢迎来到校园墙！请文明发言，禁止发布违规内容。失物招领请尽量附上图片，二手交易请当面验货。';
   return NextResponse.json(map);
 }

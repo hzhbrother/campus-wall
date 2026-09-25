@@ -11,11 +11,12 @@ export interface CreateNotificationOptions {
   link?: string;
   sendEmail?: boolean;          // 是否同时发邮件
   targetRole?: UserRole;       // 按角色发送
+  pinned?: boolean;            // 强调/置顶
 }
 
 // 创建通知 (单条或批量)
 export async function createNotification(opts: CreateNotificationOptions) {
-  const { userId, type = NotificationType.SYSTEM, title, content, link, sendEmail: doEmail = false, targetRole } = opts;
+  const { userId, type = NotificationType.SYSTEM, title, content, link, sendEmail: doEmail = false, targetRole, pinned = false } = opts;
 
   // 目标用户列表
   let userIds: string[] = [];
@@ -26,14 +27,14 @@ export async function createNotification(opts: CreateNotificationOptions) {
     userIds = users.map(u => u.id);
   } else {
     // 全体广播: 创建一条 userId=null 的广播通知
-    await prisma.notification.create({ data: { type, title, content, link, userId: null } });
+    await prisma.notification.create({ data: { type, title, content, link, userId: null, pinned } });
     if (doEmail) await broadcastEmail(title, content, null);
     return;
   }
 
   // 为每个用户创建通知
   const notifications = userIds.map(uid => ({
-    type, title, content, link, userId: uid,
+    type, title, content, link, userId: uid, pinned,
   }));
   if (notifications.length > 0) {
     await prisma.notification.createMany({ data: notifications });

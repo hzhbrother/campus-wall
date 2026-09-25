@@ -10,6 +10,7 @@ interface Notification {
   title: string;
   content: string;
   isRead: boolean;
+  pinned?: boolean;
   link?: string | null;
   createdAt: string;
 }
@@ -133,12 +134,13 @@ export default function NotificationsPage() {
           {items.map(n => (
             <div
               key={n.id}
-              className={`bg-white rounded-2xl p-4 shadow-sm ${!n.isRead ? 'border-l-4 border-blue-500' : ''} ${n.link ? 'cursor-pointer hover:bg-slate-50' : ''}`}
+              className={`bg-white rounded-2xl p-4 shadow-sm ${!n.isRead ? 'border-l-4 border-blue-500' : ''} ${n.link ? 'cursor-pointer hover:bg-slate-50' : ''} ${n.pinned ? 'ring-2 ring-amber-300' : ''}`}
               onClick={() => { if (n.link) { markRead(n.id); router.push(n.link); } }}
             >
               <div className="flex items-start justify-between gap-3">
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 mb-1">
+                    {n.pinned && <span className="text-amber-500 text-xs">📌</span>}
                     <span className={`rounded px-1.5 py-0.5 text-xs ${TYPE_COLOR[n.type] || 'bg-gray-100'}`}>{TYPE_LABEL[n.type] || n.type}</span>
                     <span className="font-semibold text-slate-900 text-sm">{n.title}</span>
                     {!n.isRead && <span className="h-2 w-2 rounded-full bg-red-500 shrink-0" />}

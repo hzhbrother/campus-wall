@@ -248,6 +248,7 @@ model Notification {
   title     String
   content   String
   isRead    Boolean          @default(false)
+  pinned    Boolean          @default(false)  // 强调/置顶通知
   link      String?          // 跳转链接
   createdAt DateTime         @default(now())
 

@@ -11,6 +11,7 @@ export default function HomePage() {
   const [items, setItems] = useState<PostListItem[]>([]);
   const [hotItems, setHotItems] = useState<PostListItem[]>([]);
   const [categories, setCategories] = useState<string[]>(DEFAULT_CATEGORIES);
+  const [announcement, setAnnouncement] = useState('欢迎来到校园墙！请文明发言，禁止发布违规内容。失物招领请尽量附上图片，二手交易请当面验货。');
   const [category, setCategory] = useState<string>('');
   const [q, setQ] = useState('');
   const [searchOpen, setSearchOpen] = useState(false);
@@ -42,6 +43,13 @@ export default function HomePage() {
   useEffect(() => {
     api.get<string[]>('/api/posts/categories')
       .then(cats => setCategories(cats.length ? cats : DEFAULT_CATEGORIES))
+      .catch(() => {});
+  }, []);
+
+  // 加载滚动公告 (从站点配置读取)
+  useEffect(() => {
+    api.get<Record<string, string>>('/api/site-config')
+      .then(d => { if (d.announcement_text) setAnnouncement(d.announcement_text); })
       .catch(() => {});
   }, []);
 
@@ -130,7 +138,7 @@ export default function HomePage() {
         <span className="shrink-0">📢</span>
         <div className="flex-1 overflow-hidden whitespace-nowrap">
           <div className="marquee inline-block">
-            欢迎来到校园墙！请文明发言，禁止发布违规内容。失物招领请尽量附上图片，二手交易请当面验货。
+            {announcement}
           </div>
         </div>
       </div>
