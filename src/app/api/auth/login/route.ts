@@ -8,16 +8,21 @@ import { signToken, sanitize } from '@/lib/server-auth';
 import { errorResponse } from '@/lib/api-response';
 
 const Schema = z.object({
-  account: z.string().min(1, '请输入账号名或邮箱'),
+  account: z.string().min(1, '请输入账号名、手机号或邮箱'),
   password: z.string().min(6, '密码至少6位'),
 });
 
 export async function POST(req: NextRequest) {
   try {
     const dto = Schema.parse(await req.json());
-    // 支持邮箱或昵称登录
+    // 支持邮箱 / 手机号 / 昵称 三种登录方式
     const isEmail = dto.account.includes('@');
-    const where = isEmail ? { email: dto.account } : { nickname: dto.account };
+    const isPhone = /^\d+$/.test(dto.account);
+    const where = isEmail
+      ? { email: dto.account }
+      : isPhone
+        ? { phoneNumber: dto.account }
+        : { nickname: dto.account };
     const user = await prisma.user.findFirst({ where });
     if (!user || !user.password) {
       return NextResponse.json({ message: '账号或密码错误' }, { status: 401 });

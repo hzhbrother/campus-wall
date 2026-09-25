@@ -60,16 +60,16 @@ export default function LoginPage() {
         {err && <div className="bg-red-50 text-red-600 text-sm p-3 rounded-lg mb-4">{err}</div>}
 
         <form onSubmit={onSubmit} className="space-y-4">
-          {/* 账号名 */}
+          {/* 账号名 / 手机号 / 邮箱 */}
           <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1.5">账号名</label>
+            <label className="block text-sm font-medium text-slate-700 mb-1.5">账号</label>
             <div className="relative">
               <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400">
                 <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0" strokeLinecap="round"/></svg>
               </span>
               <input
                 className="w-full pl-10 pr-4 py-3 rounded-xl border border-slate-200 bg-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/40"
-                placeholder="请输入账号名"
+                placeholder="账号名 / 手机号 / 邮箱"
                 value={account}
                 onChange={(e) => setAccount(e.target.value)}
                 required
