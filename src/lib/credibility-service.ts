@@ -126,7 +126,7 @@ export async function recordViolation(
     ? Math.min(100, Math.max(5, Math.round(pointsDeducted)))
     : defaultPoints;
   await prisma.violationRecord.create({
-    data: { userId, type: type as any, reason, pointsDeducted: points, relatedPostId },
+    data: { userId, type, reason, pointsDeducted: points, relatedPostId },
   });
   const newScore = await getCurrentScore(userId);
   // 同步更新用户表的诚信分, 保证实时一致

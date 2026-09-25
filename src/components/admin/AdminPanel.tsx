@@ -572,6 +572,7 @@ function BanUserModal({ user, onClose, onDone }: { user: any; onClose: () => voi
   const [selected, setSelected] = useState<number | null>(1);
   const [reason, setReason] = useState('');
   const [violationType, setViolationType] = useState('SPAM');
+  const [customType, setCustomType] = useState('');
   const [confirm, setConfirm] = useState(false);
   const [saving, setSaving] = useState(false);
   const [err, setErr] = useState('');
@@ -644,19 +645,25 @@ function BanUserModal({ user, onClose, onDone }: { user: any; onClose: () => voi
 
             {/* 违规类型 */}
             <div className="mb-4">
-              <label className="mb-1.5 block text-sm text-gray-600">违规类型</label>
-              <div className="grid grid-cols-3 gap-2">
+              <label className="mb-1.5 block text-sm text-gray-600">违规类型 <span className="text-xs text-gray-400">（可选择推荐类型或自定义输入）</span></label>
+              <div className="grid grid-cols-3 gap-2 mb-2">
                 {VIOLATION_TYPES.map(v => (
                   <button
                     key={v.value}
-                    onClick={() => { setViolationType(v.value); setUseCustomPoints(false); }}
-                    className={`rounded-lg border px-2 py-2 text-xs transition ${violationType === v.value && !useCustomPoints ? 'border-orange-500 bg-orange-50 text-orange-600' : 'border-gray-200 text-gray-600 hover:border-orange-300'}`}
+                    onClick={() => { setViolationType(v.value); setCustomType(''); setUseCustomPoints(false); }}
+                    className={`rounded-lg border px-2 py-2 text-xs transition ${violationType === v.value && !customType ? 'border-orange-500 bg-orange-50 text-orange-600' : 'border-gray-200 text-gray-600 hover:border-orange-300'}`}
                   >
                     <div className="font-medium">{v.label}</div>
                     <div className="mt-0.5 text-[10px] text-red-500">扣 {v.points} 分</div>
                   </button>
                 ))}
               </div>
+              <input
+                value={customType}
+                onChange={e => { const v = e.target.value; setCustomType(v); setViolationType(v || 'SPAM'); }}
+                placeholder="或输入自定义违规类型..."
+                className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-400/40"
+              />
             </div>
 
             {/* 自定义扣分 */}
@@ -685,12 +692,6 @@ function BanUserModal({ user, onClose, onDone }: { user: any; onClose: () => voi
                   <span className="text-xs text-gray-400 ml-auto">实际扣除: {finalPoints} 分</span>
                 </div>
               )}
-            </div>
-
-            {/* 封禁原因 */}
-            <div className="mb-4">
-              <label className="mb-1.5 block text-sm text-gray-600">封禁原因 (可选)</label>
-              <input value={reason} onChange={e => setReason(e.target.value)} placeholder="例如: 恶意刷屏、发布违规内容..." className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm" />
             </div>
 
             {/* 封禁时长 */}
@@ -763,7 +764,7 @@ function BanUserModal({ user, onClose, onDone }: { user: any; onClose: () => voi
               <p className="text-sm text-gray-500">确定封禁用户</p>
               <p className="mt-1 font-bold text-gray-900">{user.nickname}</p>
               <p className="mt-2 text-sm text-gray-500">违规类型</p>
-              <p className="mt-1 text-lg font-bold text-gray-900">{selectedVType?.label}</p>
+              <p className="mt-1 text-lg font-bold text-gray-900">{selectedVType?.label || violationType}</p>
               <p className="mt-1 text-sm text-red-500">扣除诚信分 {finalPoints} 分</p>
               <p className="mt-2 text-sm text-gray-500">封禁时间为</p>
               <p className={`mt-1 text-2xl font-bold ${isPermanent ? 'text-red-800' : 'text-orange-600'}`}>{durationLabel}</p>

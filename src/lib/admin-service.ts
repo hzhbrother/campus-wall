@@ -10,7 +10,8 @@ export const VIOLATION_TYPE_LABEL: Record<string, string> = {
 };
 
 export function violationTypeLabel(type: string): string {
-  return VIOLATION_TYPE_LABEL[type] || '违规';
+  // 预设类型返回中文标签, 自定义类型直接返回原文
+  return VIOLATION_TYPE_LABEL[type] || type || '违规';
 }
 
 export async function stats() {

@@ -331,7 +331,7 @@ model BanAppeal {
 model ViolationRecord {
   id             String        @id @default(cuid())
   userId         String
-  type           ViolationType @default(SPAM)
+  type           String        @default("SPAM")  // 违规类型, 支持自定义
   reason         String        // 违规原因描述
   pointsDeducted Int           // 扣除的诚信分
   relatedPostId  String?       // 关联帖子
