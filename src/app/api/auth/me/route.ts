@@ -12,7 +12,14 @@ export async function GET(req: NextRequest) {
       where: { id: me.id },
       include: { _count: { select: { posts: true, comments: true, likes: true } } },
     });
-    return Response.json(user ? sanitize(user) : null);
+    if (!user) return Response.json(null, { status: 200 });
+    // 获赞数: 用户所有帖子收到的点赞总数
+    const likesReceived = await prisma.like.count({
+      where: { post: { authorId: me.id } },
+    });
+    const data = sanitize(user) as any;
+    data._count = { ...data._count, likesReceived };
+    return Response.json(data);
   } catch (e) {
     return errorResponse(e);
   }

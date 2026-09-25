@@ -16,7 +16,24 @@ const CreateSchema = z.object({
 
 export async function GET(req: NextRequest) {
   try {
-    const postId = new URL(req.url).searchParams.get('postId');
+    const url = new URL(req.url);
+    const postId = url.searchParams.get('postId');
+    const authorId = url.searchParams.get('authorId');
+
+    // 按作者查询评论 (用于个人主页)
+    if (authorId) {
+      const items = await prisma.comment.findMany({
+        where: { authorId },
+        orderBy: { createdAt: 'desc' },
+        include: {
+          author: { select: { id: true, nickname: true, avatar: true } },
+          post: { select: { id: true, title: true } },
+        },
+        take: 50,
+      });
+      return NextResponse.json({ items });
+    }
+
     if (!postId) return NextResponse.json({ message: '缺少 postId' }, { status: 400 });
     const post = await prisma.post.findUnique({ where: { id: postId } });
     if (!post) return NextResponse.json({ message: '帖子不存在' }, { status: 404 });

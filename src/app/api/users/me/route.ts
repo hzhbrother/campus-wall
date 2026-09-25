@@ -9,6 +9,7 @@ import { errorResponse } from '@/lib/api-response';
 const UpdateSchema = z.object({
   nickname: z.string().max(32).optional(),
   avatar: z.string().optional(),
+  coverImage: z.string().optional().or(z.literal('')),
   studentId: z.string().max(20).optional(),
   realName: z.string().max(32).optional().or(z.literal('')),
   email: z.string().email('邮箱格式不正确').max(120).optional().or(z.literal('')),

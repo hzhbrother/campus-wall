@@ -10,6 +10,7 @@ export interface AuthUser {
   email: string | null;
   nickname: string;
   avatar?: string | null;
+  coverImage?: string | null;
   realName?: string | null;
   countryCode?: string | null;
   phoneNumber?: string | null;
@@ -17,9 +18,10 @@ export interface AuthUser {
   className?: string | null;
   remark?: string | null;
   role: Role;
+  createdAt?: string;
   bannedUntil?: string | null;
   banReason?: string | null;
-  _count?: { posts: number; comments: number; likes: number };
+  _count?: { posts: number; comments: number; likes: number; likesReceived: number };
 }
 
 interface AuthCtx {
