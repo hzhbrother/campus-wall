@@ -219,7 +219,6 @@ function ProfilePageInner() {
       { key: 'posts', label: '帖子管理' },
       { key: 'moderation', label: '内容审核' },
       { key: 'comments', label: '评论管理' },
-      { key: 'orders', label: '支付明细' },
       { key: 'users', label: '用户管理' },
       { key: 'appeals', label: '申诉审核' },
       { key: 'notifications', label: '通知发布' },

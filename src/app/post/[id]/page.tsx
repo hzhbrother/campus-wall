@@ -64,12 +64,12 @@ export default function PostDetailPage({ params }: { params: { id: string } }) {
     finally { setBusy(false); }
   };
 
-  // 创建支付订单 (置顶/打赏), 跳转 mock 支付页
-  const pay = async (type: 'PIN' | 'REWARD', amount?: number) => {
-    if (!user) { router.push('/login'); return; }
+  // 管理员/教师置顶/取消置顶
+  const togglePin = async () => {
+    if (!user) return;
     try {
-      const res = await api.post<{ order: { id: string }; payment: { payUrl?: string } }>('/api/payment/orders', { type, postId: id, amount });
-      if (res.payment.payUrl) window.location.href = res.payment.payUrl;
+      const res = await api.post<{ pinned: boolean }>(`/api/admin/posts/${id}/pin`, { pinned: !post.pinned });
+      setPost(p => p ? { ...p, pinned: res.pinned } : p);
     } catch (e: any) { alert(e.message); }
   };
 
@@ -108,11 +108,17 @@ export default function PostDetailPage({ params }: { params: { id: string } }) {
         </div>
       </div>
 
-      {/* 打赏/置顶 */}
-      <div className="flex gap-2">
-        <button className="btn-ghost text-sm flex-1" onClick={() => pay('PIN')}>📌 置顶推广 (¥1)</button>
-        <button className="btn-ghost text-sm flex-1" onClick={() => { const a = prompt('打赏金额(元)'); if (a) pay('REWARD', Math.round(Number(a) * 100)); }}>☕ 打赏作者</button>
-      </div>
+      {/* 管理员/教师置顶操作 */}
+      {user && ['ADMIN', 'SUPER_ADMIN', 'TEACHER'].includes(user.role) && (
+        <div className="flex gap-2">
+          <button
+            className={`text-sm flex-1 ${post.pinned ? 'btn-primary' : 'btn-ghost'}`}
+            onClick={togglePin}
+          >
+            📌 {post.pinned ? '取消置顶' : '置顶'}
+          </button>
+        </div>
+      )}
 
       {/* 评论 */}
       <div className="card p-5">

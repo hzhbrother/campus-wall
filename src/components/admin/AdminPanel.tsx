@@ -3,7 +3,7 @@
 import { useEffect, useState, useCallback } from 'react';
 import { api } from '@/lib/api';
 
-export type AdminTab = 'overview' | 'posts' | 'moderation' | 'comments' | 'orders' | 'users' | 'appeals' | 'notifications' | 'settings' | 'agreement';
+export type AdminTab = 'overview' | 'posts' | 'moderation' | 'comments' | 'users' | 'appeals' | 'notifications' | 'settings' | 'agreement';
 
 // ---------- 通用 UI ----------
 function SectionTitle({ title, desc }: { title: string; desc?: string }) {
@@ -22,17 +22,6 @@ function StatusBadge({ status }: { status: string }) {
     REJECTED: 'bg-red-100 text-red-700',
   };
   const label: Record<string, string> = { APPROVED: '已通过', PENDING: '待审核', REJECTED: '已拒绝' };
-  return <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${map[status] || 'bg-gray-100 text-gray-600'}`}>{label[status] || status}</span>;
-}
-
-function OrderStatusBadge({ status }: { status: string }) {
-  const map: Record<string, string> = {
-    PAID: 'bg-green-100 text-green-700',
-    PENDING: 'bg-amber-100 text-amber-700',
-    FAILED: 'bg-red-100 text-red-700',
-    CANCELLED: 'bg-gray-100 text-gray-500',
-  };
-  const label: Record<string, string> = { PAID: '已支付', PENDING: '待支付', FAILED: '失败', CANCELLED: '已取消' };
   return <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${map[status] || 'bg-gray-100 text-gray-600'}`}>{label[status] || status}</span>;
 }
 
@@ -58,8 +47,6 @@ function OverviewTab() {
     { label: '帖子总数', value: stats.posts },
     { label: '待审核', value: stats.pendingPosts },
     { label: '评论总数', value: stats.comments },
-    { label: '已支付订单', value: stats.paidOrders },
-    { label: '累计收入(元)', value: (stats.revenueCents / 100).toFixed(2) },
   ];
 
   return (
@@ -308,69 +295,6 @@ function CommentsTab() {
               </div>
             </div>
           ))}
-        </div>
-      )}
-      {total > pageSize && (
-        <div className="mt-4 flex items-center justify-center gap-2">
-          <button onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page <= 1} className="rounded-lg border border-gray-300 px-3 py-1.5 text-sm disabled:opacity-40">上一页</button>
-          <span className="text-sm text-gray-500">第 {page} 页 / 共 {Math.ceil(total / pageSize)} 页</span>
-          <button onClick={() => setPage(p => p + 1)} disabled={page * pageSize >= total} className="rounded-lg border border-gray-300 px-3 py-1.5 text-sm disabled:opacity-40">下一页</button>
-        </div>
-      )}
-    </div>
-  );
-}
-
-// ---------- 支付明细 ----------
-function OrdersTab() {
-  const [items, setItems] = useState<any[]>([]);
-  const [total, setTotal] = useState(0);
-  const [page, setPage] = useState(1);
-  const [loading, setLoading] = useState(false);
-  const [err, setErr] = useState('');
-  const pageSize = 10;
-
-  const load = useCallback(() => {
-    setLoading(true); setErr('');
-    api.get(`/api/admin/orders?page=${page}&pageSize=${pageSize}`).then((d: any) => { setItems(d.items); setTotal(d.total); })
-      .catch(e => setErr(e.message)).finally(() => setLoading(false));
-  }, [page]);
-  useEffect(load, [load]);
-
-  const payLabel: Record<string, string> = { mock: '模拟支付', alipay: '支付宝', wechatpay: '微信支付' };
-
-  return (
-    <div>
-      <SectionTitle title="支付明细" desc="所有订单记录" />
-      {err && <div className="mb-3 text-sm text-red-500">{err}</div>}
-      {loading ? <p className="py-6 text-center text-gray-400">加载中…</p> : items.length === 0 ? (
-        <p className="py-6 text-center text-gray-400">暂无订单</p>
-      ) : (
-        <div className="overflow-x-auto rounded-xl border border-gray-200">
-          <table className="w-full text-sm">
-            <thead className="bg-gray-50 text-gray-600">
-              <tr>
-                <th className="px-4 py-3 text-left">订单号</th>
-                <th className="px-4 py-3 text-left">用户</th>
-                <th className="px-4 py-3 text-right">金额(元)</th>
-                <th className="px-4 py-3 text-left">支付方式</th>
-                <th className="px-4 py-3 text-left">状态</th>
-                <th className="px-4 py-3 text-left">时间</th>
-              </tr>
-            </thead>
-            <tbody>
-              {items.map((o: any) => (
-                <tr key={o.id} className="border-t border-gray-100">
-                  <td className="px-4 py-3 font-mono text-xs text-gray-600">{o.orderNo}</td>
-                  <td className="px-4 py-3">{o.user?.nickname || '-'}</td>
-                  <td className="px-4 py-3 text-right font-semibold">{(o.amountCents / 100).toFixed(2)}</td>
-                  <td className="px-4 py-3">{payLabel[o.provider] || o.provider}</td>
-                  <td className="px-4 py-3"><OrderStatusBadge status={o.status} /></td>
-                  <td className="px-4 py-3 text-gray-500">{fmtDate(o.createdAt)}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
         </div>
       )}
       {total > pageSize && (
@@ -1362,7 +1286,6 @@ export function AdminPanel({ tab, isSuper }: { tab: AdminTab; isSuper: boolean }
     case 'posts': return <PostsTab />;
     case 'moderation': return <ModerationTab />;
     case 'comments': return <CommentsTab />;
-    case 'orders': return <OrdersTab />;
     case 'users': return <UsersTab isSuper={isSuper} />;
     case 'appeals': return <BanAppealsTab />;
     case 'notifications': return <NotificationSender />;

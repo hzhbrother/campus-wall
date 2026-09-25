@@ -14,15 +14,13 @@ export function violationTypeLabel(type: string): string {
 }
 
 export async function stats() {
-  const [users, posts, pendingPosts, comments, paidOrders, revenueAgg] = await Promise.all([
+  const [users, posts, pendingPosts, comments] = await Promise.all([
     prisma.user.count(),
     prisma.post.count(),
     prisma.post.count({ where: { status: PostStatus.PENDING } }),
     prisma.comment.count(),
-    prisma.order.count({ where: { status: 'PAID' } }),
-    prisma.order.aggregate({ where: { status: 'PAID' }, _sum: { amount: true } }),
   ]);
-  return { users, posts, pendingPosts, comments, paidOrders, revenueCents: revenueAgg._sum.amount || 0 };
+  return { users, posts, pendingPosts, comments };
 }
 
 export async function moderationQueue(page: number, pageSize: number) {
@@ -118,20 +116,6 @@ export async function listComments(page: number, pageSize: number, kw?: string) 
       },
     }),
     prisma.comment.count({ where }),
-  ]);
-  return { items, total, page, pageSize };
-}
-
-// 支付明细：列出所有订单（含用户、支付方式、金额、时间）
-export async function listOrders(page: number, pageSize: number) {
-  const [items, total] = await Promise.all([
-    prisma.order.findMany({
-      orderBy: { createdAt: 'desc' },
-      skip: (page - 1) * pageSize,
-      take: pageSize,
-      include: { user: { select: { id: true, nickname: true, email: true } } },
-    }),
-    prisma.order.count(),
   ]);
   return { items, total, page, pageSize };
 }

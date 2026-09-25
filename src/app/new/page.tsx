@@ -44,7 +44,6 @@ export default function NewPostPage() {
   const [category, setCategory] = useState('');
   const [showCategory, setShowCategory] = useState(false);
   const [isAnonymous, setIsAnonymous] = useState(false);
-  const [pinToTop, setPinToTop] = useState(false);
   const [err, setErr] = useState('');
   const [busy, setBusy] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
@@ -83,21 +82,6 @@ export default function NewPostPage() {
         images,
         isAnonymous,
       });
-
-      // 发布后置顶: 创建置顶订单并跳转支付
-      if (pinToTop) {
-        try {
-          const pay = await api.post<{ order: { id: string }; payment: { payUrl?: string } }>('/api/payment/orders', {
-            type: 'PIN', postId: res.id,
-          });
-          if (pay.payment.payUrl) {
-            window.location.href = pay.payment.payUrl;
-            return;
-          }
-        } catch (e: any) {
-          alert('帖子已发布, 但置顶订单创建失败: ' + e.message);
-        }
-      }
 
       if (res.status === 'PENDING') {
         alert('发布成功! 帖子正在审核中, 通过后将显示在信息流。');
@@ -173,22 +157,6 @@ export default function NewPostPage() {
             className={`relative h-6 w-11 rounded-full transition ${isAnonymous ? 'bg-green-500' : 'bg-slate-200'}`}
           >
             <span className={`absolute top-0.5 h-5 w-5 rounded-full bg-white shadow transition-all ${isAnonymous ? 'left-[22px]' : 'left-0.5'}`} />
-          </button>
-        </div>
-
-        {/* 发布后置顶 */}
-        <div className="flex items-center justify-between px-4 py-3.5 border-b border-slate-50">
-          <div className="flex items-center gap-2">
-            <span className="text-lg">📌</span>
-            <span className="text-sm text-slate-700">发布后置顶</span>
-            <span className="text-xs text-orange-500">¥1/次</span>
-          </div>
-          <button
-            type="button"
-            onClick={() => setPinToTop(v => !v)}
-            className={`relative h-6 w-11 rounded-full transition ${pinToTop ? 'bg-green-500' : 'bg-slate-200'}`}
-          >
-            <span className={`absolute top-0.5 h-5 w-5 rounded-full bg-white shadow transition-all ${pinToTop ? 'left-[22px]' : 'left-0.5'}`} />
           </button>
         </div>
 
