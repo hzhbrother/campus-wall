@@ -7,16 +7,9 @@ import { Prisma } from '@prisma/client';
 import { prisma } from '@/lib/prisma';
 import { getUserFromRequest } from '@/lib/server-auth';
 import { errorResponse } from '@/lib/api-response';
+import { getSiteConfigBool, getSiteConfigValue, getPostCategories } from '@/lib/site-config';
 
-const CATEGORIES = ['校园', '失物招领', '二手交易', '表白墙', '寻物启事', '招聘兼职', '求助问答'];
-
-const CreateSchema = z.object({
-  title: z.string().min(2).max(100),
-  content: z.string().min(2).max(5000),
-  category: z.enum(CATEGORIES as [string, ...string[]]),
-  images: z.array(z.string()).optional(),
-  isAnonymous: z.boolean().optional(),
-});
+const DEFAULT_CATEGORIES = ['校园', '失物招领', '二手交易', '表白墙', '寻物启事', '招聘兼职', '求助问答'];
 
 export async function GET(req: NextRequest) {
   try {
@@ -55,8 +48,51 @@ export async function POST(req: NextRequest) {
   try {
     const me = await getUserFromRequest(req);
     if (!me) return NextResponse.json({ message: '未登录' }, { status: 401 });
+
+    // 读取站点配置
+    const [categories, allowAnonymous, requiresApproval, dailyLimit, sensitiveWords] = await Promise.all([
+      getPostCategories(),
+      getSiteConfigBool('allow_anonymous', true),
+      getSiteConfigBool('post_requires_approval', true),
+      getSiteConfigValue('daily_post_limit', '0'),
+      getSiteConfigValue('sensitive_words', ''),
+    ]);
+
+    const CreateSchema = z.object({
+      title: z.string().min(2).max(100),
+      content: z.string().min(2).max(5000),
+      category: z.enum([...categories] as [string, ...string[]]),
+      images: z.array(z.string()).optional(),
+      isAnonymous: z.boolean().optional(),
+    });
+
     const dto = CreateSchema.parse(await req.json());
-    const status = me.role === UserRole.USER ? PostStatus.PENDING : PostStatus.APPROVED;
+
+    // 匿名开关
+    if (dto.isAnonymous && !allowAnonymous) {
+      return NextResponse.json({ message: '站点已关闭匿名发帖功能' }, { status: 403 });
+    }
+
+    // 敏感词过滤
+    if (sensitiveWords) {
+      const words = sensitiveWords.split(',').map(s => s.trim()).filter(Boolean);
+      const text = dto.title + dto.content;
+      const hit = words.find(w => text.includes(w));
+      if (hit) return NextResponse.json({ message: `内容包含敏感词: ${hit}` }, { status: 400 });
+    }
+
+    // 每日发帖限制
+    const limit = parseInt(dailyLimit, 10) || 0;
+    if (limit > 0 && me.role !== UserRole.ADMIN && me.role !== UserRole.SUPER_ADMIN) {
+      const start = new Date(); start.setHours(0, 0, 0, 0);
+      const todayCount = await prisma.post.count({ where: { authorId: me.id, createdAt: { gte: start } } });
+      if (todayCount >= limit) return NextResponse.json({ message: `今日发帖已达上限 (${limit}条)` }, { status: 429 });
+    }
+
+    // 审核状态: 管理员直通, 普通用户按配置决定是否审核
+    const isAdmin = me.role === UserRole.ADMIN || me.role === UserRole.SUPER_ADMIN;
+    const status = isAdmin || !requiresApproval ? PostStatus.APPROVED : PostStatus.PENDING;
+
     const post = await prisma.post.create({
       data: {
         title: dto.title,

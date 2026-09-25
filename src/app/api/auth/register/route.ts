@@ -6,6 +6,7 @@ import { AccountProvider } from '@prisma/client';
 import { prisma } from '@/lib/prisma';
 import { signToken, sanitize } from '@/lib/server-auth';
 import { errorResponse } from '@/lib/api-response';
+import { getSiteConfigBool } from '@/lib/site-config';
 
 const Schema = z.object({
   nickname: z.string().min(2, '账号名至少2位').max(32),
@@ -18,6 +19,9 @@ const Schema = z.object({
 
 export async function POST(req: NextRequest) {
   try {
+    const allowRegister = await getSiteConfigBool('allow_register', true);
+    if (!allowRegister) return NextResponse.json({ message: '站点已关闭注册功能' }, { status: 403 });
+
     const body = await req.json();
     const dto = Schema.parse(body);
 

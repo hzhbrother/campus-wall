@@ -1,6 +1,10 @@
-// GET /api/posts/categories  分类目录
+// GET /api/posts/categories  分类目录 (从站点配置读取)
 import { NextResponse } from 'next/server';
+import { getPostCategories } from '@/lib/site-config';
+
+export const dynamic = 'force-dynamic';
 
 export async function GET() {
-  return NextResponse.json(['校园', '失物招领', '二手交易', '表白墙', '寻物启事', '招聘兼职', '求助问答']);
+  const cats = await getPostCategories();
+  return NextResponse.json(cats);
 }

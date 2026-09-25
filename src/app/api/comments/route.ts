@@ -5,6 +5,7 @@ import { z } from 'zod';
 import { prisma } from '@/lib/prisma';
 import { requireUser } from '@/lib/server-auth';
 import { errorResponse } from '@/lib/api-response';
+import { getSiteConfigBool } from '@/lib/site-config';
 
 const CreateSchema = z.object({
   postId: z.string(),
@@ -31,6 +32,9 @@ export async function GET(req: NextRequest) {
 
 export async function POST(req: NextRequest) {
   try {
+    const commentEnabled = await getSiteConfigBool('comment_enabled', true);
+    if (!commentEnabled) return NextResponse.json({ message: '站点已关闭评论功能' }, { status: 403 });
+
     const me = await requireUser(req);
     const dto = CreateSchema.parse(await req.json());
     const post = await prisma.post.findUnique({ where: { id: dto.postId } });

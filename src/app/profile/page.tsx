@@ -645,12 +645,17 @@ function SiteSettings() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [msg, setMsg] = useState('');
+  const [testEmail, setTestEmail] = useState('');
+  const [testing, setTesting] = useState(false);
+  const [testMsg, setTestMsg] = useState('');
 
   useEffect(() => {
     api.get('/api/admin/site-config').then(setCfg).catch(console.error).finally(() => setLoading(false));
   }, []);
 
   const set = (k: string, v: string) => setCfg({ ...cfg, [k]: v });
+  const bool = (k: string, def = true) => cfg[k] === undefined ? def : cfg[k] === 'true';
+  const setBool = (k: string, v: boolean) => set(k, String(v));
 
   const save = async () => {
     setSaving(true); setMsg('');
@@ -658,36 +663,67 @@ function SiteSettings() {
     catch (e: any) { setMsg(e.message); } finally { setSaving(false); }
   };
 
+  const sendTest = async () => {
+    if (!testEmail) { setTestMsg('请输入收件邮箱'); return; }
+    setTesting(true); setTestMsg('');
+    try {
+      const r = await api.post<{ message?: string }>('/api/admin/site-config/test-email', { to: testEmail });
+      setTestMsg(r.message || '已发送');
+    } catch (e: any) { setTestMsg(e.message); } finally { setTesting(false); }
+  };
+
   if (loading) return <p className="py-6 text-center text-gray-400">加载中…</p>;
 
   return (
     <div>
-      <SectionTitle title="站点设置" desc="站点信息与 SMTP 邮件配置" />
+      <SectionTitle title="站点设置" desc="站点信息、SMTP 邮件、功能开关与内容配置" />
       {msg && <div className={`mb-3 text-sm ${msg.includes('成功') ? 'text-green-600' : 'text-red-500'}`}>{msg}</div>}
 
       <div className="space-y-5">
         {/* 站点信息 */}
-        <div>
-          <h3 className="font-semibold text-gray-900 mb-3">站点信息</h3>
+        <div className="rounded-xl border border-gray-100 p-4">
+          <h3 className="font-semibold text-gray-900 mb-3">🏷️ 站点信息</h3>
           <div className="space-y-3">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">站点名称</label>
-              <input value={cfg.site_name || ''} onChange={e => set('site_name', e.target.value)} className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm" placeholder="校园墙" />
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">站点名称</label>
+                <input value={cfg.site_name || ''} onChange={e => set('site_name', e.target.value)} className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm" placeholder="校园墙" />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">站点域名</label>
+                <input value={cfg.site_url || ''} onChange={e => set('site_url', e.target.value)} className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm" placeholder="https://example.com" />
+              </div>
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">站点描述</label>
               <input value={cfg.site_desc || ''} onChange={e => set('site_desc', e.target.value)} className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm" placeholder="校园信息交流平台" />
             </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">站点 Logo URL</label>
-              <input value={cfg.site_logo || ''} onChange={e => set('site_logo', e.target.value)} className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm" placeholder="https://..." />
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">站点 Logo URL</label>
+                <input value={cfg.site_logo || ''} onChange={e => set('site_logo', e.target.value)} className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm" placeholder="https://..." />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">SEO 关键词</label>
+                <input value={cfg.site_keywords || ''} onChange={e => set('site_keywords', e.target.value)} className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm" placeholder="校园,墙,交流" />
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">联系邮箱</label>
+                <input value={cfg.contact_email || ''} onChange={e => set('contact_email', e.target.value)} className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm" placeholder="admin@example.com" />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">ICP 备案号</label>
+                <input value={cfg.site_icp || ''} onChange={e => set('site_icp', e.target.value)} className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm" placeholder="京ICP备xxxxxxxx号" />
+              </div>
             </div>
           </div>
         </div>
 
         {/* SMTP */}
-        <div>
-          <h3 className="font-semibold text-gray-900 mb-3">SMTP 邮件配置</h3>
+        <div className="rounded-xl border border-gray-100 p-4">
+          <h3 className="font-semibold text-gray-900 mb-3">📧 SMTP 邮件配置</h3>
           <div className="space-y-3">
             <div className="grid grid-cols-2 gap-3">
               <div>
@@ -722,11 +758,65 @@ function SiteSettings() {
                 </select>
               </div>
             </div>
+            {/* 测试邮件 */}
+            <div className="flex gap-2 pt-1">
+              <input value={testEmail} onChange={e => setTestEmail(e.target.value)} placeholder="输入收件邮箱测试" className="flex-1 rounded-lg border border-gray-300 px-3 py-2 text-sm" />
+              <button onClick={sendTest} disabled={testing} className="rounded-lg bg-green-600 px-4 py-2 text-sm font-medium text-white disabled:opacity-50">{testing ? '发送中…' : '发送测试'}</button>
+            </div>
+            {testMsg && <p className={`text-xs ${testMsg.includes('成功') || testMsg.includes('已') ? 'text-green-600' : 'text-red-500'}`}>{testMsg}</p>}
+          </div>
+        </div>
+
+        {/* 功能开关 */}
+        <div className="rounded-xl border border-gray-100 p-4">
+          <h3 className="font-semibold text-gray-900 mb-3">⚙️ 功能开关</h3>
+          <div className="space-y-3">
+            {[
+              { key: 'allow_register', label: '允许新用户注册', desc: '关闭后新用户无法注册账号' },
+              { key: 'post_requires_approval', label: '发帖需审核', desc: '普通用户发帖需管理员审核通过' },
+              { key: 'allow_anonymous', label: '允许匿名发帖', desc: '用户可选择匿名发布内容' },
+              { key: 'comment_enabled', label: '允许评论', desc: '关闭后所有帖子不可评论' },
+              { key: 'email_notify_enabled', label: '邮件通知', desc: '全局邮件推送开关' },
+            ].map(it => (
+              <label key={it.key} className="flex items-center justify-between rounded-lg bg-gray-50 p-3">
+                <div>
+                  <div className="text-sm font-medium text-gray-900">{it.label}</div>
+                  <div className="text-xs text-gray-400">{it.desc}</div>
+                </div>
+                <input type="checkbox" checked={bool(it.key)} onChange={e => setBool(it.key, e.target.checked)} className="h-5 w-5" />
+              </label>
+            ))}
+          </div>
+        </div>
+
+        {/* 内容设置 */}
+        <div className="rounded-xl border border-gray-100 p-4">
+          <h3 className="font-semibold text-gray-900 mb-3">📝 内容设置</h3>
+          <div className="space-y-3">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">帖子分类（逗号分隔）</label>
+              <textarea value={cfg.post_categories || ''} onChange={e => set('post_categories', e.target.value)} rows={2} className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm" placeholder="校园,失物招领,二手交易,表白墙,寻物启事,招聘兼职,求助问答" />
+              <p className="text-xs text-gray-400 mt-1">修改后将影响发帖时的分类选项</p>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">每日发帖上限</label>
+                <input type="number" min="0" value={cfg.daily_post_limit || ''} onChange={e => set('daily_post_limit', e.target.value)} className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm" placeholder="0 = 不限制" />
+              </div>
+              <div className="flex items-end">
+                <p className="text-xs text-gray-400">0 表示不限制，仅对普通用户生效</p>
+              </div>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">敏感词过滤（逗号分隔）</label>
+              <textarea value={cfg.sensitive_words || ''} onChange={e => set('sensitive_words', e.target.value)} rows={2} className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm" placeholder="广告,诈骗,违规" />
+              <p className="text-xs text-gray-400 mt-1">标题或内容包含敏感词时将无法发布</p>
+            </div>
           </div>
         </div>
 
         <button onClick={save} disabled={saving} className="w-full rounded-lg bg-blue-600 py-2.5 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50">
-          {saving ? '保存中…' : '保存设置'}
+          {saving ? '保存中…' : '保存所有设置'}
         </button>
       </div>
     </div>

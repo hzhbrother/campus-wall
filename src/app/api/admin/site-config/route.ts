@@ -6,9 +6,14 @@ import { prisma } from '@/lib/prisma';
 import { errorResponse } from '@/lib/api-response';
 
 const CONFIG_KEYS = [
-  'site_name', 'site_desc', 'site_logo',
+  // 站点信息
+  'site_name', 'site_desc', 'site_logo', 'site_url', 'site_icp', 'contact_email', 'site_keywords',
+  // SMTP
   'smtp_host', 'smtp_port', 'smtp_user', 'smtp_pass', 'smtp_from', 'smtp_secure',
-  'notification_enabled',
+  // 功能开关
+  'allow_register', 'post_requires_approval', 'allow_anonymous', 'email_notify_enabled', 'comment_enabled',
+  // 内容设置
+  'post_categories', 'daily_post_limit', 'sensitive_words',
 ];
 
 export async function GET() {

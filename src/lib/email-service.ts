@@ -50,6 +50,12 @@ export async function saveSmtpConfig(cfg: Partial<SmtpConfig>) {
 
 // 发送邮件
 export async function sendEmail(to: string, subject: string, html: string): Promise<boolean> {
+  // 检查邮件通知总开关
+  const toggle = await prisma.siteConfig.findUnique({ where: { key: 'email_notify_enabled' } });
+  if (toggle && toggle.value === 'false') {
+    console.warn('[email] 邮件通知已关闭, 跳过发送');
+    return false;
+  }
   const cfg = await getSmtpConfig();
   if (!cfg) {
     console.warn('[email] SMTP 未配置, 跳过发送');
