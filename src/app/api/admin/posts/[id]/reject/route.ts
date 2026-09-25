@@ -8,8 +8,8 @@ import { errorResponse } from '@/lib/api-response';
 export async function POST(req: NextRequest, { params }: { params: { id: string } }) {
   try {
     const me = await requireRole(req, UserRole.ADMIN, UserRole.SUPER_ADMIN);
-    const { reason } = await req.json().catch(() => ({}));
-    return NextResponse.json(await reject(params.id, me.id, reason));
+    const { reason, violationType } = await req.json().catch(() => ({}));
+    return NextResponse.json(await reject(params.id, me.id, reason, violationType));
   } catch (e) {
     return errorResponse(e);
   }

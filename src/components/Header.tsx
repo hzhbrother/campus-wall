@@ -53,7 +53,7 @@ export function Header() {
       {banRemain && (
         <div className="bg-red-500 text-white text-center text-xs py-1.5 px-3">
           <span className="font-semibold">账号封禁中</span> · {banRemain}
-          {user?.banReason ? ` · 原因: ${user.banReason}` : ''} · 封禁期间无法发帖、评论、点赞
+          {user?.banReason ? ` · 原因: ${user.banReason}` : ''} · 封禁期间无法发帖、评论
         </div>
       )}
       <div className="mx-auto h-14 flex items-center justify-between px-4" style={{ maxWidth: 640 }}>

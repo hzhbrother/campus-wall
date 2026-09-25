@@ -179,11 +179,21 @@ function PostsTab() {
 }
 
 // ---------- 内容审核 ----------
+const REJECT_VIOLATION_TYPES = [
+  { value: 'SPAM', label: '垃圾广告', points: 10 },
+  { value: 'ABUSE', label: '辱骂攻击', points: 20 },
+  { value: 'PORN', label: '色情低俗', points: 30 },
+  { value: 'ILLEGAL', label: '违法违规', points: 50 },
+  { value: 'PLAGIARISM', label: '抄袭侵权', points: 15 },
+  { value: 'OTHER', label: '其他违规', points: 10 },
+];
+
 function ModerationTab() {
   const [items, setItems] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState('');
   const [reason, setReason] = useState('');
+  const [violationType, setViolationType] = useState('OTHER');
   const [rejectId, setRejectId] = useState<string | null>(null);
 
   const load = () => {
@@ -196,7 +206,7 @@ function ModerationTab() {
   const approve = async (id: string) => { try { await api.post(`/api/admin/posts/${id}/approve`); load(); } catch (e: any) { setErr(e.message); } };
   const reject = async (id: string) => {
     if (!reason.trim()) { alert('请输入拒绝理由'); return; }
-    try { await api.post(`/api/admin/posts/${id}/reject`, { reason }); setRejectId(null); setReason(''); load(); } catch (e: any) { setErr(e.message); }
+    try { await api.post(`/api/admin/posts/${id}/reject`, { reason, violationType }); setRejectId(null); setReason(''); setViolationType('OTHER'); load(); } catch (e: any) { setErr(e.message); }
   };
 
   return (
@@ -217,9 +227,26 @@ function ModerationTab() {
                 <button onClick={() => setRejectId(rejectId === p.id ? null : p.id)} className="rounded-lg bg-red-50 px-4 py-1.5 text-sm text-red-600">拒绝</button>
               </div>
               {rejectId === p.id && (
-                <div className="mt-2 flex gap-2">
-                  <input value={reason} onChange={e => setReason(e.target.value)} placeholder="拒绝理由" className="flex-1 rounded-lg border border-gray-300 px-3 py-1.5 text-sm" />
-                  <button onClick={() => reject(p.id)} className="rounded-lg bg-red-600 px-4 py-1.5 text-sm text-white">确认拒绝</button>
+                <div className="mt-3 space-y-3 rounded-xl bg-red-50/50 p-3">
+                  <div>
+                    <label className="mb-1.5 block text-sm text-gray-600">违规类型 <span className="text-xs text-gray-400">(将同步扣除作者诚信分)</span></label>
+                    <div className="grid grid-cols-3 gap-2">
+                      {REJECT_VIOLATION_TYPES.map(v => (
+                        <button
+                          key={v.value}
+                          onClick={() => setViolationType(v.value)}
+                          className={`rounded-lg border px-2 py-2 text-xs transition ${violationType === v.value ? 'border-red-500 bg-red-50 text-red-600' : 'border-gray-200 bg-white text-gray-600 hover:border-red-300'}`}
+                        >
+                          <div className="font-medium">{v.label}</div>
+                          <div className="mt-0.5 text-[10px] text-red-500">扣 {v.points} 分</div>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                  <div className="flex gap-2">
+                    <input value={reason} onChange={e => setReason(e.target.value)} placeholder="拒绝理由 (将通知作者)" className="flex-1 rounded-lg border border-gray-300 px-3 py-1.5 text-sm" />
+                    <button onClick={() => reject(p.id)} className="rounded-lg bg-red-600 px-4 py-1.5 text-sm text-white">确认拒绝</button>
+                  </div>
                 </div>
               )}
             </div>
@@ -390,7 +417,10 @@ function UsersTab({ isSuper }: { isSuper: boolean }) {
   const statusLabel: Record<string, string> = { NORMAL: '正常', GRADUATED: '毕业生', BANNED: '永久封禁' };
   const statusColor: Record<string, string> = { NORMAL: 'bg-green-100 text-green-700', GRADUATED: 'bg-amber-100 text-amber-700', BANNED: 'bg-red-600 text-white' };
 
-  const isBanned = (u: any) => u.bannedUntil && new Date(u.bannedUntil).getTime() > Date.now();
+  const isBanned = (u: any) => {
+    if (!u.bannedUntil) return false;
+    try { return new Date(u.bannedUntil).getTime() > Date.now(); } catch { return false; }
+  };
   const userStatus = (u: any) => {
     if (u.status === 'BANNED') return { label: '永久封禁', color: 'bg-red-600 text-white' };
     if (isBanned(u)) return { label: '封禁中', color: 'bg-orange-500 text-white' };
@@ -398,9 +428,12 @@ function UsersTab({ isSuper }: { isSuper: boolean }) {
   };
   const banInfo = (u: any) => {
     if (u.status === 'BANNED') return '永久封禁';
-    if (isBanned(u)) return `临时封禁至 ${new Date(u.bannedUntil).toLocaleDateString()}`;
+    if (isBanned(u)) {
+      try { return `临时封禁至 ${new Date(u.bannedUntil).toLocaleDateString()}`; } catch { return '临时封禁中'; }
+    }
     return '';
   };
+  const scoreColor = (s: number) => s >= 80 ? 'text-green-600' : s >= 60 ? 'text-amber-600' : s >= 40 ? 'text-orange-600' : 'text-red-600';
 
   return (
     <div>
@@ -430,6 +463,7 @@ function UsersTab({ isSuper }: { isSuper: boolean }) {
                   </div>
                   <p className="mt-0.5 text-xs text-gray-400">
                     {u.realName ? u.realName + ' · ' : ''}{u.grade || ''}{u.className || ''}{u.email ? ' · ' + u.email : ''} · 帖子 {u._count?.posts}
+                    {typeof u.credibilityScore === 'number' && <span className={`ml-2 font-medium ${scoreColor(u.credibilityScore)}`}>诚信分 {u.credibilityScore}</span>}
                   </p>
                   {banInfo(u) && <p className="mt-0.5 text-xs text-red-500 font-medium">{banInfo(u)}{u.banReason ? ' · ' + u.banReason : ''}</p>}
                 </div>
@@ -504,6 +538,21 @@ function EditUserModal({ user, onClose, onSaved, isSuper }: { user: any; onClose
         </div>
 
         {err && <div className="mb-3 text-sm text-red-500">{err}</div>}
+
+        {/* 封禁状态提示 */}
+        {(() => {
+          const isPerm = user.status === 'BANNED';
+          const isTemp = user.bannedUntil && new Date(user.bannedUntil).getTime() > Date.now();
+          if (!isPerm && !isTemp) return null;
+          return (
+            <div className={`mb-3 rounded-lg p-3 text-sm ${isPerm ? 'bg-red-50 text-red-700' : 'bg-orange-50 text-orange-700'}`}>
+              <span className="font-semibold">{isPerm ? '⚠ 永久封禁中' : '⚠ 临时封禁中'}</span>
+              {isTemp && user.bannedUntil && ` · 到期: ${new Date(user.bannedUntil).toLocaleString('zh-CN')}`}
+              {user.banReason && ` · 原因: ${user.banReason}`}
+              <div className="mt-1 text-xs opacity-80">修改访问状态不会解除封禁, 如需解封请在用户列表点击「解封」按钮。</div>
+            </div>
+          );
+        })()}
 
         <div className="space-y-3">
           {/* 头像 */}

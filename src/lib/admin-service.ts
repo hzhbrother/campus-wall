@@ -3,6 +3,16 @@ import { UserRole, UserStatus, PostStatus } from '@prisma/client';
 import { Prisma } from '@prisma/client';
 import { prisma } from '@/lib/prisma';
 
+// 违规类型标签映射
+export const VIOLATION_TYPE_LABEL: Record<string, string> = {
+  SPAM: '垃圾广告', ABUSE: '辱骂攻击', PORN: '色情低俗',
+  ILLEGAL: '违法违规', PLAGIARISM: '抄袭侵权', OTHER: '其他违规',
+};
+
+export function violationTypeLabel(type: string): string {
+  return VIOLATION_TYPE_LABEL[type] || '违规';
+}
+
 export async function stats() {
   const [users, posts, pendingPosts, comments, paidOrders, revenueAgg] = await Promise.all([
     prisma.user.count(),
@@ -38,11 +48,29 @@ export async function approve(postId: string, actorId: string) {
   return updated;
 }
 
-export async function reject(postId: string, actorId: string, reason?: string) {
-  const post = await prisma.post.findUnique({ where: { id: postId } });
+export async function reject(postId: string, actorId: string, reason?: string, violationType?: string) {
+  const post = await prisma.post.findUnique({ where: { id: postId }, include: { author: { select: { id: true, nickname: true } } } });
   if (!post) throw new Error('帖子不存在');
   const updated = await prisma.post.update({ where: { id: postId }, data: { status: PostStatus.REJECTED } });
   await audit(actorId, 'REJECT_POST', postId, reason);
+
+  // 驳回帖子时同步创建违规记录并扣除诚信分
+  if (violationType && post.author) {
+    const { recordViolation, VIOLATION_POINTS } = await import('@/lib/credibility-service');
+    const vLabel = violationTypeLabel(violationType);
+    const points = VIOLATION_POINTS[violationType] || 10;
+    const { newScore } = await recordViolation(post.author.id, violationType, `帖子「${post.title}」因「${reason || vLabel}」被驳回`, postId);
+    // 发送违规扣分通知
+    const { createNotification } = await import('@/lib/notification-service');
+    const { NotificationType } = await import('@prisma/client');
+    await createNotification({
+      userId: post.author.id,
+      type: NotificationType.SYSTEM,
+      title: '账号违规通知',
+      content: `您发布的帖子「${post.title}」因「${reason || vLabel}」被驳回, 已扣除诚信分 ${points} 分, 当前诚信分 ${newScore} 分。`,
+      link: `/post/${postId}`,
+    });
+  }
   return updated;
 }
 
@@ -119,7 +147,7 @@ export async function listUsers(page: number, pageSize: number, role?: UserRole,
       orderBy: { createdAt: 'desc' },
       skip: (page - 1) * pageSize,
       take: pageSize,
-      select: { id: true, email: true, nickname: true, realName: true, avatar: true, role: true, status: true, grade: true, className: true, remark: true, bannedUntil: true, banReason: true, createdAt: true, _count: { select: { posts: true } } },
+      select: { id: true, email: true, nickname: true, realName: true, avatar: true, role: true, status: true, grade: true, className: true, remark: true, bannedUntil: true, banReason: true, credibilityScore: true, createdAt: true, _count: { select: { posts: true } } },
     }),
     prisma.user.count({ where }),
   ]);
@@ -151,9 +179,14 @@ export async function updateUser(userId: string, data: {
   avatar?: string;
   status?: UserStatus;
   role?: UserRole;
+  bannedUntil?: Date | null;
 }, actorId: string) {
   const user = await prisma.user.findUnique({ where: { id: userId } });
   if (!user) throw new Error('用户不存在');
+  // 若将状态设为永久封禁, 同步清空临时封禁到期时间, 保持字段一致
+  if (data.status === UserStatus.BANNED) {
+    data.bannedUntil = null;
+  }
   const updated = await prisma.user.update({ where: { id: userId }, data });
   await audit(actorId, 'UPDATE_USER', userId);
   return updated;
@@ -188,22 +221,19 @@ export async function banUser(userId: string, durationDays: number, reason: stri
 
   // 同步创建违规记录并扣除诚信分
   const { recordViolation, VIOLATION_POINTS } = await import('@/lib/credibility-service');
-  const vTypeLabel: Record<string, string> = {
-    SPAM: '垃圾广告', ABUSE: '辱骂攻击', PORN: '色情低俗',
-    ILLEGAL: '违法违规', PLAGIARISM: '抄袭侵权', OTHER: '其他违规',
-  };
-  const vLabel = vTypeLabel[violationType] || '违规';
+  const vLabel = violationTypeLabel(violationType);
   const points = VIOLATION_POINTS[violationType] || 10;
   const { newScore } = await recordViolation(userId, violationType, `${reason || vLabel}（封禁${isPermanent ? '永久' : durationDays + '天'}）`);
 
-  // 发送封禁通知到铃铛
+  // 发送封禁通知到铃铛 (直接说明违规原因 + 扣除信用分)
   const { createNotification } = await import('@/lib/notification-service');
   const { NotificationType } = await import('@prisma/client');
+  const banDurationText = isPermanent ? '永久封禁' : `封禁 ${durationDays} 天`;
   await createNotification({
     userId,
     type: NotificationType.BAN,
-    title: isPermanent ? '账号被永久封禁' : `账号被封禁 ${durationDays} 天`,
-    content: `因「${vLabel}」违规, 扣除诚信分 ${points} 分, 当前诚信分 ${newScore} 分。\n封禁原因: ${reason || '未填写'}\n如有异议, 可点击下方进行申诉。`,
+    title: '账号违规通知',
+    content: `您的账号已违规: 因「${vLabel}」${reason ? '（' + reason + '）' : ''}, 扣除诚信分 ${points} 分, 当前诚信分 ${newScore} 分。\n处罚措施: ${banDurationText}。\n如有异议, 可点击下方进行申诉。`,
     link: '/profile/ban-appeal',
   });
 
