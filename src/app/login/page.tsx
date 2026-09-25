@@ -81,7 +81,7 @@ export default function LoginPage() {
           <div>
             <div className="flex items-center justify-between mb-1.5">
               <label className="text-sm font-medium text-slate-700">密码</label>
-              <span className="text-xs text-blue-500 cursor-pointer">忘记密码？</span>
+              <span className="text-xs text-blue-500 cursor-pointer" onClick={() => router.push('/forgot-password')}>忘记密码？</span>
             </div>
             <div className="relative">
               <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400">

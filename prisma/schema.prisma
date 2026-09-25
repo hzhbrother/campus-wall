@@ -342,6 +342,20 @@ model ViolationRecord {
   @@index([userId, createdAt])
 }
 
+// ---- 邮箱验证码 (用于忘记密码、绑定邮箱等) ----
+
+model EmailVerificationCode {
+  id        String   @id @default(cuid())
+  email     String
+  code      String   // 6 位验证码
+  purpose   String   // 用途: reset-password / bind-email / change-email
+  used      Boolean  @default(false)
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  @@index([email, purpose, createdAt])
+}
+
 // ---- 站点配置 (键值对存储, 含 SMTP 等) ----
 
 model SiteConfig {

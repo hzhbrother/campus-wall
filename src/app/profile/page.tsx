@@ -27,6 +27,7 @@ function EditProfile({ user, onSaved, forcePhone = false }: { user: any; onSaved
   const [realName, setRealName] = useState(user?.realName || '');
   const [countryCode, setCountryCode] = useState(user?.countryCode || '+86');
   const [phoneNumber, setPhoneNumber] = useState(user?.phoneNumber || '');
+  const [email, setEmail] = useState(user?.email || '');
   const [grade, setGrade] = useState(user?.grade || '');
   const [className, setClassName] = useState(user?.className || '');
   const [remark, setRemark] = useState(user?.remark || '');
@@ -50,12 +51,32 @@ function EditProfile({ user, onSaved, forcePhone = false }: { user: any; onSaved
   const save = async () => {
     setMsg(''); setPhoneError('');
     if (!realName.trim()) { setMsg('请输入真实姓名'); return; }
-    const v = validatePhone(countryCode, phoneNumber);
-    if (!v.ok) { setPhoneError(v.message || '请输入手机号'); return; }
+
+    const hasPhone = phoneNumber.trim().length > 0;
+    const hasEmail = email.trim().length > 0;
+
+    // 手机号和邮箱至少填一个
+    if (!hasPhone && !hasEmail) {
+      setMsg('手机号和邮箱至少填写一个');
+      return;
+    }
+    // 校验手机号格式 (如果填写了)
+    if (hasPhone) {
+      const v = validatePhone(countryCode, phoneNumber);
+      if (!v.ok) { setPhoneError(v.message || '请输入手机号'); return; }
+    }
+    // 校验邮箱格式 (如果填写了)
+    if (hasEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      setMsg('邮箱格式不正确');
+      return;
+    }
+
     setSaving(true);
     try {
       await api.patch('/api/users/me', {
-        nickname, realName: realName.trim(), countryCode, phoneNumber,
+        nickname, realName: realName.trim(), countryCode: hasPhone ? countryCode : '',
+        phoneNumber: hasPhone ? phoneNumber : '',
+        email: hasEmail ? email.trim() : '',
         grade, className, remark, avatar,
       });
       setMsg('已保存');
@@ -92,16 +113,17 @@ function EditProfile({ user, onSaved, forcePhone = false }: { user: any; onSaved
       </div>
 
       {forcePhone && (
-        <p className="mt-3 text-xs text-orange-500">为保障账号安全, 请先完善真实姓名和手机号信息</p>
+        <p className="mt-3 text-xs text-orange-500">为保障账号安全, 请先完善真实姓名和联系方式 (手机号或邮箱)</p>
       )}
 
       <Row label="昵称">
         <input value={nickname} onChange={e => setNickname(e.target.value)} className="w-32 text-right text-[15px] text-gray-900 outline-none" placeholder="请输入昵称" />
       </Row>
 
+      {/* 手机号 - 选填 */}
       <div className="border-b border-gray-100 py-3.5">
         <div className="flex items-center justify-between">
-          <span className="text-[15px] text-gray-800">手机号<span className="ml-1 text-red-500">*</span></span>
+          <span className="text-[15px] text-gray-800">手机号<span className="ml-1 text-xs text-gray-400">(选填)</span></span>
           <div className="flex items-center gap-2">
             <button type="button" onClick={() => setShowCountryPicker(true)} className="flex items-center gap-0.5 text-[15px] text-gray-900">
               {country.code}
@@ -112,6 +134,11 @@ function EditProfile({ user, onSaved, forcePhone = false }: { user: any; onSaved
         </div>
         {phoneError && <p className="mt-1 text-right text-xs text-red-500">{phoneError}</p>}
       </div>
+
+      {/* 邮箱 - 选填 */}
+      <Row label={<>邮箱<span className="ml-1 text-xs text-gray-400">(选填, 用于找回密码)</span></>}>
+        <input type="email" value={email} onChange={e => setEmail(e.target.value)} className="w-44 text-right text-[15px] text-gray-900 outline-none" placeholder="请输入邮箱" />
+      </Row>
 
       <Row label={<>真实姓名<span className="ml-1 text-red-500">*</span></>}>
         <input value={realName} onChange={e => setRealName(e.target.value)} className="w-32 text-right text-[15px] text-gray-900 outline-none" placeholder="请输入真实姓名" />
@@ -148,6 +175,8 @@ function EditProfile({ user, onSaved, forcePhone = false }: { user: any; onSaved
         <textarea value={remark} onChange={e => setRemark(e.target.value.slice(0, 200))} rows={3} className="w-full resize-none rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm outline-none focus:border-blue-400" placeholder="介绍一下自己吧..." />
         <div className="mt-1 text-right text-xs text-gray-400">{remark.length}/200</div>
       </div>
+
+      <p className="mb-1 text-xs text-gray-400">手机号和邮箱至少填写一个</p>
 
       {msg && <p className={`text-sm ${msg.includes('成功') || msg.includes('已保存') ? 'text-green-600' : 'text-red-500'}`}>{msg}</p>}
 
