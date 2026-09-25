@@ -10,6 +10,7 @@ export function Header() {
   const [siteName, setSiteName] = useState('校园墙');
   const [siteLogo, setSiteLogo] = useState('');
   const [banRemain, setBanRemain] = useState('');
+  const [unread, setUnread] = useState(0);
 
   // 封禁倒计时
   useEffect(() => {
@@ -39,6 +40,14 @@ export function Header() {
       .catch(() => {});
   }, []);
 
+  // 未读消息数
+  useEffect(() => {
+    if (!user) { setUnread(0); return; }
+    api.get<{ count: number }>('/api/notifications/unread-count')
+      .then(d => setUnread(d.count))
+      .catch(() => {});
+  }, [user]);
+
   return (
     <header className="sticky top-0 z-20 bg-white border-b border-slate-100">
       {banRemain && (
@@ -57,6 +66,19 @@ export function Header() {
           <span className="text-lg font-bold text-slate-900">{siteName}</span>
         </Link>
         <div className="flex items-center gap-3">
+          {user && (
+            <Link href="/notifications" className="relative no-underline" aria-label="消息">
+              <svg className="h-6 w-6 text-slate-600" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
+                <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" strokeLinecap="round" strokeLinejoin="round"/>
+                <path d="M13.73 21a2 2 0 0 1-3.46 0" strokeLinecap="round" strokeLinejoin="round"/>
+              </svg>
+              {unread > 0 && (
+                <span className="absolute -top-1 -right-1 h-4 min-w-4 px-1 rounded-full bg-red-500 text-white text-[10px] flex items-center justify-center">
+                  {unread > 99 ? '99+' : unread}
+                </span>
+              )}
+            </Link>
+          )}
           <div className="w-8 flex items-center justify-end">
             {loading ? (
               <span className="text-slate-300">…</span>
