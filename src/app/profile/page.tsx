@@ -391,6 +391,11 @@ function UsersTab({ isSuper }: { isSuper: boolean }) {
   const statusColor: Record<string, string> = { NORMAL: 'bg-green-100 text-green-700', GRADUATED: 'bg-amber-100 text-amber-700', BANNED: 'bg-red-600 text-white' };
 
   const isBanned = (u: any) => u.bannedUntil && new Date(u.bannedUntil).getTime() > Date.now();
+  const userStatus = (u: any) => {
+    if (u.status === 'BANNED') return { label: '永久封禁', color: 'bg-red-600 text-white' };
+    if (isBanned(u)) return { label: '封禁中', color: 'bg-orange-500 text-white' };
+    return { label: statusLabel[u.status] || u.status, color: statusColor[u.status] || 'bg-gray-100' };
+  };
   const banInfo = (u: any) => {
     if (u.status === 'BANNED') return '永久封禁';
     if (isBanned(u)) return `临时封禁至 ${new Date(u.bannedUntil).toLocaleDateString()}`;
@@ -421,7 +426,7 @@ function UsersTab({ isSuper }: { isSuper: boolean }) {
                   <div className="flex items-center gap-2 flex-wrap">
                     <span className="font-semibold text-gray-900">{u.nickname}</span>
                     <span className="rounded bg-blue-100 px-1.5 py-0.5 text-xs text-blue-700">{roleLabel[u.role] || u.role}</span>
-                    <span className={`rounded px-1.5 py-0.5 text-xs ${statusColor[u.status] || 'bg-gray-100'}`}>{statusLabel[u.status] || u.status}</span>
+                    <span className={`rounded px-1.5 py-0.5 text-xs ${userStatus(u).color}`}>{userStatus(u).label}</span>
                   </div>
                   <p className="mt-0.5 text-xs text-gray-400">
                     {u.realName ? u.realName + ' · ' : ''}{u.grade || ''}{u.className || ''}{u.email ? ' · ' + u.email : ''} · 帖子 {u._count?.posts}
@@ -598,20 +603,31 @@ const BAN_OPTIONS = [
   { days: 0, label: '永久', color: 'bg-red-800 hover:bg-red-900 text-white' },
 ];
 
+const VIOLATION_TYPES = [
+  { value: 'SPAM', label: '垃圾广告', points: 10 },
+  { value: 'ABUSE', label: '辱骂攻击', points: 20 },
+  { value: 'PORN', label: '色情低俗', points: 30 },
+  { value: 'ILLEGAL', label: '违法违规', points: 50 },
+  { value: 'PLAGIARISM', label: '抄袭侵权', points: 15 },
+  { value: 'OTHER', label: '其他违规', points: 10 },
+];
+
 function BanUserModal({ user, onClose, onDone }: { user: any; onClose: () => void; onDone: () => void }) {
   const [selected, setSelected] = useState<number | null>(null);
   const [reason, setReason] = useState('');
+  const [violationType, setViolationType] = useState('OTHER');
   const [confirm, setConfirm] = useState(false);
   const [saving, setSaving] = useState(false);
   const [err, setErr] = useState('');
 
   const selectedOpt = BAN_OPTIONS.find(o => o.days === selected);
+  const selectedVType = VIOLATION_TYPES.find(v => v.value === violationType);
 
   const doBan = async () => {
     if (selected === null) return;
     setSaving(true); setErr('');
     try {
-      await api.post(`/api/admin/users/${user.id}/ban`, { durationDays: selected, reason });
+      await api.post(`/api/admin/users/${user.id}/ban`, { durationDays: selected, reason, violationType });
       onDone();
       onClose();
     } catch (e: any) {
@@ -635,6 +651,21 @@ function BanUserModal({ user, onClose, onDone }: { user: any; onClose: () => voi
             <h3 className="text-lg font-bold text-gray-900 mb-1">封禁用户</h3>
             <p className="text-sm text-gray-500 mb-4">正在封禁: <span className="font-semibold text-gray-700">{user.nickname}</span></p>
             <div className="mb-4">
+              <label className="mb-1.5 block text-sm text-gray-600">违规类型 <span className="text-xs text-gray-400">(将同步扣除诚信分)</span></label>
+              <div className="grid grid-cols-3 gap-2">
+                {VIOLATION_TYPES.map(v => (
+                  <button
+                    key={v.value}
+                    onClick={() => setViolationType(v.value)}
+                    className={`rounded-lg border px-2 py-2 text-xs transition ${violationType === v.value ? 'border-orange-500 bg-orange-50 text-orange-600' : 'border-gray-200 text-gray-600 hover:border-orange-300'}`}
+                  >
+                    <div className="font-medium">{v.label}</div>
+                    <div className="mt-0.5 text-[10px] text-red-500">扣 {v.points} 分</div>
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div className="mb-4">
               <label className="mb-1.5 block text-sm text-gray-600">封禁原因 (可选)</label>
               <input value={reason} onChange={e => setReason(e.target.value)} placeholder="例如: 恶意刷屏、发布违规内容..." className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm" />
             </div>
@@ -655,10 +686,13 @@ function BanUserModal({ user, onClose, onDone }: { user: any; onClose: () => voi
             <div className="mb-5 rounded-xl bg-gray-50 p-4 text-center">
               <p className="text-sm text-gray-500">确定封禁用户</p>
               <p className="mt-1 font-bold text-gray-900">{user.nickname}</p>
+              <p className="mt-2 text-sm text-gray-500">违规类型</p>
+              <p className="mt-1 text-lg font-bold text-gray-900">{selectedVType?.label}</p>
+              <p className="mt-1 text-sm text-red-500">扣除诚信分 {selectedVType?.points} 分</p>
               <p className="mt-2 text-sm text-gray-500">封禁时间为</p>
               <p className={`mt-1 text-2xl font-bold ${selected === 0 ? 'text-red-800' : 'text-orange-600'}`}>{selectedOpt?.label}</p>
               {selected === 0 && <p className="mt-2 text-xs text-red-600">永久封禁后该用户将无法登录</p>}
-              {selected !== 0 && <p className="mt-2 text-xs text-gray-500">封禁期间用户可浏览内容, 但不能发帖、评论、点赞</p>}
+              {selected !== 0 && <p className="mt-2 text-xs text-gray-500">封禁期间用户可浏览、点赞、收藏, 但不能发帖、评论</p>}
             </div>
             {err && <div className="mb-3 text-sm text-red-500">{err}</div>}
             <div className="flex gap-3">

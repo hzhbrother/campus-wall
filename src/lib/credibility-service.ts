@@ -124,5 +124,7 @@ export async function recordViolation(
     data: { userId, type: type as any, reason, pointsDeducted: points, relatedPostId },
   });
   const newScore = await getCurrentScore(userId);
+  // 同步更新用户表的诚信分, 保证实时一致
+  await prisma.user.update({ where: { id: userId }, data: { credibilityScore: newScore } });
   return { newScore, deducted: points };
 }

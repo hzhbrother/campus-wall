@@ -160,7 +160,7 @@ export async function updateUser(userId: string, data: {
 }
 
 // 封禁用户 (durationDays = 0 表示永久封禁)
-export async function banUser(userId: string, durationDays: number, reason: string, actorId: string) {
+export async function banUser(userId: string, durationDays: number, reason: string, actorId: string, violationType: string = 'OTHER') {
   const user = await prisma.user.findUnique({ where: { id: userId } });
   if (!user) throw new Error('用户不存在');
   const isPermanent = durationDays <= 0;
@@ -186,6 +186,16 @@ export async function banUser(userId: string, durationDays: number, reason: stri
     },
   });
 
+  // 同步创建违规记录并扣除诚信分
+  const { recordViolation, VIOLATION_POINTS } = await import('@/lib/credibility-service');
+  const vTypeLabel: Record<string, string> = {
+    SPAM: '垃圾广告', ABUSE: '辱骂攻击', PORN: '色情低俗',
+    ILLEGAL: '违法违规', PLAGIARISM: '抄袭侵权', OTHER: '其他违规',
+  };
+  const vLabel = vTypeLabel[violationType] || '违规';
+  const points = VIOLATION_POINTS[violationType] || 10;
+  const { newScore } = await recordViolation(userId, violationType, `${reason || vLabel}（封禁${isPermanent ? '永久' : durationDays + '天'}）`);
+
   // 发送封禁通知到铃铛
   const { createNotification } = await import('@/lib/notification-service');
   const { NotificationType } = await import('@prisma/client');
@@ -193,7 +203,7 @@ export async function banUser(userId: string, durationDays: number, reason: stri
     userId,
     type: NotificationType.BAN,
     title: isPermanent ? '账号被永久封禁' : `账号被封禁 ${durationDays} 天`,
-    content: `封禁原因: ${reason || '未填写'}\n如有异议, 可点击下方按钮进行申诉。`,
+    content: `因「${vLabel}」违规, 扣除诚信分 ${points} 分, 当前诚信分 ${newScore} 分。\n封禁原因: ${reason || '未填写'}\n如有异议, 可点击下方进行申诉。`,
     link: '/profile/ban-appeal',
   });
 

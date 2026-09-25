@@ -8,11 +8,11 @@ import { errorResponse } from '@/lib/api-response';
 export async function POST(req: NextRequest, { params }: { params: { id: string } }) {
   try {
     const me = await requireRole(req, UserRole.ADMIN, UserRole.SUPER_ADMIN);
-    const { durationDays, reason } = await req.json().catch(() => ({}));
+    const { durationDays, reason, violationType } = await req.json().catch(() => ({}));
     if (typeof durationDays !== 'number') {
       return NextResponse.json({ message: '缺少封禁时长' }, { status: 400 });
     }
-    const user = await banUser(params.id, durationDays, reason || '', me.id);
+    const user = await banUser(params.id, durationDays, reason || '', me.id, violationType || 'OTHER');
     return NextResponse.json(user);
   } catch (e) {
     return errorResponse(e);
