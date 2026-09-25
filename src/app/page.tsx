@@ -11,6 +11,7 @@ export default function HomePage() {
   const [items, setItems] = useState<PostListItem[]>([]);
   const [category, setCategory] = useState<string>('');
   const [q, setQ] = useState('');
+  const [searchOpen, setSearchOpen] = useState(false);
   const [loading, setLoading] = useState(true);
 
   const load = useCallback(async () => {
@@ -31,43 +32,70 @@ export default function HomePage() {
   useEffect(() => { load(); }, [load]);
 
   return (
-    <div className="space-y-4">
-      {/* 搜索 */}
-      <div className="flex gap-2">
-        <input
-          className="input flex-1"
-          placeholder="搜索标题或内容…"
-          value={q}
-          onChange={(e) => setQ(e.target.value)}
-          onKeyDown={(e) => e.key === 'Enter' && load()}
-        />
-        <button className="btn-primary" onClick={load}>搜索</button>
-      </div>
-
-      {/* 分类筛选 */}
-      <div className="flex flex-wrap gap-2">
+    <div className="space-y-3">
+      {/* 分类标签栏 */}
+      <div className="flex items-center gap-1 overflow-x-auto pb-1 no-scrollbar">
         <button
           onClick={() => setCategory('')}
-          className={`tag px-3 py-1 ${!category ? 'bg-brand-600 text-white' : 'bg-white border border-slate-200 text-slate-600'}`}
+          className={`shrink-0 px-3.5 py-1.5 rounded-full text-sm font-medium transition ${
+            !category ? 'bg-slate-900 text-white' : 'bg-white text-slate-500'
+          }`}
         >
-          全部
+          推荐
         </button>
         {CATEGORIES.map((c) => (
           <button
             key={c}
             onClick={() => setCategory(c === category ? '' : c)}
-            className={`tag px-3 py-1 ${c === category ? 'bg-brand-600 text-white' : 'bg-white border border-slate-200 text-slate-600'}`}
+            className={`shrink-0 px-3.5 py-1.5 rounded-full text-sm font-medium transition ${
+              c === category ? 'bg-slate-900 text-white' : 'bg-white text-slate-500'
+            }`}
           >
             {c}
           </button>
         ))}
+        <button
+          onClick={() => setSearchOpen(s => !s)}
+          className="shrink-0 ml-auto p-2 rounded-full bg-white text-slate-500"
+          aria-label="搜索"
+        >
+          <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <circle cx="11" cy="11" r="8" />
+            <path d="m21 21-4.3-4.3" strokeLinecap="round" />
+          </svg>
+        </button>
+      </div>
+
+      {/* 搜索框 */}
+      {searchOpen && (
+        <div className="flex gap-2">
+          <input
+            className="flex-1 px-3 py-2 rounded-xl border border-slate-200 bg-white text-sm focus:outline-none focus:ring-2 focus:ring-brand-500/40"
+            placeholder="搜索标题或内容…"
+            value={q}
+            onChange={(e) => setQ(e.target.value)}
+            onKeyDown={(e) => e.key === 'Enter' && load()}
+            autoFocus
+          />
+          <button className="px-4 py-2 rounded-xl bg-brand-600 text-white text-sm" onClick={load}>搜索</button>
+        </div>
+      )}
+
+      {/* 滚动公告栏 */}
+      <div className="flex items-center gap-2 rounded-xl bg-amber-50 border border-amber-200 px-3 py-2 overflow-hidden">
+        <span className="shrink-0">📢</span>
+        <div className="flex-1 overflow-hidden whitespace-nowrap">
+          <div className="marquee inline-block">
+            欢迎来到校园墙！请文明发言，禁止发布违规内容。失物招领请尽量附上图片，二手交易请当面验货。
+          </div>
+        </div>
       </div>
 
       {/* 信息流 */}
       {loading ? (
         <p className="text-center text-slate-400 py-10">加载中…</p>
       ) : items.length === 0 ? (
-        <div className="card p-10 text-center text-slate-400">
+        <div className="bg-white rounded-2xl p-10 text-center text-slate-400">
           暂无内容。{q || category ? '换个筛选试试' : <>先去<Link href="/new" className="text-brand-600">发布第一条</Link>吧</>}
         </div>
       ) : (

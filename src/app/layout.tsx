@@ -2,6 +2,7 @@ import './globals.css';
 import type { Metadata } from 'next';
 import { Providers } from './providers';
 import { Header } from '@/components/Header';
+import { BottomNav } from '@/components/BottomNav';
 
 export const metadata: Metadata = {
   title: '校园墙',
@@ -14,10 +15,10 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <body>
         <Providers>
           <Header />
-          <main className="max-w-3xl mx-auto px-4 py-6 min-h-[calc(100vh-64px)]">{children}</main>
-          <footer className="border-t border-slate-200 text-center text-xs text-slate-400 py-6">
-            校园墙 · 仅供学习交流
-          </footer>
+          <main className="mx-auto px-4 pt-3 pb-20 min-h-[calc(100vh-56px)]" style={{ maxWidth: 640 }}>
+            {children}
+          </main>
+          <BottomNav />
         </Providers>
       </body>
     </html>

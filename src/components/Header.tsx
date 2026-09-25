@@ -5,39 +5,32 @@ import { useAuth } from '@/lib/auth-context';
 
 export function Header() {
   const { user, loading, logout } = useAuth();
-  const isAdmin = user && (user.role === 'ADMIN' || user.role === 'SUPER_ADMIN');
 
   return (
-    <header className="sticky top-0 z-20 bg-white/90 backdrop-blur border-b border-slate-200">
-      <div className="max-w-3xl mx-auto px-4 h-16 flex items-center justify-between">
-        <Link href="/" className="flex items-center gap-2 text-brand-600 font-bold text-lg no-underline">
-          <span className="inline-flex w-8 h-8 rounded-lg bg-brand-600 text-white items-center justify-center">墙</span>
-          校园墙
+    <header className="sticky top-0 z-20 bg-white border-b border-slate-100">
+      <div className="mx-auto h-14 flex items-center justify-between px-4" style={{ maxWidth: 640 }}>
+        <div className="w-8" />
+        <Link href="/" className="flex items-center gap-2 no-underline">
+          <span className="text-lg font-bold text-slate-900">校园墙</span>
         </Link>
-
-        <nav className="flex items-center gap-3 text-sm">
-          <Link href="/" className="text-slate-600 hover:text-brand-600 no-underline">首页</Link>
-          {user && <Link href="/new" className="text-slate-600 hover:text-brand-600 no-underline">发布</Link>}
-
+        <div className="w-8 flex items-center justify-end">
           {loading ? (
-            <span className="text-slate-400">…</span>
+            <span className="text-slate-300">…</span>
           ) : user ? (
-            <div className="flex items-center gap-3">
-              {isAdmin && (
-                <Link href="/profile" className="text-brand-600 no-underline">管理后台</Link>
-              )}
-              <Link href="/profile" className="text-slate-600 hover:text-brand-600 no-underline">
-                {user.nickname}
-              </Link>
-              <button onClick={logout} className="btn-ghost text-xs px-3 py-1.5">退出</button>
-            </div>
+            <Link href="/profile" className="no-underline">
+              <div className="h-8 w-8 overflow-hidden rounded-full bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center text-white text-sm font-medium">
+                {user.avatar ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={user.avatar} alt="" className="h-full w-full object-cover" />
+                ) : (
+                  (user.nickname || 'U')[0].toUpperCase()
+                )}
+              </div>
+            </Link>
           ) : (
-            <div className="flex items-center gap-2">
-              <Link href="/login" className="text-slate-600 hover:text-brand-600 no-underline">登录</Link>
-              <Link href="/register" className="btn-primary text-xs px-3 py-1.5 no-underline">注册</Link>
-            </div>
+            <Link href="/login" className="text-slate-500 text-sm no-underline">登录</Link>
           )}
-        </nav>
+        </div>
       </div>
     </header>
   );
