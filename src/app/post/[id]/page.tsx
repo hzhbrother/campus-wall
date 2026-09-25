@@ -1,9 +1,9 @@
 'use client';
 
-import { useEffect, useState, use } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/auth-context';
-import { api, ApiError } from '@/lib/api';
+import { api } from '@/lib/api';
 
 interface Author { id: string; nickname: string; avatar?: string | null; role?: string }
 interface Comment { id: string; content: string; createdAt: string; author: Author; parentId?: string | null }
@@ -14,8 +14,8 @@ interface PostDetail {
   createdAt: string; author: Author; comments: Comment[];
 }
 
-export default function PostDetailPage({ params }: { params: Promise<{ id: string }> }) {
-  const { id } = use(params);
+export default function PostDetailPage({ params }: { params: { id: string } }) {
+  const { id } = params;
   const { user } = useAuth();
   const router = useRouter();
   const [post, setPost] = useState<PostDetail | null>(null);
