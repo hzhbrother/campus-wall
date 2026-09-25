@@ -41,44 +41,89 @@ export default function NotificationsPage() {
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
   const [loading, setLoading] = useState(false);
+  const [tab, setTab] = useState<'unread' | 'all'>('unread');
+  const [unreadCount, setUnreadCount] = useState(0);
   const pageSize = 20;
 
   const load = useCallback(() => {
     setLoading(true);
-    api.get(`/api/notifications?page=${page}&pageSize=${pageSize}`)
+    const params = new URLSearchParams({ page: String(page), pageSize: String(pageSize) });
+    if (tab === 'unread') params.set('unread', '1');
+    api.get(`/api/notifications?${params.toString()}`)
       .then((d: any) => { setItems(d.items); setTotal(d.total); })
       .catch(e => console.error(e))
       .finally(() => setLoading(false));
-  }, [page]);
+  }, [page, tab]);
 
   useEffect(() => { load(); }, [load]);
+
+  // 获取未读总数
+  const refreshUnread = useCallback(() => {
+    api.get<{ count: number }>('/api/notifications/unread-count')
+      .then(d => setUnreadCount(d.count))
+      .catch(() => {});
+  }, []);
+
+  useEffect(() => { refreshUnread(); }, [refreshUnread]);
+
+  // 切换标签时重置页码
+  const switchTab = (t: 'unread' | 'all') => { setTab(t); setPage(1); };
 
   const markRead = async (id: string) => {
     try {
       await api.post(`/api/notifications/${id}/read`, {});
       setItems(items.map(i => i.id === id ? { ...i, isRead: true } : i));
+      if (tab === 'unread') setItems(items.filter(i => i.id !== id));
+      refreshUnread();
     } catch (e) { console.error(e); }
   };
 
   const markAll = async () => {
     try {
       await api.post('/api/notifications/read-all', {});
-      setItems(items.map(i => ({ ...i, isRead: true })));
+      if (tab === 'unread') setItems([]);
+      else setItems(items.map(i => ({ ...i, isRead: true })));
+      refreshUnread();
     } catch (e) { console.error(e); }
   };
 
   return (
     <div>
       <div className="flex items-center justify-between mb-4">
-        <h1 className="text-xl font-bold text-slate-900">通知中心</h1>
-        <button onClick={markAll} className="text-sm text-blue-500 hover:text-blue-600">全部已读</button>
+        <h1 className="text-xl font-bold text-slate-900">消息中心</h1>
+        {/* 未读标签下显示全部已读按钮; 全部标签下显示未读数量 */}
+        {tab === 'unread' ? (
+          <button onClick={markAll} className="text-sm text-blue-500 hover:text-blue-600">全部已读</button>
+        ) : (
+          <span className="text-sm text-slate-400">未读 {unreadCount} 条</span>
+        )}
+      </div>
+
+      {/* 标签切换 */}
+      <div className="flex gap-1 mb-4 bg-slate-100 p-1 rounded-xl">
+        <button
+          onClick={() => switchTab('unread')}
+          className={`flex-1 py-2 rounded-lg text-sm font-medium transition ${
+            tab === 'unread' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-400'
+          }`}
+        >
+          未读 {unreadCount > 0 && <span className="text-red-500">({unreadCount})</span>}
+        </button>
+        <button
+          onClick={() => switchTab('all')}
+          className={`flex-1 py-2 rounded-lg text-sm font-medium transition ${
+            tab === 'all' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-400'
+          }`}
+        >
+          全部
+        </button>
       </div>
 
       {loading ? (
         <p className="py-10 text-center text-slate-400">加载中…</p>
       ) : items.length === 0 ? (
         <div className="bg-white rounded-2xl p-10 text-center text-slate-400">
-          暂无通知
+          {tab === 'unread' ? '暂无未读消息' : '暂无消息'}
         </div>
       ) : (
         <div className="space-y-2">

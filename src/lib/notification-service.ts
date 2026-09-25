@@ -72,8 +72,9 @@ export async function getUnreadCount(userId: string): Promise<number> {
 }
 
 // 获取用户通知列表 (个人 + 广播)
-export async function listUserNotifications(userId: string, page = 1, pageSize = 20) {
-  const where = { OR: [{ userId }, { userId: null }] };
+export async function listUserNotifications(userId: string, page = 1, pageSize = 20, onlyUnread = false) {
+  const where: any = { OR: [{ userId }, { userId: null }] };
+  if (onlyUnread) where.isRead = false;
   const [items, total] = await Promise.all([
     prisma.notification.findMany({
       where,
