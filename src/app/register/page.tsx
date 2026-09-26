@@ -1,9 +1,10 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useAuth } from '@/lib/auth-context';
+import { api } from '@/lib/api';
 
 const GRADES = ['高一', '高二', '高三', '初一', '初二', '初三', '不填写'];
 
@@ -12,6 +13,8 @@ export default function RegisterPage() {
   const router = useRouter();
   const [form, setForm] = useState({
     nickname: '',
+    email: '',
+    emailCode: '',
     realName: '',
     grade: '',
     className: '',
@@ -23,8 +26,30 @@ export default function RegisterPage() {
   const [showPwd2, setShowPwd2] = useState(false);
   const [err, setErr] = useState('');
   const [busy, setBusy] = useState(false);
+  const [sendingCode, setSendingCode] = useState(false);
+  const [codeSent, setCodeSent] = useState(false);
+  const [countdown, setCountdown] = useState(0);
+
+  useEffect(() => {
+    if (countdown <= 0) return;
+    const t = setTimeout(() => setCountdown(c => c - 1), 1000);
+    return () => clearTimeout(t);
+  }, [countdown]);
 
   const set = (k: string, v: string) => setForm({ ...form, [k]: v });
+
+  const sendCode = async () => {
+    if (!form.email.trim()) { setErr('请先输入邮箱'); return; }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email)) { setErr('邮箱格式不正确'); return; }
+    setSendingCode(true); setErr('');
+    try {
+      await api.post('/api/auth/register/send-code', { email: form.email.trim() });
+      setCodeSent(true);
+      setCountdown(60);
+      setErr('验证码已发送, 请查收邮件');
+    } catch (e: any) { setErr(e.message); }
+    finally { setSendingCode(false); }
+  };
 
   const onSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -33,17 +58,22 @@ export default function RegisterPage() {
       setErr('两次输入的密码不一致');
       return;
     }
+    if (!form.emailCode.trim()) {
+      setErr('请输入邮箱验证码');
+      return;
+    }
     setBusy(true);
     try {
       await register({
         nickname: form.nickname,
+        email: form.email.trim(),
+        emailCode: form.emailCode.trim(),
         realName: form.realName,
         grade: form.grade,
         className: form.className,
         password: form.password,
         remark: form.remark,
       });
-      // 注册成功后跳转首页 (联系方式由全局浮窗强制完善)
       router.replace('/');
     } catch (e: any) {
       setErr(e.message);
@@ -64,7 +94,7 @@ export default function RegisterPage() {
           <p className="text-sm text-slate-500 mt-1">注册您的校园墙账户</p>
         </div>
 
-        {err && <div className="bg-red-50 text-red-600 text-sm p-3 rounded-lg mb-4">{err}</div>}
+        {err && <div className={`text-sm p-3 rounded-lg mb-4 ${err.includes('已发送') ? 'bg-green-50 text-green-600' : 'bg-red-50 text-red-600'}`}>{err}</div>}
 
         <form onSubmit={onSubmit} className="space-y-4">
           {/* 账号名 */}
@@ -76,6 +106,36 @@ export default function RegisterPage() {
               </span>
               <input className="w-full pl-10 pr-4 py-3 rounded-xl border border-slate-200 bg-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/40"
                 placeholder="请输入账号名" value={form.nickname} onChange={e => set('nickname', e.target.value)} required />
+            </div>
+          </div>
+
+          {/* 邮箱 */}
+          <div>
+            <label className="block text-sm font-medium text-slate-700 mb-1.5">邮箱<span className="text-red-500"> *</span></label>
+            <div className="relative">
+              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400">
+                <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="m22 7-10 6L2 7" strokeLinecap="round" strokeLinejoin="round"/></svg>
+              </span>
+              <input type="email" className="w-full pl-10 pr-4 py-3 rounded-xl border border-slate-200 bg-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/40"
+                placeholder="请输入邮箱" value={form.email} onChange={e => set('email', e.target.value)} required />
+            </div>
+          </div>
+
+          {/* 邮箱验证码 */}
+          <div>
+            <label className="block text-sm font-medium text-slate-700 mb-1.5">邮箱验证码<span className="text-red-500"> *</span></label>
+            <div className="flex gap-2">
+              <div className="relative flex-1">
+                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400">
+                  <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10Z"/><path d="m9 12 2 2 4-4" strokeLinecap="round" strokeLinejoin="round"/></svg>
+                </span>
+                <input type="text" inputMode="numeric" maxLength={6} className="w-full pl-10 pr-4 py-3 rounded-xl border border-slate-200 bg-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/40"
+                  placeholder="6位验证码" value={form.emailCode} onChange={e => set('emailCode', e.target.value.replace(/\D/g, ''))} required />
+              </div>
+              <button type="button" onClick={sendCode} disabled={sendingCode || countdown > 0}
+                className="shrink-0 px-4 rounded-xl bg-blue-500 text-white text-sm font-medium disabled:opacity-50 hover:bg-blue-600 transition">
+                {sendingCode ? '发送中' : countdown > 0 ? `${countdown}s` : codeSent ? '重发' : '获取验证码'}
+              </button>
             </div>
           </div>
 

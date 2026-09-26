@@ -12,6 +12,7 @@ const PURPOSE_LABEL: Record<string, string> = {
   'reset-password': '重置密码',
   'bind-email': '绑定邮箱',
   'change-email': '变更邮箱',
+  'register': '注册账号',
 };
 
 // 生成 6 位数字验证码
