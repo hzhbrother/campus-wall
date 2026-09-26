@@ -739,6 +739,8 @@ function VerificationModal({ user, onClose, onVerified, onSubmitted }: { user: a
       .catch(() => setTemplates([]));
   }, [verifyType]);
 
+  const [localQualStatus, setLocalQualStatus] = useState<string>(user.qualificationStatus || 'NONE');
+
   const refreshStatus = useCallback(async () => {
     try {
       const d = await api.get<{ verificationStatus: string; verificationRejectReason?: string; verified?: boolean }>('/api/users/me/verification');
@@ -747,6 +749,14 @@ function VerificationModal({ user, onClose, onVerified, onSubmitted }: { user: a
       if (d.verified || d.verificationStatus === 'APPROVED') onVerified();
     } catch { /* ignore */ }
   }, [onVerified]);
+
+  // 刷新资质认证状态 (提交后/轮询时调用)
+  const refreshQualStatus = useCallback(async () => {
+    try {
+      const d = await api.get<{ qualificationStatus: string; qualificationVerified: boolean; qualificationRejectReason?: string }>('/api/users/me/qualification');
+      setLocalQualStatus(d.qualificationStatus || 'NONE');
+    } catch { /* ignore */ }
+  }, []);
 
   const role = user.role || 'STUDENT';
   const isSuperAdmin = role === 'SUPER_ADMIN';
@@ -758,9 +768,16 @@ function VerificationModal({ user, onClose, onVerified, onSubmitted }: { user: a
     : isQual ? '证明材料' : '校园卡/工牌';
   const isFace = photoType === 'FACE';
 
-  const status = localStatus || user.verificationStatus || 'NONE';
-  const isApproved = user.verified || status === 'APPROVED';
-  const isAiReviewing = status === 'AI_REVIEWING';
+  // 身份认证 vs 资质认证 使用各自独立的状态字段, 互不污染
+  const idStatus = localStatus || user.verificationStatus || 'NONE';
+  const qualStatus = localQualStatus || user.qualificationStatus || 'NONE';
+  // 超级管理员身份认证自动通过; 资质认证需手动提交
+  const idApproved = isSuperAdmin || user.verified || idStatus === 'APPROVED';
+  const qualApproved = user.qualificationVerified || qualStatus === 'APPROVED';
+
+  const isApproved = isQual ? qualApproved : idApproved;
+  const status = isQual ? qualStatus : idStatus;
+  const isAiReviewing = !isQual && status === 'AI_REVIEWING';
   const isPending = status === 'PENDING';
   const isRejected = status === 'REJECTED';
   const inProgress = isAiReviewing || isPending;
@@ -768,9 +785,10 @@ function VerificationModal({ user, onClose, onVerified, onSubmitted }: { user: a
   // AI 初审 / 人工复核期间轮询刷新状态 (每 3 秒)
   useEffect(() => {
     if (!isAiReviewing && !isPending) return;
-    const t = setInterval(refreshStatus, 3000);
+    const refresh = isQual ? refreshQualStatus : refreshStatus;
+    const t = setInterval(refresh, 3000);
     return () => clearInterval(t);
-  }, [isAiReviewing, isPending, refreshStatus]);
+  }, [isAiReviewing, isPending, isQual, refreshStatus, refreshQualStatus]);
 
   // 认证进度阶段: 0=提交, 1=AI初审, 2=人工复核, 3=完成
   const progressStep = isApproved ? 3 : isPending ? 2 : isAiReviewing ? 1 : (status !== 'NONE' ? 0 : -1);
@@ -822,7 +840,7 @@ function VerificationModal({ user, onClose, onVerified, onSubmitted }: { user: a
       try {
         const res: any = await api.post('/api/users/me/qualification', { photo, type: qualName.trim() });
         setMsg(res?.message || '资质认证申请已提交');
-        await refreshStatus();
+        await refreshQualStatus();
         onSubmitted?.();
         setPhoto('');
       } catch (e: any) { setMsg(e.message); } finally { setBusy(false); }
@@ -859,18 +877,24 @@ function VerificationModal({ user, onClose, onVerified, onSubmitted }: { user: a
           <button onClick={onClose} className="text-gray-400 hover:text-gray-600 text-xl">✕</button>
         </div>
 
-        {/* 超级管理员: 自动已认证 */}
-        {isSuperAdmin ? (
+        {/* 超级管理员: 身份认证自动通过 (资质认证仍需手动提交) */}
+        {isSuperAdmin && !isQual ? (
           <div className="rounded-xl bg-green-50 p-4 text-center">
             <div className="text-3xl mb-1">✅</div>
-            <div className="text-sm font-medium text-green-700">已认证</div>
-            <div className="text-xs text-green-600 mt-1">超级管理员身份自动通过认证</div>
+            <div className="text-sm font-medium text-green-700">已身份认证</div>
+            <div className="text-xs text-green-600 mt-1">超级管理员身份自动通过身份认证</div>
+            <div className="text-xs text-gray-400 mt-1">如需资质/荣誉认证, 请选择下方对应类型</div>
           </div>
         ) : isApproved ? (
           <div className="rounded-xl bg-green-50 p-4 text-center">
             <div className="text-3xl mb-1">✅</div>
             <div className="text-sm font-medium text-green-700">已{verifyLabel}</div>
-            {user.verifiedAt && <div className="text-xs text-green-600 mt-1">认证时间: {new Date(user.verifiedAt).toLocaleDateString('zh-CN')}</div>}
+            {isQual ? (
+              user.qualificationVerifiedAt && <div className="text-xs text-green-600 mt-1">认证时间: {new Date(user.qualificationVerifiedAt).toLocaleDateString('zh-CN')}</div>
+            ) : (
+              user.verifiedAt && <div className="text-xs text-green-600 mt-1">认证时间: {new Date(user.verifiedAt).toLocaleDateString('zh-CN')}</div>
+            )}
+            {isQual && <div className="text-xs text-gray-400 mt-1">可重新提交新的资质/荣誉认证</div>}
           </div>
         ) : inProgress ? (
           <div className="rounded-xl bg-amber-50 p-4">
@@ -913,16 +937,18 @@ function VerificationModal({ user, onClose, onVerified, onSubmitted }: { user: a
           </div>
         ) : isRejected ? (
           <div className="rounded-xl bg-red-50 p-4 mb-3">
-            <div className="text-sm font-medium text-red-700">❌ 认证被驳回</div>
-            {user.verificationRejectReason || localRejectReason ? (
-              <div className="text-xs text-red-600 mt-1">原因: {user.verificationRejectReason || localRejectReason}</div>
+            <div className="text-sm font-medium text-red-700">❌ {verifyLabel}被驳回</div>
+            {(isQual ? user.qualificationRejectReason : (user.verificationRejectReason || localRejectReason)) ? (
+              <div className="text-xs text-red-600 mt-1">原因: {isQual ? user.qualificationRejectReason : (user.verificationRejectReason || localRejectReason)}</div>
             ) : null}
-            <div className="text-xs text-red-500 mt-1">请重新拍摄清晰的{photoLabel}照片后再次提交</div>
+            <div className="text-xs text-red-500 mt-1">请重新提交{isQual ? '资质/荣誉' : ''}材料后再次提交</div>
           </div>
         ) : null}
 
-        {/* 未通过且非审核中时可提交 (资质/荣誉认证可重复提交) */}
-        {!isSuperAdmin && (isQual || (!isApproved && !isPending && !isAiReviewing)) && (
+        {/* 可提交条件:
+            - 资质/荣誉认证: 所有人(含超管)均可随时重复提交
+            - 身份认证: 非超管且未通过、非审核中时可提交 */}
+        {(isQual || (!isSuperAdmin && !isApproved && !isPending && !isAiReviewing)) && (
           <>
             {/* 第一步: 选择认证类型 */}
             <div className="mb-3">

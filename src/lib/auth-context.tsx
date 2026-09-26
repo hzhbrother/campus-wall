@@ -21,11 +21,15 @@ export interface AuthUser {
   roleId?: string | null;
   customRole?: { id: string; name: string; permissions: string[] } | null;
   verified?: boolean;
+  verifiedAt?: string | null;
   verificationStatus?: string;
   verificationRejectReason?: string | null;
   // 资质认证 (组织身份)
   qualificationType?: string | null;
   qualificationVerified?: boolean;
+  qualificationVerifiedAt?: string | null;
+  qualificationStatus?: string;
+  qualificationRejectReason?: string | null;
   createdAt?: string;
   bannedUntil?: string | null;
   points?: number;
