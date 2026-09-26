@@ -90,6 +90,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setUser(null);
   }, []);
 
+  // 监听 api.ts 派发的 401 事件: 清除用户态让 UI 自然降级
+  // 不删除 token, 保留以便下次刷新时重新验证 (避免瞬时 401 导致误登出)
+  useEffect(() => {
+    const onUnauthorized = () => setUser(null);
+    window.addEventListener('auth:unauthorized', onUnauthorized);
+    return () => window.removeEventListener('auth:unauthorized', onUnauthorized);
+  }, []);
+
   return (
     <Ctx.Provider value={{ user, loading, login, register, applyToken, logout, refreshUser: fetchMe }}>
       {children}

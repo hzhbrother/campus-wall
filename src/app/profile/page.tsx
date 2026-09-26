@@ -286,8 +286,8 @@ function ProfilePageInner() {
     }
   }, [searchParams, view]);
 
-  // 标签页激活时刷新用户信息
-  usePageRefresh(() => { refreshUser(); }, [refreshUser]);
+  // 标签页激活时刷新用户信息 (跳过挂载时首次刷新, 由 auth context 负责)
+  usePageRefresh(() => { refreshUser(); }, [refreshUser], true);
 
   if (loading) return <div className="min-h-screen flex items-center justify-center text-gray-400">加载中…</div>;
 

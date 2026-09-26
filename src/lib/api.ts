@@ -38,12 +38,11 @@ async function request<T>(path: string, opts: RequestInit = {}): Promise<T> {
   const data = text ? JSON.parse(text) : null;
 
   if (!res.ok) {
-    // 401: token 失效, 清除登录态并跳转登录页
+    // 401: token 可能失效, 通知 auth context 清除用户态让 UI 自然降级
+    // 不直接删 token 也不强制跳转, 避免瞬时 401 (如数据库抖动/并发竞态) 导致误登出
+    // 保留 token 以便下次刷新时由 auth context 重新验证; 若确实失效则用户态保持为空
     if (res.status === 401 && typeof window !== 'undefined') {
-      localStorage.removeItem('cw_token');
-      if (!window.location.pathname.startsWith('/login')) {
-        window.location.href = '/login';
-      }
+      window.dispatchEvent(new CustomEvent('auth:unauthorized'));
     }
     const message = data?.message || (Array.isArray(data?.message) ? data.message[0] : `请求失败 (${res.status})`);
     throw new ApiError(message, res.status, data);
