@@ -16,6 +16,8 @@ const SubmitSchema = z.object({
   photo: z.string().min(1).max(Math.ceil(MAX_PHOTO_BYTES * 4 / 3) + 100),
   templateId: z.string().optional(),
   photoType: z.enum(['CARD', 'FACE']).optional(), // 卡面 / 人脸
+  faceName: z.string().max(32).optional(), // 人脸照片时用户填写的姓名
+  faceId: z.string().max(32).optional(),   // 人脸照片时用户填写的工号/学号
 });
 
 export async function GET(req: NextRequest) {
@@ -75,7 +77,7 @@ export async function POST(req: NextRequest) {
     // 异步触发 AI 初审 (不阻塞响应)
     if (isVisionEnabled()) {
       const isFace = dto.photoType === 'FACE';
-      runAiReview(me.id, dto.photo, dto.photoType === 'FACE' ? null : (dto.templateId || null), isFace).catch(e => console.error('[verification] AI review failed:', e));
+      runAiReview(me.id, dto.photo, dto.photoType === 'FACE' ? null : (dto.templateId || null), isFace, dto.faceName || null, dto.faceId || null).catch(e => console.error('[verification] AI review failed:', e));
     }
 
     // 通知所有管理员: 有新的实名认证申请待审核
@@ -112,11 +114,16 @@ export async function POST(req: NextRequest) {
 }
 
 // AI 初审: 判断是否校园卡 + 清晰度, 通过则进入人工复审, 不通过则直接驳回
-async function runAiReview(userId: string, photo: string, templateId: string | null, isFace: boolean) {
+async function runAiReview(userId: string, photo: string, templateId: string | null, isFace: boolean, faceName: string | null, faceId: string | null) {
   let result;
   if (isFace) {
     // 人脸照片: 检测人脸 + 清晰度
     result = await preliminaryFaceReview(photo);
+    // 把用户填写的姓名和工号放入 fields, 供管理员复审时核对
+    if (result) {
+      if (faceName) result.fields['姓名'] = faceName;
+      if (faceId) result.fields['工号/学号'] = faceId;
+    }
   } else {
     // 卡面照片: 加载模板 + OCR 文字提取
     let template: any = null;

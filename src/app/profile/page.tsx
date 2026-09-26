@@ -628,6 +628,8 @@ function VerificationModal({ user, onClose, onVerified, onSubmitted }: { user: a
   const [templateId, setTemplateId] = useState<string>('');
   const [verifyType, setVerifyType] = useState<VerifyType | ''>('');
   const [photoType, setPhotoType] = useState<'CARD' | 'FACE'>('CARD');
+  const [faceName, setFaceName] = useState('');
+  const [faceId, setFaceId] = useState('');
   const [templates, setTemplates] = useState<{ id: string; name: string; type: string; image: string; isActive: boolean }[]>([]);
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState('');
@@ -720,11 +722,17 @@ function VerificationModal({ user, onClose, onVerified, onSubmitted }: { user: a
 
   const submit = async () => {
     if (!isFace && !templateId) { setMsg('请先选择模板'); return; }
+    if (isFace && !faceName.trim()) { setMsg('请填写姓名'); return; }
+    if (isFace && !faceId.trim()) { setMsg('请填写工号/学号'); return; }
     if (!photo) { setMsg(`请先拍摄${photoLabel}`); return; }
     setBusy(true); setMsg('');
     try {
       const payload: any = { photo, photoType };
       if (!isFace) payload.templateId = templateId;
+      if (isFace) {
+        payload.faceName = faceName.trim();
+        payload.faceId = faceId.trim();
+      }
       const res: any = await api.post('/api/users/me/verification', payload);
       setMsg(res?.message || '认证申请已提交');
       await refreshStatus();
@@ -913,6 +921,31 @@ function VerificationModal({ user, onClose, onVerified, onSubmitted }: { user: a
                     </ul>
                   )}
                 </div>
+
+                {/* 人脸照片: 必须填写姓名和工号/学号 (供管理员核对身份) */}
+                {isFace && (
+                  <div className="rounded-xl bg-blue-50 p-3 mb-3 space-y-2">
+                    <div className="text-sm font-medium text-blue-800 mb-1">📝 填写身份信息 (管理员将据此核对)</div>
+                    <div>
+                      <label className="block text-xs text-blue-700 mb-1">姓名 <span className="text-red-500">*</span></label>
+                      <input
+                        value={faceName}
+                        onChange={e => setFaceName(e.target.value)}
+                        placeholder="请输入真实姓名"
+                        className="w-full rounded-lg border border-blue-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs text-blue-700 mb-1">工号/学号 <span className="text-red-500">*</span></label>
+                      <input
+                        value={faceId}
+                        onChange={e => setFaceId(e.target.value)}
+                        placeholder="请输入工号或学号"
+                        className="w-full rounded-lg border border-blue-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
+                      />
+                    </div>
+                  </div>
+                )}
 
                 {photo ? (
                   <div className="relative mb-3">
