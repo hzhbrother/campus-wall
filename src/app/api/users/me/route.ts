@@ -4,6 +4,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import { prisma } from '@/lib/prisma';
 import { requireUser, sanitize } from '@/lib/server-auth';
+import { verifyEmailCode } from '@/lib/email-verify';
 import { errorResponse } from '@/lib/api-response';
 
 const UpdateSchema = z.object({
@@ -18,6 +19,8 @@ const UpdateSchema = z.object({
   grade: z.string().max(20).optional().or(z.literal('')),
   className: z.string().max(20).optional().or(z.literal('')),
   remark: z.string().max(200).optional().or(z.literal('')),
+  // 邮箱变更时需携带的验证码
+  emailCode: z.string().length(6, '验证码为6位数字').optional(),
 });
 
 export async function GET(req: NextRequest) {
@@ -37,7 +40,23 @@ export async function PATCH(req: NextRequest) {
   try {
     const me = await requireUser(req);
     const dto = UpdateSchema.parse(await req.json());
-    const user = await prisma.user.update({ where: { id: me.id }, data: dto });
+
+    // 如果邮箱发生变更, 必须验证验证码
+    if (dto.email !== undefined && dto.email !== me.email) {
+      if (!dto.emailCode) {
+        return NextResponse.json({ message: '变更邮箱需要验证码' }, { status: 400 });
+      }
+      const purpose = me.email ? 'change-email' : 'bind-email';
+      const valid = await verifyEmailCode(dto.email, dto.emailCode, purpose);
+      if (!valid) {
+        return NextResponse.json({ message: '验证码错误或已过期' }, { status: 400 });
+      }
+    }
+
+    // 移除 emailCode (不存入数据库)
+    const { emailCode, ...data } = dto;
+
+    const user = await prisma.user.update({ where: { id: me.id }, data });
     return NextResponse.json(sanitize(user));
   } catch (e: any) {
     if (e?.name === 'ZodError') return NextResponse.json({ message: e.errors?.[0]?.message || '参数错误' }, { status: 400 });

@@ -16,6 +16,18 @@ const AdminPanel = dynamic(() => import('@/components/admin/AdminPanel').then(m 
 
 type View = 'home' | 'admin' | 'edit' | AdminTab;
 
+// ---------- 通用行组件 (定义在组件外, 避免每次渲染重建导致 input 失焦) ----------
+const Row = ({ label, children, onClick, border = true }: { label: React.ReactNode; children: React.ReactNode; onClick?: () => void; border?: boolean }) => (
+  <div className={`flex items-center justify-between px-1 py-3.5 ${border ? 'border-b border-gray-100' : ''} ${onClick ? 'cursor-pointer hover:bg-gray-50' : ''}`} onClick={onClick}>
+    <span className="text-[15px] text-gray-800">{label}</span>
+    <div className="flex items-center gap-1">{children}</div>
+  </div>
+);
+
+const Arrow = () => (
+  <svg className="h-4 w-4 text-gray-300" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="m9 18 6-6-6-6" strokeLinecap="round" strokeLinejoin="round"/></svg>
+);
+
 // ---------- 个人资料编辑 ----------
 const GRADES = ['高一', '高二', '高三', '初一', '初二', '初三'];
 const CLASS_LIST = ['1班', '2班', '3班', '4班', '5班', '6班', '7班', '8班', '9班', '10班'];
@@ -37,6 +49,21 @@ function EditProfile({ user, onSaved, forcePhone = false }: { user: any; onSaved
   const [phoneError, setPhoneError] = useState('');
   const [showCountryPicker, setShowCountryPicker] = useState(false);
   const [editingField, setEditingField] = useState<string | null>(null);
+  // 邮箱绑定验证码
+  const [emailCode, setEmailCode] = useState('');
+  const [sendingCode, setSendingCode] = useState(false);
+  const [codeSent, setCodeSent] = useState(false);
+  const [countdown, setCountdown] = useState(0);
+
+  // 邮箱是否被修改 (与原值不同)
+  const emailChanged = (email.trim() || '') !== (user?.email || '');
+
+  // 倒计时
+  useEffect(() => {
+    if (countdown <= 0) return;
+    const t = setTimeout(() => setCountdown(c => c - 1), 1000);
+    return () => clearTimeout(t);
+  }, [countdown]);
 
   const handleAvatarFile = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -48,6 +75,20 @@ function EditProfile({ user, onSaved, forcePhone = false }: { user: any; onSaved
 
   const classOptions = grade ? CLASS_LIST : [];
 
+  // 发送邮箱绑定验证码
+  const sendEmailBindCode = async () => {
+    if (!email.trim()) { setMsg('请先输入邮箱'); return; }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { setMsg('邮箱格式不正确'); return; }
+    setSendingCode(true); setMsg('');
+    try {
+      await api.post('/api/users/me/email/send-code', { email: email.trim() });
+      setCodeSent(true);
+      setCountdown(60);
+      setMsg('验证码已发送, 请查收邮件');
+    } catch (e: any) { setMsg(e.message); }
+    finally { setSendingCode(false); }
+  };
+
   const save = async () => {
     setMsg(''); setPhoneError('');
     if (!realName.trim()) { setMsg('请输入真实姓名'); return; }
@@ -55,47 +96,39 @@ function EditProfile({ user, onSaved, forcePhone = false }: { user: any; onSaved
     const hasPhone = phoneNumber.trim().length > 0;
     const hasEmail = email.trim().length > 0;
 
-    // 手机号和邮箱至少填一个
-    if (!hasPhone && !hasEmail) {
-      setMsg('手机号和邮箱至少填写一个');
-      return;
-    }
-    // 校验手机号格式 (如果填写了)
+    // 邮箱必填
+    if (!hasEmail) { setMsg('请输入邮箱'); return; }
+    // 校验邮箱格式
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { setMsg('邮箱格式不正确'); return; }
+    // 校验手机号格式 (选填, 填写了才校验)
     if (hasPhone) {
       const v = validatePhone(countryCode, phoneNumber);
       if (!v.ok) { setPhoneError(v.message || '请输入手机号'); return; }
     }
-    // 校验邮箱格式 (如果填写了)
-    if (hasEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-      setMsg('邮箱格式不正确');
+    // 邮箱变更时必须验证
+    if (emailChanged && !emailCode.trim()) {
+      setMsg('邮箱已变更, 请输入验证码完成绑定');
       return;
     }
 
     setSaving(true);
     try {
-      await api.patch('/api/users/me', {
-        nickname, realName: realName.trim(), countryCode: hasPhone ? countryCode : '',
+      const payload: any = {
+        nickname, realName: realName.trim(),
+        countryCode: hasPhone ? countryCode : '',
         phoneNumber: hasPhone ? phoneNumber : '',
-        email: hasEmail ? email.trim() : '',
+        email: email.trim(),
         grade, className, remark, avatar,
-      });
+      };
+      if (emailChanged) payload.emailCode = emailCode.trim();
+      await api.patch('/api/users/me', payload);
       setMsg('已保存');
+      setEmailCode(''); setCodeSent(false);
       onSaved();
     } catch (e: any) { setMsg(e.message); } finally { setSaving(false); }
   };
 
   const country = getCountryByCode(countryCode);
-
-  const Row = ({ label, children, onClick, border = true }: { label: React.ReactNode; children: React.ReactNode; onClick?: () => void; border?: boolean }) => (
-    <div className={`flex items-center justify-between px-1 py-3.5 ${border ? 'border-b border-gray-100' : ''} ${onClick ? 'cursor-pointer hover:bg-gray-50' : ''}`} onClick={onClick}>
-      <span className="text-[15px] text-gray-800">{label}</span>
-      <div className="flex items-center gap-1">{children}</div>
-    </div>
-  );
-
-  const Arrow = () => (
-    <svg className="h-4 w-4 text-gray-300" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="m9 18 6-6-6-6" strokeLinecap="round" strokeLinejoin="round"/></svg>
-  );
 
   return (
     <div>
@@ -113,7 +146,7 @@ function EditProfile({ user, onSaved, forcePhone = false }: { user: any; onSaved
       </div>
 
       {forcePhone && (
-        <p className="mt-3 text-xs text-orange-500">为保障账号安全, 请先完善真实姓名和联系方式 (手机号或邮箱)</p>
+        <p className="mt-3 text-xs text-orange-500">为保障账号安全, 请先完善真实姓名和邮箱 (邮箱为必填)</p>
       )}
 
       <Row label="昵称">
@@ -135,10 +168,23 @@ function EditProfile({ user, onSaved, forcePhone = false }: { user: any; onSaved
         {phoneError && <p className="mt-1 text-right text-xs text-red-500">{phoneError}</p>}
       </div>
 
-      {/* 邮箱 - 选填 */}
-      <Row label={<>邮箱<span className="ml-1 text-xs text-gray-400">(选填, 用于找回密码)</span></>}>
-        <input type="email" value={email} onChange={e => setEmail(e.target.value)} className="w-44 text-right text-[15px] text-gray-900 outline-none" placeholder="请输入邮箱" />
-      </Row>
+      {/* 邮箱 - 必填, 变更需验证 */}
+      <div className="border-b border-gray-100 py-3.5">
+        <div className="flex items-center justify-between">
+          <span className="text-[15px] text-gray-800">邮箱<span className="ml-1 text-red-500">*</span><span className="ml-1 text-xs text-gray-400">(用于找回密码/通知)</span></span>
+          <div className="flex items-center gap-2">
+            <input type="email" value={email} onChange={e => { setEmail(e.target.value); setEmailCode(''); setCodeSent(false); }} className="w-40 text-right text-[15px] text-gray-900 outline-none" placeholder="请输入邮箱" />
+          </div>
+        </div>
+        {emailChanged && (
+          <div className="mt-3 flex items-center gap-2">
+            <input type="text" inputMode="numeric" maxLength={6} value={emailCode} onChange={e => setEmailCode(e.target.value.replace(/\D/g, ''))} className="flex-1 rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-[15px] outline-none focus:border-blue-400" placeholder="请输入验证码" />
+            <button type="button" onClick={sendEmailBindCode} disabled={sendingCode || countdown > 0} className="shrink-0 rounded-lg bg-blue-500 px-4 py-2 text-[13px] font-medium text-white disabled:opacity-50">
+              {sendingCode ? '发送中…' : countdown > 0 ? `${countdown}s 后重发` : codeSent ? '重新发送' : '获取验证码'}
+            </button>
+          </div>
+        )}
+      </div>
 
       <Row label={<>真实姓名<span className="ml-1 text-red-500">*</span></>}>
         <input value={realName} onChange={e => setRealName(e.target.value)} className="w-32 text-right text-[15px] text-gray-900 outline-none" placeholder="请输入真实姓名" />
@@ -176,7 +222,7 @@ function EditProfile({ user, onSaved, forcePhone = false }: { user: any; onSaved
         <div className="mt-1 text-right text-xs text-gray-400">{remark.length}/200</div>
       </div>
 
-      <p className="mb-1 text-xs text-gray-400">手机号和邮箱至少填写一个</p>
+      <p className="mb-1 text-xs text-gray-400">邮箱为必填项, 变更邮箱需短信验证码验证; 手机号选填</p>
 
       {msg && <p className={`text-sm ${msg.includes('成功') || msg.includes('已保存') ? 'text-green-600' : 'text-red-500'}`}>{msg}</p>}
 
