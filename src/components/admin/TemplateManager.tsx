@@ -152,6 +152,13 @@ export default function TemplateManager() {
     } catch (e: any) { alert(e.message || '操作失败'); }
   };
 
+  const deactivate = async (id: string) => {
+    try {
+      await api.post(`/api/admin/verification-templates/${id}/deactivate`);
+      await load();
+    } catch (e: any) { alert(e.message || '操作失败'); }
+  };
+
   const remove = async (id: string) => {
     if (!confirm('确定删除该模板?')) return;
     try {
@@ -198,8 +205,10 @@ export default function TemplateManager() {
                   <div className="text-xs text-gray-400 mt-0.5">{new Date(t.createdAt).toLocaleString('zh-CN')}</div>
                 </div>
                 <div className="flex gap-2">
-                  {!t.isActive && (
-                    <button onClick={() => activate(t.id)} className="text-xs px-2.5 py-1 bg-green-500 text-white rounded hover:bg-green-600">设为激活</button>
+                  {t.isActive ? (
+                    <button onClick={() => deactivate(t.id)} className="text-xs px-2.5 py-1 bg-gray-200 text-gray-700 rounded hover:bg-gray-300">停用</button>
+                  ) : (
+                    <button onClick={() => activate(t.id)} className="text-xs px-2.5 py-1 bg-green-500 text-white rounded hover:bg-green-600">激活</button>
                   )}
                   <button onClick={() => remove(t.id)} className="text-xs px-2.5 py-1 bg-red-50 text-red-600 rounded hover:bg-red-100">删除</button>
                 </div>

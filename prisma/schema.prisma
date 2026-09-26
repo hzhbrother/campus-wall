@@ -167,6 +167,7 @@ model User {
   notificationSettings NotificationSetting?
   customRole   Role?            @relation(fields: [roleId], references: [id])
   userBadges   UserBadge[]
+  qualifications Qualification[]
   checkIns     CheckInRecord[]
   school       School?          @relation(fields: [schoolId], references: [id])
   organization Organization?    @relation(fields: [organizationId], references: [id])
@@ -479,6 +480,27 @@ model UserBadge {
 
   @@unique([userId, badgeId])
   @@index([userId])
+}
+
+// ---- 资质/荣誉认证 (一个用户可拥有多个, 需管理员审核) ----
+
+model Qualification {
+  id              String             @id @default(cuid())
+  userId          String
+  type            String                          // 资质/荣誉名称, 如 "学生会主席" / "优秀志愿者"
+  category        String             @default("QUALIFICATION") // QUALIFICATION(资质) / HONOR(荣誉)
+  photo           String?                         // 证明材料 (证书/奖状 base64)
+  status          VerificationStatus @default(NONE)
+  verified        Boolean            @default(false)
+  verifiedAt      DateTime?
+  rejectReason    String?
+  createdAt       DateTime           @default(now())
+  updatedAt       DateTime           @updatedAt
+
+  user            User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([status])
 }
 
 // ---- 签到记录 (积分) ----

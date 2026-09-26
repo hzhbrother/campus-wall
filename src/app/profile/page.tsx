@@ -10,6 +10,7 @@ import { usePageRefresh } from '@/lib/use-page-refresh';
 import { VerifiedBadge } from '@/components/VerifiedBadge';
 import { BadgesView } from '@/components/BadgesView';
 import { CheckInView } from '@/components/CheckInView';
+import { formatUserCode } from '@/lib/user-number';
 import type { AdminTab } from '@/components/admin/AdminPanel';
 
 // 管理后台懒加载 (大幅减少首屏体积)
@@ -343,7 +344,7 @@ function ProfilePageInner() {
     }
     // 通过通知链接直接打开管理后台的申诉审核
     const tab = searchParams.get('tab');
-    if (tab === 'appeals' || tab === 'verification' || tab === 'moderation' || tab === 'users') {
+    if (tab === 'appeals' || tab === 'verification' || tab === 'qualifications' || tab === 'moderation' || tab === 'users') {
       setAdminTab(tab);
       setView(tab);
       router.replace('/profile', { scroll: false });
@@ -358,7 +359,7 @@ function ProfilePageInner() {
   const counts = (user as any)?._count || { posts: 0, comments: 0, likes: 0, favorites: 0 };
 
   // 判断是否为管理后台标签
-  const ADMIN_TABS: AdminTab[] = ['overview', 'posts', 'moderation', 'comments', 'users', 'verification', 'template', 'appeals', 'notifications', 'settings', 'email', 'agreement', 'roles', 'badges', 'schools', 'orgs'];
+  const ADMIN_TABS: AdminTab[] = ['overview', 'posts', 'moderation', 'comments', 'users', 'verification', 'qualifications', 'template', 'appeals', 'notifications', 'settings', 'email', 'agreement', 'roles', 'badges', 'schools', 'orgs'];
   const isAdminView = (v: View): v is AdminTab => ADMIN_TABS.includes(v as AdminTab);
 
   // ---- 管理后台视图 ----
@@ -370,6 +371,7 @@ function ProfilePageInner() {
       { key: 'comments', label: '评论管理' },
       { key: 'users', label: '用户管理' },
       { key: 'verification', label: '实名认证审核' },
+      { key: 'qualifications', label: '资质/荣誉审核' },
       { key: 'appeals', label: '申诉审核' },
       { key: 'notifications', label: '通知发布' },
       { key: 'schools', label: '学校管理' },
@@ -432,7 +434,7 @@ function ProfilePageInner() {
   const menuItems = [
     { key: 'verification', label: '认证', icon: '✅' },
     { key: 'violations', label: '违规与信用', icon: '📋' },
-    { key: 'badges', label: '我的勋章', icon: '🏅' },
+    { key: 'badges', label: '证书/勋章', icon: '🎖️' },
     { key: 'checkin', label: '签到积分', icon: '🪙' },
     { key: 'security', label: '账户与安全', icon: '🔒' },
     ...(isAdmin ? [{ key: 'admin', label: '管理后台', icon: '⚙️' }] : []),
@@ -572,7 +574,7 @@ function ProfilePageInner() {
                 <div className="text-sm text-white/80 mt-0.5">{user.email || '未绑定邮箱'}</div>
                 {user.userNumber != null && (
                   <div className="text-xs text-white/60 mt-0.5 tracking-wide">
-                    <span className="text-white/40">Nº</span> {user.verified ? 'XY' : 'XYS'}{user.userNumber >= 100000001 ? user.userNumber : String(user.userNumber).padStart(5, '0')}
+                    <span className="text-white/40">Nº</span> {formatUserCode(user.userNumber, !!user.verified)}
                   </div>
                 )}
                 <div className="mt-1.5 flex items-center gap-2">
@@ -786,6 +788,8 @@ function VerificationModal({ user, onClose, onVerified, onSubmitted }: { user: a
   const [faceName, setFaceName] = useState('');
   const [faceId, setFaceId] = useState('');
   const [qualName, setQualName] = useState(''); // 资质/荣誉名称
+  const [qualCategory, setQualCategory] = useState<'QUALIFICATION' | 'HONOR'>('QUALIFICATION'); // 资质 / 荣誉
+  const [qualList, setQualList] = useState<any[]>([]); // 我的资质/荣誉列表
   const [templates, setTemplates] = useState<{ id: string; name: string; type: string; image: string; isActive: boolean }[]>([]);
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState('');
@@ -813,11 +817,15 @@ function VerificationModal({ user, onClose, onVerified, onSubmitted }: { user: a
     } catch { /* ignore */ }
   }, [onVerified]);
 
-  // 刷新资质认证状态 (提交后/轮询时调用)
+  // 刷新资质认证列表 (提交后/轮询时调用)
   const refreshQualStatus = useCallback(async () => {
     try {
-      const d = await api.get<{ qualificationStatus: string; qualificationVerified: boolean; qualificationRejectReason?: string }>('/api/users/me/qualification');
-      setLocalQualStatus(d.qualificationStatus || 'NONE');
+      const d = await api.get<{ items: any[] }>('/api/users/me/qualifications');
+      const list = d.items || [];
+      setQualList(list);
+      // 若有任意一条待审核, 则视为 PENDING
+      const hasPending = list.some((q: any) => q.status === 'PENDING');
+      setLocalQualStatus(hasPending ? 'PENDING' : 'NONE');
     } catch { /* ignore */ }
   }, []);
 
@@ -831,6 +839,11 @@ function VerificationModal({ user, onClose, onVerified, onSubmitted }: { user: a
     ? '人脸照片'
     : isQual ? '证明材料' : '校园卡/工牌';
   const isFace = photoType === 'FACE';
+
+  // 打开资质/荣誉认证时加载已有列表
+  useEffect(() => {
+    if (isQual) refreshQualStatus();
+  }, [isQual, refreshQualStatus]);
 
   // 管理员无需身份认证, 打开弹窗直接进入资质/荣誉认证
   useEffect(() => {
@@ -904,14 +917,17 @@ function VerificationModal({ user, onClose, onVerified, onSubmitted }: { user: a
   const submit = async () => {
     if (isQual) {
       if (!qualName.trim()) { setMsg('请填写资质/荣誉名称'); return; }
-      if (!photo) { setMsg('请先上传证明材料'); return; }
+      // 资质/荣誉认证的证明材料可选 (拍照或上传均可, 不强制)
       setBusy(true); setMsg('');
       try {
-        const res: any = await api.post('/api/users/me/qualification', { photo, type: qualName.trim() });
+        const payload: any = { type: qualName.trim(), category: qualCategory };
+        if (photo) payload.photo = photo;
+        const res: any = await api.post('/api/users/me/qualifications', payload);
         setMsg(res?.message || '资质认证申请已提交');
         await refreshQualStatus();
         onSubmitted?.();
         setPhoto('');
+        setQualName('');
       } catch (e: any) { setMsg(e.message); } finally { setBusy(false); }
       return;
     }
@@ -1042,19 +1058,68 @@ function VerificationModal({ user, onClose, onVerified, onSubmitted }: { user: a
             - 身份认证: 非超管且未通过、非审核中时可提交 */}
         {verifyType && (isQual || (!isSuperAdmin && !isApproved && !isPending && !isAiReviewing)) && (
           <>
-            {/* 资质/荣誉认证: 填写名称 */}
+            {/* 资质/荣誉认证: 选择类别 + 填写名称 */}
             {isQual && (
-              <div className="mb-3">
-                <label className="block text-sm font-medium text-gray-700 mb-2">资质/荣誉名称</label>
-                <input
-                  type="text"
-                  value={qualName}
-                  onChange={e => setQualName(e.target.value)}
-                  placeholder="如: 学生会主席 / 优秀志愿者 / 数学竞赛一等奖"
-                  maxLength={50}
-                  className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm focus:border-blue-400 focus:outline-none"
-                />
-              </div>
+              <>
+                <div className="mb-3">
+                  <label className="block text-sm font-medium text-gray-700 mb-2">类别</label>
+                  <div className="grid grid-cols-2 gap-2">
+                    <button
+                      onClick={() => setQualCategory('QUALIFICATION')}
+                      className={`flex flex-col items-center justify-center rounded-xl border-2 p-3 transition ${
+                        qualCategory === 'QUALIFICATION' ? 'border-blue-500 bg-blue-50' : 'border-gray-200 bg-white hover:border-blue-300'
+                      }`}
+                    >
+                      <div className="text-2xl mb-1">🎖️</div>
+                      <div className={`text-xs font-medium ${qualCategory === 'QUALIFICATION' ? 'text-blue-700' : 'text-gray-700'}`}>资质认证</div>
+                    </button>
+                    <button
+                      onClick={() => setQualCategory('HONOR')}
+                      className={`flex flex-col items-center justify-center rounded-xl border-2 p-3 transition ${
+                        qualCategory === 'HONOR' ? 'border-blue-500 bg-blue-50' : 'border-gray-200 bg-white hover:border-blue-300'
+                      }`}
+                    >
+                      <div className="text-2xl mb-1">🏆</div>
+                      <div className={`text-xs font-medium ${qualCategory === 'HONOR' ? 'text-blue-700' : 'text-gray-700'}`}>荣誉认证</div>
+                    </button>
+                  </div>
+                </div>
+                <div className="mb-3">
+                  <label className="block text-sm font-medium text-gray-700 mb-2">{qualCategory === 'HONOR' ? '荣誉' : '资质'}名称</label>
+                  <input
+                    type="text"
+                    value={qualName}
+                    onChange={e => setQualName(e.target.value)}
+                    placeholder={qualCategory === 'HONOR' ? '如: 优秀志愿者 / 数学竞赛一等奖' : '如: 学生会主席 / 小黄人应急救护员'}
+                    maxLength={50}
+                    className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm focus:border-blue-400 focus:outline-none"
+                  />
+                </div>
+
+                {/* 我的资质/荣誉列表 */}
+                {qualList.length > 0 && (
+                  <div className="mb-3 rounded-xl bg-gray-50 p-3">
+                    <div className="text-xs font-medium text-gray-600 mb-2">我的{qualCategory === 'HONOR' ? '荣誉' : '资质'}记录</div>
+                    <div className="space-y-1.5">
+                      {qualList.map((q: any) => (
+                        <div key={q.id} className="flex items-center justify-between text-xs">
+                          <div className="flex items-center gap-1.5 min-w-0">
+                            <span className={q.category === 'HONOR' ? 'text-amber-500' : 'text-purple-500'}>{q.category === 'HONOR' ? '🏆' : '🎖️'}</span>
+                            <span className="text-gray-700 truncate">{q.type}</span>
+                          </div>
+                          <span className={`shrink-0 rounded-full px-1.5 py-0.5 ${
+                            q.status === 'APPROVED' ? 'bg-green-100 text-green-700' :
+                            q.status === 'PENDING' ? 'bg-amber-100 text-amber-700' :
+                            q.status === 'REJECTED' ? 'bg-red-100 text-red-600' : 'bg-gray-100 text-gray-500'
+                          }`}>
+                            {q.status === 'APPROVED' ? '已通过' : q.status === 'PENDING' ? '待审核' : q.status === 'REJECTED' ? '已驳回' : '未提交'}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </>
             )}
 
             {/* 第二步: 选择照片类型 (卡面 / 人脸) — 仅身份认证 */}
@@ -1181,26 +1246,45 @@ function VerificationModal({ user, onClose, onVerified, onSubmitted }: { user: a
                     <button onClick={() => setPhoto('')} className="absolute top-2 right-2 h-7 w-7 rounded-full bg-black/60 text-white text-sm">✕</button>
                   </div>
                 ) : (
-                  <label className="flex flex-col items-center justify-center w-full rounded-xl border-2 border-dashed border-gray-300 py-8 mb-3 cursor-pointer hover:border-blue-400 hover:bg-blue-50/50 transition">
-                    <svg className="h-10 w-10 text-gray-400 mb-2" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
-                      <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z" strokeLinecap="round" strokeLinejoin="round"/>
-                      <circle cx="12" cy="13" r="4"/>
-                    </svg>
-                    <span className="text-sm text-blue-600 font-medium">点击拍摄{photoLabel}</span>
-                    <input
-                      ref={inputRef}
-                      type="file"
-                      accept="image/*"
-                      capture="environment"
-                      className="hidden"
-                      onChange={onCapture}
-                    />
-                  </label>
+                  <div className="mb-3">
+                    <div className="grid grid-cols-2 gap-2">
+                      <label className="flex flex-col items-center justify-center rounded-xl border-2 border-dashed border-gray-300 py-6 cursor-pointer hover:border-blue-400 hover:bg-blue-50/50 transition">
+                        <svg className="h-8 w-8 text-gray-400 mb-1" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+                          <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z" strokeLinecap="round" strokeLinejoin="round"/>
+                          <circle cx="12" cy="13" r="4"/>
+                        </svg>
+                        <span className="text-xs text-blue-600 font-medium">拍照</span>
+                        <input
+                          type="file"
+                          accept="image/*"
+                          capture="environment"
+                          className="hidden"
+                          onChange={onCapture}
+                        />
+                      </label>
+                      <label className="flex flex-col items-center justify-center rounded-xl border-2 border-dashed border-gray-300 py-6 cursor-pointer hover:border-blue-400 hover:bg-blue-50/50 transition">
+                        <svg className="h-8 w-8 text-gray-400 mb-1" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+                          <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" strokeLinecap="round" strokeLinejoin="round"/>
+                          <polyline points="17 8 12 3 7 8" strokeLinecap="round" strokeLinejoin="round"/>
+                          <line x1="12" y1="3" x2="12" y2="15" strokeLinecap="round" strokeLinejoin="round"/>
+                        </svg>
+                        <span className="text-xs text-blue-600 font-medium">从相册上传</span>
+                        <input
+                          ref={inputRef}
+                          type="file"
+                          accept="image/*"
+                          className="hidden"
+                          onChange={onCapture}
+                        />
+                      </label>
+                    </div>
+                    <p className="mt-2 text-center text-xs text-gray-400">支持拍照或从相册选择, 上传后将自动压缩</p>
+                  </div>
                 )}
 
                 {msg && <p className={`mb-3 text-sm ${msg.includes('已提交') ? 'text-green-600' : 'text-red-500'}`}>{msg}</p>}
 
-                <button onClick={submit} disabled={busy || !photo || (!isQual && !isFace && !templateId)} className="w-full rounded-full bg-blue-600 py-3 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50">
+                <button onClick={submit} disabled={busy || (!isQual && !photo) || (!isQual && !isFace && !templateId)} className="w-full rounded-full bg-blue-600 py-3 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50">
                   {busy ? '提交中…' : `提交${verifyLabel}申请`}
                 </button>
               </>

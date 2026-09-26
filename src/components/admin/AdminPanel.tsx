@@ -6,7 +6,7 @@ import { PERMISSIONS, PERMISSIONS_BY_GROUP, SUPER_ADMIN_ONLY_PERMISSIONS } from 
 import TemplateManager from './TemplateManager';
 import { BadgesManager } from './BadgesManager';
 
-export type AdminTab = 'overview' | 'posts' | 'moderation' | 'comments' | 'users' | 'verification' | 'template' | 'appeals' | 'notifications' | 'settings' | 'email' | 'agreement' | 'roles' | 'badges' | 'schools' | 'orgs';
+export type AdminTab = 'overview' | 'posts' | 'moderation' | 'comments' | 'users' | 'verification' | 'qualifications' | 'template' | 'appeals' | 'notifications' | 'settings' | 'email' | 'agreement' | 'roles' | 'badges' | 'schools' | 'orgs';
 
 // ---------- 通用 UI ----------
 function SectionTitle({ title, desc }: { title: string; desc?: string }) {
@@ -485,8 +485,6 @@ function EditUserModal({ user, onClose, onSaved, isSuper }: { user: any; onClose
   const [verified, setVerified] = useState(!!user.verified);
   const [rejectReason, setRejectReason] = useState('');
   const [avatar, setAvatar] = useState(user.avatar || '');
-  const [qualificationType, setQualificationType] = useState(user.qualificationType || '');
-  const [qualificationVerified, setQualificationVerified] = useState(!!user.qualificationVerified);
   const [saving, setSaving] = useState(false);
   const [err, setErr] = useState('');
 
@@ -528,9 +526,6 @@ function EditUserModal({ user, onClose, onSaved, isSuper }: { user: any; onClose
       if (phoneNumber !== (user.phoneNumber || '')) payload.phoneNumber = phoneNumber || '';
       // 仅头像有变更时才上传, 避免无谓的大体积请求
       if (avatar !== (user.avatar || '')) payload.avatar = avatar;
-      // 资质认证
-      if (qualificationType !== (user.qualificationType || '')) payload.qualificationType = qualificationType || '';
-      if (qualificationVerified !== !!user.qualificationVerified) payload.qualificationVerified = qualificationVerified;
       // 角色: 系统角色 or 自定义角色
       if (roleVal.startsWith('custom:')) {
         payload.roleId = roleVal.slice(7);
@@ -729,26 +724,9 @@ function EditUserModal({ user, onClose, onSaved, isSuper }: { user: any; onClose
             </div>
           )}
 
-          {/* 资质认证 (学生会/广播站等组织认证) */}
-          <div className="rounded-lg border border-purple-200 px-3 py-2.5">
-            <div className="text-sm font-medium text-purple-700 mb-2">🏅 资质认证 (组织身份)</div>
-            <div className="grid grid-cols-2 gap-2">
-              <select value={qualificationType} onChange={e => setQualificationType(e.target.value)} className="rounded-lg border border-gray-300 px-3 py-2 text-sm">
-                <option value="">无</option>
-                <option value="学生会">学生会</option>
-                <option value="广播站">广播站</option>
-                <option value="团委">团委</option>
-                <option value="社团联合会">社团联合会</option>
-                <option value="校报编辑部">校报编辑部</option>
-                <option value="志愿者协会">志愿者协会</option>
-                <option value="其他">其他</option>
-              </select>
-              <label className="flex items-center gap-2 text-sm text-gray-600">
-                <input type="checkbox" checked={qualificationVerified} onChange={e => setQualificationVerified(e.target.checked)} className="h-4 w-4" />
-                已验证
-              </label>
-            </div>
-            <p className="mt-1 text-xs text-gray-400">管理员可手动设置用户的组织身份和验证状态</p>
+          {/* 资质/荣誉认证已移至独立的「资质/荣誉审核」标签页 */}
+          <div className="rounded-lg border border-purple-100 bg-purple-50/50 px-3 py-2.5">
+            <div className="text-xs text-purple-600">🏅 资质/荣誉认证请前往「资质/荣誉审核」标签页管理</div>
           </div>
 
           <div>
@@ -3011,6 +2989,180 @@ function OrgsManager() {
   );
 }
 
+// ---------- 资质/荣誉认证审核 ----------
+function QualificationReviewTab() {
+  const [items, setItems] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [err, setErr] = useState('');
+  const [filter, setFilter] = useState<'PENDING' | 'ALL' | 'APPROVED' | 'REJECTED'>('PENDING');
+  const [category, setCategory] = useState<'QUALIFICATION' | 'HONOR' | ''>('');
+  const [reviewTarget, setReviewTarget] = useState<any>(null);
+  const [rejectReason, setRejectReason] = useState('');
+  const [busy, setBusy] = useState(false);
+
+  const load = useCallback(() => {
+    setLoading(true); setErr('');
+    const params = new URLSearchParams({ status: filter });
+    if (category) params.set('category', category);
+    api.get<{ items: any[] }>(`/api/admin/qualifications?${params}`)
+      .then(d => setItems(d.items || []))
+      .catch(e => setErr(e.message))
+      .finally(() => setLoading(false));
+  }, [filter, category]);
+
+  useEffect(() => { load(); }, [load]);
+
+  const approve = async (id: string) => {
+    if (!confirm('确认通过该资质/荣誉认证?')) return;
+    setBusy(true);
+    try {
+      await api.patch(`/api/admin/qualifications/${id}`, { status: 'APPROVED' });
+      setReviewTarget(null);
+      load();
+    } catch (e: any) { alert(e.message); }
+    finally { setBusy(false); }
+  };
+
+  const reject = async (id: string) => {
+    if (!rejectReason.trim()) { alert('请填写驳回原因'); return; }
+    setBusy(true);
+    try {
+      await api.patch(`/api/admin/qualifications/${id}`, { status: 'REJECTED', rejectReason: rejectReason.trim() });
+      setReviewTarget(null);
+      setRejectReason('');
+      load();
+    } catch (e: any) { alert(e.message); }
+    finally { setBusy(false); }
+  };
+
+  const statusBadge = (s: string) => {
+    const map: Record<string, string> = {
+      APPROVED: 'bg-green-100 text-green-700',
+      PENDING: 'bg-amber-100 text-amber-700',
+      REJECTED: 'bg-red-100 text-red-700',
+    };
+    const label: Record<string, string> = { APPROVED: '已通过', PENDING: '待审核', REJECTED: '已驳回' };
+    return <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${map[s] || 'bg-gray-100 text-gray-600'}`}>{label[s] || s}</span>;
+  };
+
+  return (
+    <div>
+      <SectionTitle title="资质/荣誉认证审核" desc="审核用户提交的资质认证 (身份标签) 和荣誉认证, 通过后将展示在用户个人主页" />
+
+      <div className="mb-4 flex flex-wrap gap-2">
+        {(['PENDING', 'ALL', 'APPROVED', 'REJECTED'] as const).map(f => (
+          <button
+            key={f}
+            onClick={() => setFilter(f)}
+            className={`rounded-full px-3 py-1.5 text-sm ${filter === f ? 'bg-slate-900 text-white' : 'bg-white text-gray-500 border border-gray-200'}`}
+          >
+            {f === 'PENDING' ? '待审核' : f === 'ALL' ? '全部' : f === 'APPROVED' ? '已通过' : '已驳回'}
+          </button>
+        ))}
+        <select value={category} onChange={e => setCategory(e.target.value as any)} className="rounded-full border border-gray-300 px-3 py-1.5 text-sm">
+          <option value="">全部类别</option>
+          <option value="QUALIFICATION">资质认证</option>
+          <option value="HONOR">荣誉认证</option>
+        </select>
+      </div>
+
+      {loading ? (
+        <div className="py-8 text-center text-gray-400">加载中…</div>
+      ) : err ? (
+        <div className="py-8 text-center text-red-500">{err}</div>
+      ) : items.length === 0 ? (
+        <div className="py-16 flex flex-col items-center gap-2 text-gray-400">
+          <div className="text-4xl">🎖️</div>
+          <span className="text-sm">暂无资质/荣誉认证申请</span>
+        </div>
+      ) : (
+        <div className="space-y-3">
+          {items.map(q => (
+            <div key={q.id} className="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm">
+              <div className="flex items-start justify-between gap-3">
+                <div className="flex items-center gap-3 min-w-0">
+                  <div className="h-10 w-10 overflow-hidden rounded-full bg-gradient-to-br from-indigo-400 to-purple-500 flex items-center justify-center text-white text-sm font-bold shrink-0">
+                    {q.user?.avatar ? <img src={q.user.avatar} alt="" className="h-full w-full object-cover" /> : (q.user?.nickname || 'U')[0]}
+                  </div>
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="font-medium text-gray-900">{q.user?.nickname}</span>
+                      <span className={`text-xs px-1.5 py-0.5 rounded ${q.category === 'HONOR' ? 'bg-amber-100 text-amber-700' : 'bg-purple-100 text-purple-700'}`}>
+                        {q.category === 'HONOR' ? '🏆 荣誉' : '🎖️ 资质'}
+                      </span>
+                      {statusBadge(q.status)}
+                    </div>
+                    <p className="mt-0.5 text-sm text-gray-700 font-medium">{q.type}</p>
+                    <p className="mt-0.5 text-xs text-gray-400">
+                      {q.user?.realName ? q.user.realName + ' · ' : ''}{q.user?.grade || ''}{q.user?.className || ''} · {fmtDate(q.createdAt)}
+                    </p>
+                  </div>
+                </div>
+                {q.status === 'PENDING' && (
+                  <div className="flex shrink-0 gap-2">
+                    <button onClick={() => { setReviewTarget(q); setRejectReason(''); }} className="rounded-lg bg-blue-50 px-3 py-1.5 text-xs text-blue-600 hover:bg-blue-100">审核</button>
+                  </div>
+                )}
+              </div>
+              {q.photo && (
+                <div className="mt-3">
+                  <div className="text-xs text-gray-500 mb-1">证明材料</div>
+                  <img src={q.photo} alt="证明材料" className="max-h-48 rounded-lg border border-gray-200" />
+                </div>
+              )}
+              {q.rejectReason && (
+                <div className="mt-2 rounded-lg bg-red-50 px-3 py-2 text-xs text-red-600">驳回原因: {q.rejectReason}</div>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* 审核弹窗 */}
+      {reviewTarget && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" onClick={() => setReviewTarget(null)}>
+          <div className="w-full max-w-md rounded-2xl bg-white p-5" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-bold text-gray-900">审核{reviewTarget.category === 'HONOR' ? '荣誉' : '资质'}认证</h3>
+              <button onClick={() => setReviewTarget(null)} className="text-gray-400 text-xl">✕</button>
+            </div>
+            <div className="space-y-3">
+              <div className="flex items-center gap-3">
+                <div className="h-12 w-12 overflow-hidden rounded-full bg-gradient-to-br from-indigo-400 to-purple-500 flex items-center justify-center text-white font-bold">
+                  {reviewTarget.user?.avatar ? <img src={reviewTarget.user.avatar} alt="" className="h-full w-full object-cover" /> : (reviewTarget.user?.nickname || 'U')[0]}
+                </div>
+                <div>
+                  <div className="font-medium text-gray-900">{reviewTarget.user?.nickname}</div>
+                  <div className="text-xs text-gray-400">{reviewTarget.user?.realName || ''}</div>
+                </div>
+              </div>
+              <div className="rounded-lg bg-gray-50 p-3">
+                <div className="text-xs text-gray-500">认证类型</div>
+                <div className="text-sm font-medium text-gray-900">{reviewTarget.type}</div>
+              </div>
+              {reviewTarget.photo && (
+                <div>
+                  <div className="text-xs text-gray-500 mb-1">证明材料</div>
+                  <img src={reviewTarget.photo} alt="证明材料" className="w-full rounded-lg border border-gray-200" />
+                </div>
+              )}
+              <div>
+                <label className="block text-sm text-gray-600 mb-1">驳回原因 (驳回时填写)</label>
+                <input value={rejectReason} onChange={e => setRejectReason(e.target.value)} placeholder="如: 证明材料不清晰或信息不符"
+                  className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/40" />
+              </div>
+            </div>
+            <div className="mt-5 flex gap-2">
+              <button onClick={() => reject(reviewTarget.id)} disabled={busy} className="flex-1 rounded-lg bg-red-500 py-2.5 text-sm font-medium text-white hover:bg-red-600 disabled:opacity-50">{busy ? '处理中…' : '驳回'}</button>
+              <button onClick={() => approve(reviewTarget.id)} disabled={busy} className="flex-1 rounded-lg bg-green-600 py-2.5 text-sm font-medium text-white hover:bg-green-700 disabled:opacity-50">{busy ? '处理中…' : '通过'}</button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ---------- 管理后台主组件 ----------
 export function AdminPanel({ tab, isSuper }: { tab: AdminTab; isSuper: boolean }) {
   switch (tab) {
@@ -3020,6 +3172,7 @@ export function AdminPanel({ tab, isSuper }: { tab: AdminTab; isSuper: boolean }
     case 'comments': return <CommentsTab />;
     case 'users': return <UsersTab isSuper={isSuper} />;
     case 'verification': return <VerificationReviewTab />;
+    case 'qualifications': return <QualificationReviewTab />;
     case 'template': return <TemplateManager />;
     case 'appeals': return <BanAppealsTab />;
     case 'notifications': return <NotificationSender />;

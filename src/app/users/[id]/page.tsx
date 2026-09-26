@@ -7,6 +7,7 @@ import { useAuth } from '@/lib/auth-context';
 import Link from 'next/link';
 import { usePageRefresh } from '@/lib/use-page-refresh';
 import { VerifiedBadge } from '@/components/VerifiedBadge';
+import { formatUserCode } from '@/lib/user-number';
 
 interface UserProfile {
   id: string;
@@ -24,6 +25,7 @@ interface UserProfile {
   school: { id: string; name: string; gradeCount: number } | null;
   organization: { id: string; name: string } | null;
   createdAt: string;
+  qualifications: { id: string; type: string; category: string; verifiedAt: string | null }[];
   _count: { posts: number; comments: number; favorites: number; likesReceived: number };
 }
 
@@ -44,14 +46,6 @@ interface Comment {
   post: { id: string; title: string };
 }
 
-// 用户编号展示: 未认证=XYS, 已认证=XY
-function formatUserCode(userNumber: number | null | undefined, verified: boolean): string {
-  if (userNumber == null) return '';
-  const prefix = verified ? 'XY' : 'XYS';
-  const padded = userNumber >= 100000001 ? String(userNumber) : String(userNumber).padStart(5, '0');
-  return `${prefix}${padded}`;
-}
-
 export default function UserProfilePage() {
   const params = useParams();
   const router = useRouter();
@@ -65,6 +59,7 @@ export default function UserProfilePage() {
   const [tab, setTab] = useState<'posts' | 'likes' | 'favorites' | 'comments'>('posts');
   const [savingCover, setSavingCover] = useState(false);
   const [showAvatarLightbox, setShowAvatarLightbox] = useState(false);
+  const [lightboxBadge, setLightboxBadge] = useState<{ icon: string | null; name: string; description: string | null } | null>(null);
   const [badges, setBadges] = useState<{ badge: { id: string; name: string; icon: string | null; description: string | null }; earnedAt: string }[]>([]);
   // 墙龄自动刷新: 每天 0 点更新一次 now, 触发重新计算天数
   const [now, setNow] = useState(Date.now());
@@ -214,7 +209,7 @@ export default function UserProfilePage() {
           )}
         </div>
 
-        {/* 标签行: 学校/团体 / 年级 / 班级 / 墙龄 */}
+        {/* 标签行: 学校/团体 / 年级 / 班级 / 墙龄 / 资质认证 */}
         <div className="mt-3 flex flex-wrap items-center gap-2">
           {profile.school && (
             <span className="rounded-full bg-blue-50 px-2.5 py-0.5 text-xs text-blue-600">🏫 {profile.school.name}</span>
@@ -229,6 +224,20 @@ export default function UserProfilePage() {
             <span className="rounded-full bg-gray-100 px-2.5 py-0.5 text-xs text-gray-500">{profile.className}</span>
           )}
           <span className="rounded-full bg-blue-50 px-2.5 py-0.5 text-xs text-blue-500">墙龄 {wallDays} 天</span>
+          {/* 已通过的资质认证标签 (实时动态) */}
+          {profile.qualifications?.filter((q: any) => q.category === 'QUALIFICATION').map((q: any) => (
+            <span key={q.id} className="inline-flex items-center gap-1 rounded-full bg-green-50 px-2.5 py-0.5 text-xs text-green-700">
+              <svg className="h-3 w-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3"><path d="m5 12 5 5L20 7" strokeLinecap="round" strokeLinejoin="round"/></svg>
+              {q.type}
+            </span>
+          ))}
+          {/* 兼容旧字段: 单个资质认证 */}
+          {profile.qualificationVerified && profile.qualificationType && !profile.qualifications?.some((q: any) => q.type === profile.qualificationType) && (
+            <span className="inline-flex items-center gap-1 rounded-full bg-green-50 px-2.5 py-0.5 text-xs text-green-700">
+              <svg className="h-3 w-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3"><path d="m5 12 5 5L20 7" strokeLinecap="round" strokeLinejoin="round"/></svg>
+              {profile.qualificationType}
+            </span>
+          )}
         </div>
 
         {/* 统计: 帖子 / 获赞 / 收藏 / 评论 — 可点击切换内容 */}
@@ -258,32 +267,59 @@ export default function UserProfilePage() {
         </div>
       )}
 
-      {/* 认证资质 / 荣誉勋章 */}
-      {(profile.qualificationVerified || badges.length > 0) && (
-        <div className="mx-3 mt-3 rounded-2xl bg-white p-4 shadow-sm">
-          {profile.qualificationVerified && profile.qualificationType && (
-            <div className="mb-3">
-              <h3 className="text-sm font-bold text-gray-900 mb-2">📜 认证资质</h3>
-              <span className="inline-flex items-center gap-1 rounded-full bg-green-50 px-3 py-1 text-sm text-green-700">
-                ✓ {profile.qualificationType}
-              </span>
-            </div>
-          )}
-          {badges.length > 0 && (
+      {/* 荣誉认证 (证书) / 资质认证 / 勋章 */}
+      {((profile.qualifications?.length ?? 0) > 0 || profile.qualificationVerified || badges.length > 0) && (
+        <div className="mx-3 mt-3 rounded-2xl bg-white p-4 shadow-sm space-y-4">
+          {/* 荣誉认证 (证书类) */}
+          {(profile.qualifications?.filter((q: any) => q.category === 'HONOR').length ?? 0) > 0 && (
             <div>
-              <h3 className="text-sm font-bold text-gray-900 mb-2">🏅 荣誉勋章</h3>
-              <div className="grid grid-cols-4 gap-3">
-                {badges.slice(0, 8).map(ub => (
-                  <div key={ub.badge.id} className="flex flex-col items-center text-center">
-                    <div className="h-12 w-12 rounded-full bg-gradient-to-br from-yellow-400 to-amber-500 flex items-center justify-center text-2xl shadow-sm">
-                      {ub.badge.icon || '🏅'}
-                    </div>
-                    <div className="mt-1 text-[11px] text-gray-600 line-clamp-1">{ub.badge.name}</div>
-                  </div>
+              <h3 className="text-sm font-bold text-gray-900 mb-2">📜 荣誉证书</h3>
+              <div className="flex flex-wrap gap-2">
+                {profile.qualifications!.filter((q: any) => q.category === 'HONOR').map((q: any) => (
+                  <span key={q.id} className="inline-flex items-center gap-1 rounded-full bg-amber-50 px-3 py-1 text-sm text-amber-700">
+                    🏆 {q.type}
+                  </span>
                 ))}
               </div>
             </div>
           )}
+
+          {/* 证书/勋章 (badges) */}
+          {badges.length > 0 && (
+            <div>
+              <h3 className="text-sm font-bold text-gray-900 mb-2">🎖️ 证书/勋章</h3>
+              <div className="grid grid-cols-4 gap-3">
+                {badges.map(ub => (
+                  <button
+                    key={ub.badge.id}
+                    onClick={() => setLightboxBadge({ icon: ub.badge.icon, name: ub.badge.name, description: ub.badge.description })}
+                    className="flex flex-col items-center text-center"
+                  >
+                    <div className="h-12 w-12 rounded-full bg-gradient-to-br from-yellow-400 to-amber-500 flex items-center justify-center text-2xl shadow-sm hover:scale-110 transition-transform">
+                      {ub.badge.icon || '🏅'}
+                    </div>
+                    <div className="mt-1 text-[11px] text-gray-600 line-clamp-1">{ub.badge.name}</div>
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* 勋章放大灯箱 */}
+      {lightboxBadge && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80" onClick={() => setLightboxBadge(null)}>
+          <div className="flex flex-col items-center" onClick={e => e.stopPropagation()}>
+            <div className="h-32 w-32 rounded-full bg-gradient-to-br from-yellow-400 to-amber-500 flex items-center justify-center text-7xl shadow-2xl">
+              {lightboxBadge.icon || '🏅'}
+            </div>
+            <div className="mt-4 text-xl font-bold text-white">{lightboxBadge.name}</div>
+            {lightboxBadge.description && (
+              <div className="mt-2 text-sm text-white/70 max-w-xs text-center">{lightboxBadge.description}</div>
+            )}
+            <button onClick={() => setLightboxBadge(null)} className="mt-6 rounded-full bg-white/20 px-5 py-2 text-sm text-white hover:bg-white/30">关闭</button>
+          </div>
         </div>
       )}
 

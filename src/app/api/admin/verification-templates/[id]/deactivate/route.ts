@@ -1,4 +1,3 @@
-// POST /api/admin/verification-templates/[id]/activate  激活模板 (允许多个同时激活)
 // POST /api/admin/verification-templates/[id]/deactivate  停用模板
 import { NextRequest, NextResponse } from 'next/server';
 import { UserRole } from '@prisma/client';
@@ -9,12 +8,11 @@ import { errorResponse } from '@/lib/api-response';
 export async function POST(req: NextRequest, { params }: { params: { id: string } }) {
   try {
     await requireRole(req, UserRole.SUPER_ADMIN);
-    // 只激活当前模板, 不影响其他模板 (允许多个同时激活)
     const tpl = await prisma.verificationTemplate.update({
       where: { id: params.id },
-      data: { isActive: true },
+      data: { isActive: false },
     });
-    return NextResponse.json({ message: '已激活', template: tpl });
+    return NextResponse.json({ message: '已停用', template: tpl });
   } catch (e) {
     return errorResponse(e);
   }

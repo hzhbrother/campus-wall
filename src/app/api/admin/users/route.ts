@@ -87,7 +87,7 @@ export async function POST(req: NextRequest) {
     // 管理员认证状态: ADMIN/SUPER_ADMIN 默认已认证
     const isAutoVerified = finalRole === UserRole.ADMIN || finalRole === UserRole.SUPER_ADMIN;
 
-    const userNumber = await generateUserNumber(finalRole);
+    const userNumber = await generateUserNumber();
     const user = await prisma.user.create({
       data: {
         email,

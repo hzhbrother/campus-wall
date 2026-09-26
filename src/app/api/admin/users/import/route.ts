@@ -77,7 +77,7 @@ export async function POST(req: NextRequest) {
             realName, grade, className, role, status, remark,
             verified: isAutoVerified,
             verifiedAt: isAutoVerified ? new Date() : null,
-            userNumber: await generateUserNumber(role),
+            userNumber: await generateUserNumber(),
           },
         });
         created++;

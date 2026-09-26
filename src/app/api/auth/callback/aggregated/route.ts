@@ -48,7 +48,7 @@ export async function GET(req: NextRequest) {
         i += 1;
         nickname = `${baseName.slice(0, 20)}_${i}`;
       }
-      const userNumber = await generateUserNumber('STUDENT');
+      const userNumber = await generateUserNumber();
       user = await prisma.user.create({
         data: { nickname, avatar: info.faceimg || null, userNumber },
       });

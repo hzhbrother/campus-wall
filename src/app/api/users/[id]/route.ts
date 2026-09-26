@@ -25,7 +25,13 @@ export async function GET(_req: NextRequest, { params }: { params: { id: string 
     const likesReceived = await prisma.like.count({
       where: { post: { authorId: params.id } },
     });
-    return NextResponse.json({ ...user, verified, _count: { ...user._count, likesReceived } });
+    // 已通过的资质/荣誉认证 (用于主页展示)
+    const qualifications = await prisma.qualification.findMany({
+      where: { userId: params.id, verified: true },
+      orderBy: { verifiedAt: 'desc' },
+      select: { id: true, type: true, category: true, verifiedAt: true },
+    });
+    return NextResponse.json({ ...user, verified, qualifications, _count: { ...user._count, likesReceived } });
   } catch (e) {
     return errorResponse(e);
   }

@@ -43,7 +43,7 @@ export async function POST(req: NextRequest) {
     if (!valid) return NextResponse.json({ message: '验证码错误或已过期' }, { status: 400 });
 
     const password = await bcrypt.hash(dto.password, 10);
-    const userNumber = await generateUserNumber(UserRole.STUDENT);
+    const userNumber = await generateUserNumber();
     const user = await prisma.user.create({
       data: {
         nickname: dto.nickname,

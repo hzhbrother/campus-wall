@@ -14,6 +14,19 @@ interface Badge {
   createdAt: string;
 }
 
+interface BadgeHolder {
+  id: string;
+  earnedAt: string;
+  user: { id: string; nickname: string; avatar: string | null; realName: string | null };
+}
+
+interface SearchUser {
+  id: string;
+  nickname: string;
+  avatar: string | null;
+  realName: string | null;
+}
+
 const CONDITION_LABELS: Record<string, string> = {
   POST_COUNT: '发帖数',
   LIKE_COUNT: '获赞数',
@@ -28,6 +41,8 @@ export function BadgesManager() {
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
   const [editing, setEditing] = useState<Badge | null>(null);
+  // 授予/撤销弹窗
+  const [grantBadge, setGrantBadge] = useState<Badge | null>(null);
 
   const load = useCallback(() => {
     setLoading(true);
@@ -58,7 +73,7 @@ export function BadgesManager() {
       <div className="flex items-center justify-between">
         <div>
           <h3 className="text-lg font-bold text-gray-900">勋章管理</h3>
-          <p className="text-xs text-gray-400 mt-0.5">配置勋章获得条件, 用户满足条件后自动授予 (发帖/评论/点赞时触发)</p>
+          <p className="text-xs text-gray-400 mt-0.5">配置勋章获得条件, 用户满足条件后自动授予 (发帖/评论/点赞时触发); 手动类型的勋章可在此直接授予用户</p>
         </div>
         <button
           onClick={() => { setEditing(null); setShowForm(true); }}
@@ -108,6 +123,7 @@ export function BadgesManager() {
                     </button>
                   </td>
                   <td className="py-3 pr-3">
+                    <button onClick={() => setGrantBadge(b)} className="text-amber-600 hover:underline mr-3">授予</button>
                     <button onClick={() => { setEditing(b); setShowForm(true); }} className="text-blue-500 hover:underline mr-3">编辑</button>
                     <button onClick={() => remove(b.id)} className="text-red-400 hover:underline">删除</button>
                   </td>
@@ -125,6 +141,156 @@ export function BadgesManager() {
           onSaved={() => { setShowForm(false); load(); }}
         />
       )}
+
+      {grantBadge && (
+        <GrantBadgeModal
+          badge={grantBadge}
+          onClose={() => setGrantBadge(null)}
+          onChanged={() => {}}
+        />
+      )}
+    </div>
+  );
+}
+
+// ---------- 授予/撤销勋章弹窗 ----------
+function GrantBadgeModal({ badge, onClose }: { badge: Badge; onClose: () => void; onChanged: () => void }) {
+  const [holders, setHolders] = useState<BadgeHolder[]>([]);
+  const [holdersLoading, setHoldersLoading] = useState(true);
+  const [search, setSearch] = useState('');
+  const [searchResults, setSearchResults] = useState<SearchUser[]>([]);
+  const [searching, setSearching] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [msg, setMsg] = useState('');
+
+  const loadHolders = useCallback(async () => {
+    setHoldersLoading(true);
+    try {
+      const d = await api.get<{ items: BadgeHolder[] }>(`/api/admin/badges/${badge.id}/grant`);
+      setHolders(d.items || []);
+    } catch { setHolders([]); }
+    finally { setHoldersLoading(false); }
+  }, [badge.id]);
+
+  useEffect(() => { loadHolders(); }, [loadHolders]);
+
+  // 搜索用户 (防抖)
+  useEffect(() => {
+    if (!search.trim()) { setSearchResults([]); return; }
+    setSearching(true);
+    const t = setTimeout(() => {
+      api.get<{ items: SearchUser[] }>(`/api/admin/users?q=${encodeURIComponent(search)}&pageSize=20`)
+        .then(d => setSearchResults(d.items || []))
+        .catch(() => setSearchResults([]))
+        .finally(() => setSearching(false));
+    }, 300);
+    return () => clearTimeout(t);
+  }, [search]);
+
+  const grant = async (userId: string) => {
+    setBusy(true); setMsg('');
+    try {
+      await api.post(`/api/admin/badges/${badge.id}/grant`, { userId });
+      setMsg('已授予');
+      setSearch('');
+      loadHolders();
+    } catch (e: any) { setMsg(e.message); }
+    finally { setBusy(false); }
+  };
+
+  const revoke = async (userId: string) => {
+    if (!confirm('确认撤销该用户的勋章?')) return;
+    setBusy(true); setMsg('');
+    try {
+      await api.del(`/api/admin/badges/${badge.id}/grant?userId=${userId}`);
+      setMsg('已撤销');
+      loadHolders();
+    } catch (e: any) { setMsg(e.message); }
+    finally { setBusy(false); }
+  };
+
+  const holderIds = new Set(holders.map(h => h.user.id));
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" onClick={onClose}>
+      <div className="w-full max-w-lg rounded-2xl bg-white p-5 max-h-[85vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
+        <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center gap-2">
+            <span className="text-2xl">{badge.icon || '🏅'}</span>
+            <h3 className="text-lg font-bold text-gray-900">授予「{badge.name}」</h3>
+          </div>
+          <button onClick={onClose} className="text-gray-400 text-xl">✕</button>
+        </div>
+
+        {msg && <p className={`mb-3 text-sm ${msg.includes('已') ? 'text-green-600' : 'text-red-500'}`}>{msg}</p>}
+
+        {/* 搜索并授予 */}
+        <div className="mb-4">
+          <label className="block text-sm font-medium text-gray-700 mb-1.5">搜索用户并授予</label>
+          <input
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+            placeholder="输入昵称/姓名搜索"
+            className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm focus:border-blue-400 focus:outline-none"
+          />
+          {searching && <p className="mt-1 text-xs text-gray-400">搜索中…</p>}
+          {searchResults.length > 0 && (
+            <div className="mt-2 space-y-1 max-h-48 overflow-y-auto">
+              {searchResults.map(u => (
+                <div key={u.id} className="flex items-center justify-between rounded-lg border border-gray-100 px-3 py-2">
+                  <div className="flex items-center gap-2">
+                    <div className="h-7 w-7 overflow-hidden rounded-full bg-gradient-to-br from-indigo-400 to-purple-500 flex items-center justify-center text-white text-xs">
+                      {u.avatar ? <img src={u.avatar} alt="" className="h-full w-full object-cover" /> : (u.nickname || 'U')[0]}
+                    </div>
+                    <div>
+                      <div className="text-sm text-gray-800">{u.nickname}</div>
+                      {u.realName && <div className="text-xs text-gray-400">{u.realName}</div>}
+                    </div>
+                  </div>
+                  {holderIds.has(u.id) ? (
+                    <span className="text-xs text-green-600">已拥有</span>
+                  ) : (
+                    <button onClick={() => grant(u.id)} disabled={busy} className="rounded-lg bg-amber-500 px-3 py-1 text-xs text-white hover:bg-amber-600 disabled:opacity-50">授予</button>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* 已有此勋章的用户 */}
+        <div>
+          <div className="flex items-center justify-between mb-2">
+            <label className="text-sm font-medium text-gray-700">已拥有此勋章 ({holders.length})</label>
+          </div>
+          {holdersLoading ? (
+            <p className="py-4 text-center text-xs text-gray-400">加载中…</p>
+          ) : holders.length === 0 ? (
+            <p className="py-4 text-center text-xs text-gray-400">暂无用户拥有此勋章</p>
+          ) : (
+            <div className="space-y-1 max-h-60 overflow-y-auto">
+              {holders.map(h => (
+                <div key={h.id} className="flex items-center justify-between rounded-lg border border-gray-100 px-3 py-2">
+                  <div className="flex items-center gap-2">
+                    <div className="h-7 w-7 overflow-hidden rounded-full bg-gradient-to-br from-indigo-400 to-purple-500 flex items-center justify-center text-white text-xs">
+                      {h.user.avatar ? <img src={h.user.avatar} alt="" className="h-full w-full object-cover" /> : (h.user.nickname || 'U')[0]}
+                    </div>
+                    <div>
+                      <div className="text-sm text-gray-800">{h.user.nickname}</div>
+                      <div className="text-xs text-gray-400">{new Date(h.earnedAt).toLocaleDateString('zh-CN')} 获得</div>
+                    </div>
+                  </div>
+                  <button onClick={() => revoke(h.user.id)} disabled={busy} className="rounded-lg bg-red-50 px-3 py-1 text-xs text-red-600 hover:bg-red-100 disabled:opacity-50">撤销</button>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        <div className="mt-5">
+          <button onClick={onClose} className="w-full rounded-lg bg-gray-100 py-2 text-sm text-gray-600 hover:bg-gray-200">关闭</button>
+        </div>
+      </div>
     </div>
   );
 }
