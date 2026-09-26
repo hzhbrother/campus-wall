@@ -1145,13 +1145,14 @@ function ImportModal({ onClose, onDone }: { onClose: () => void; onDone: () => v
 
   const downloadTemplate = async () => {
     try {
-      const res = await fetch('/api/admin/users/template', { headers: { Authorization: `Bearer ${localStorage.getItem('token')}` } });
+      const token = localStorage.getItem('cw_token');
+      const res = await fetch(`${api.base}/api/admin/users/template`, { headers: { Authorization: `Bearer ${token}` } });
       if (!res.ok) throw new Error('下载失败');
       const blob = await res.blob();
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = 'user-import-template.xlsx';
+      a.download = 'user导入模板.xlsx';
       a.click();
       URL.revokeObjectURL(url);
     } catch (e: any) { setErr(e.message); }
