@@ -29,7 +29,8 @@ export async function GET() {
 
 export async function PATCH(req: NextRequest) {
   try {
-    await requireRole(req, UserRole.ADMIN, UserRole.SUPER_ADMIN);
+    // 站点配置 (SMTP/站点信息等) 仅超级管理员可修改
+    await requireRole(req, UserRole.SUPER_ADMIN);
     const body = await req.json();
     const entries = Object.entries(body).filter(([k]) => CONFIG_KEYS.includes(k));
     await Promise.all(

@@ -74,7 +74,8 @@ async function tryConnect(cfg: SmtpConfig): Promise<{ ok: boolean; diag: ReturnT
 
 export async function POST(req: NextRequest) {
   try {
-    await requireRole(req, UserRole.ADMIN, UserRole.SUPER_ADMIN);
+    // SMTP 配置测试仅超级管理员可用
+    await requireRole(req, UserRole.SUPER_ADMIN);
 
     const cfg = await getSmtpConfig();
     if (!cfg) {

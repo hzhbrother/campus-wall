@@ -268,7 +268,8 @@ function ProfilePageInner() {
   const [showNotifModal, setShowNotifModal] = useState(false);
   const [showVerifyModal, setShowVerifyModal] = useState(false);
 
-  const isAdmin = user?.role === 'ADMIN' || user?.role === 'SUPER_ADMIN';
+  // 系统管理员/超级管理员, 或拥有自定义角色的用户均可进入管理后台
+  const isAdmin = user?.role === 'ADMIN' || user?.role === 'SUPER_ADMIN' || !!user?.roleId;
   const isSuper = user?.role === 'SUPER_ADMIN';
   const forcePhone = searchParams.get('forcePhone') === '1';
 
@@ -298,9 +299,13 @@ function ProfilePageInner() {
       { key: 'users', label: '用户管理' },
       { key: 'appeals', label: '申诉审核' },
       { key: 'notifications', label: '通知发布' },
-      { key: 'email', label: '邮件配置' },
-      { key: 'settings', label: '站点设置' },
-      { key: 'agreement', label: '协议管理' },
+      // 站点配置类 (SMTP/站点信息/协议) + 角色管理 仅超级管理员可见
+      ...(isSuper ? [
+        { key: 'roles' as AdminTab, label: '角色管理' },
+        { key: 'email' as AdminTab, label: '邮件配置' },
+        { key: 'settings' as AdminTab, label: '站点设置' },
+        { key: 'agreement' as AdminTab, label: '协议管理' },
+      ] : []),
     ];
     const tab = view === 'admin' ? adminTab : (view as AdminTab);
     return (

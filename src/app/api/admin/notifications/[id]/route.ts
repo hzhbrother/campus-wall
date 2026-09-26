@@ -3,7 +3,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import { UserRole } from '@prisma/client';
-import { requireRole } from '@/lib/server-auth';
+import { requirePermission } from '@/lib/server-auth';
 import { prisma } from '@/lib/prisma';
 import { errorResponse } from '@/lib/api-response';
 
@@ -16,7 +16,7 @@ const UpdateSchema = z.object({
 
 export async function PATCH(req: NextRequest, { params }: { params: { id: string } }) {
   try {
-    await requireRole(req, UserRole.ADMIN, UserRole.SUPER_ADMIN);
+    await requirePermission(req, 'notification.send');
     const dto = UpdateSchema.parse(await req.json());
     const updated = await prisma.notification.update({
       where: { id: params.id },
@@ -31,7 +31,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
 
 export async function DELETE(req: NextRequest, { params }: { params: { id: string } }) {
   try {
-    await requireRole(req, UserRole.ADMIN, UserRole.SUPER_ADMIN);
+    await requirePermission(req, 'notification.send');
     await prisma.notification.delete({ where: { id: params.id } });
     return NextResponse.json({ ok: true });
   } catch (e) {

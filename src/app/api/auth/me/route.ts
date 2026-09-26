@@ -10,7 +10,10 @@ export async function GET(req: NextRequest) {
     if (!me) return Response.json(null, { status: 200 });
     const user = await prisma.user.findUnique({
       where: { id: me.id },
-      include: { _count: { select: { posts: true, comments: true, likes: true } } },
+      include: {
+        _count: { select: { posts: true, comments: true, likes: true } },
+        customRole: { select: { id: true, name: true, permissions: true } },
+      },
     });
     if (!user) return Response.json(null, { status: 200 });
     // 获赞数: 用户所有帖子收到的点赞总数

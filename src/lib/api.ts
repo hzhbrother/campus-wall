@@ -18,10 +18,11 @@ function token(): string | null {
 }
 
 async function request<T>(path: string, opts: RequestInit = {}): Promise<T> {
-  const headers: Record<string, string> = {
-    'Content-Type': 'application/json',
-    ...(opts.headers as any),
-  };
+  const headers: Record<string, string> = { ...(opts.headers as any) };
+  // FormData 不设 Content-Type, 让浏览器自动加 boundary
+  if (!(opts.body instanceof FormData)) {
+    headers['Content-Type'] = 'application/json';
+  }
   const t = token();
   if (t) headers['Authorization'] = `Bearer ${t}`;
 
@@ -45,8 +46,15 @@ async function request<T>(path: string, opts: RequestInit = {}): Promise<T> {
 
 export const api = {
   get: <T>(path: string) => request<T>(path),
-  post: <T>(path: string, body?: any) => request<T>(path, { method: 'POST', body: body ? JSON.stringify(body) : undefined }),
-  patch: <T>(path: string, body?: any) => request<T>(path, { method: 'PATCH', body: body ? JSON.stringify(body) : undefined }),
+  post: <T>(path: string, body?: any) => {
+    // FormData 直接传, 普通对象 JSON 序列化
+    const isForm = body instanceof FormData;
+    return request<T>(path, { method: 'POST', body: isForm ? body : (body ? JSON.stringify(body) : undefined) });
+  },
+  patch: <T>(path: string, body?: any) => {
+    const isForm = body instanceof FormData;
+    return request<T>(path, { method: 'PATCH', body: isForm ? body : (body ? JSON.stringify(body) : undefined) });
+  },
   del: <T>(path: string) => request<T>(path, { method: 'DELETE' }),
   base: BASE,
 };

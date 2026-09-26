@@ -7,7 +7,8 @@ import { errorResponse } from '@/lib/api-response';
 
 export async function POST(req: NextRequest) {
   try {
-    await requireRole(req, UserRole.ADMIN, UserRole.SUPER_ADMIN);
+    // 测试邮件发送仅超级管理员可用
+    await requireRole(req, UserRole.SUPER_ADMIN);
     const { to } = await req.json();
     if (!to) return NextResponse.json({ message: '请输入收件邮箱' }, { status: 400 });
 

@@ -28,7 +28,10 @@ export async function GET(req: NextRequest) {
     const me = await requireUser(req);
     const user = await prisma.user.findUnique({
       where: { id: me.id },
-      include: { _count: { select: { posts: true, comments: true, likes: true } } },
+      include: {
+        _count: { select: { posts: true, comments: true, likes: true } },
+        customRole: { select: { id: true, name: true, permissions: true } },
+      },
     });
     return NextResponse.json(sanitize(user));
   } catch (e) {

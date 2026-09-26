@@ -2,8 +2,9 @@
 
 import { useEffect, useState, useCallback } from 'react';
 import { api } from '@/lib/api';
+import { PERMISSIONS, PERMISSIONS_BY_GROUP, SUPER_ADMIN_ONLY_PERMISSIONS } from '@/lib/permissions';
 
-export type AdminTab = 'overview' | 'posts' | 'moderation' | 'comments' | 'users' | 'appeals' | 'notifications' | 'settings' | 'email' | 'agreement';
+export type AdminTab = 'overview' | 'posts' | 'moderation' | 'comments' | 'users' | 'appeals' | 'notifications' | 'settings' | 'email' | 'agreement' | 'roles';
 
 // ---------- 通用 UI ----------
 function SectionTitle({ title, desc }: { title: string; desc?: string }) {
@@ -319,6 +320,10 @@ function UsersTab({ isSuper }: { isSuper: boolean }) {
   const [editUser, setEditUser] = useState<any>(null);
   const [banUser, setBanUser] = useState<any>(null);
   const [deleteTarget, setDeleteTarget] = useState<any>(null);
+  const [showCreate, setShowCreate] = useState(false);
+  const [showBatch, setShowBatch] = useState(false);
+  const [showImport, setShowImport] = useState(false);
+  const [selected, setSelected] = useState<Set<string>>(new Set());
   const pageSize = 10;
 
   const load = useCallback(() => {
@@ -356,13 +361,20 @@ function UsersTab({ isSuper }: { isSuper: boolean }) {
   return (
     <div>
       <SectionTitle title="用户管理" desc="编辑用户资料、状态与身份" />
-      <div className="mb-4 flex flex-wrap gap-3">
+      <div className="mb-4 flex flex-wrap items-center gap-3">
         <select value={role} onChange={e => { setRole(e.target.value); setPage(1); }} className="rounded-lg border border-gray-300 px-3 py-2 text-sm">
           <option value="">全部身份</option>
           <option value="STUDENT">学生</option><option value="TEACHER">教师</option>
           <option value="ADMIN">管理员</option><option value="SUPER_ADMIN">超级管理员</option>
         </select>
         <input value={q} onChange={e => { setQ(e.target.value); setPage(1); }} placeholder="搜索昵称/姓名/邮箱" className="flex-1 min-w-[180px] rounded-lg border border-gray-300 px-3 py-2 text-sm" />
+        <div className="flex items-center gap-2 ml-auto">
+          <button onClick={() => setShowCreate(true)} className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700">新增用户</button>
+          <button onClick={() => setShowImport(true)} className="rounded-lg bg-green-600 px-4 py-2 text-sm font-medium text-white hover:bg-green-700">Excel 导入</button>
+          {selected.size > 0 && (
+            <button onClick={() => setShowBatch(true)} className="rounded-lg bg-amber-500 px-4 py-2 text-sm font-medium text-white hover:bg-amber-600">批量更新 ({selected.size})</button>
+          )}
+        </div>
       </div>
       {err && <div className="mb-3 text-sm text-red-500">{err}</div>}
       {loading ? <p className="py-6 text-center text-gray-400">加载中…</p> : (
@@ -370,6 +382,16 @@ function UsersTab({ isSuper }: { isSuper: boolean }) {
           {users.map((u: any) => (
             <div key={u.id} className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-gray-200 bg-white p-4">
               <div className="flex items-center gap-3">
+                <input
+                  type="checkbox"
+                  checked={selected.has(u.id)}
+                  onChange={e => {
+                    const ns = new Set(selected);
+                    if (e.target.checked) ns.add(u.id); else ns.delete(u.id);
+                    setSelected(ns);
+                  }}
+                  className="h-4 w-4 rounded border-gray-300 text-blue-600"
+                />
                 <div className="h-10 w-10 shrink-0 overflow-hidden rounded-full bg-gradient-to-br from-indigo-400 to-purple-500 flex items-center justify-center text-white font-medium">
                   {u.avatar ? <img src={u.avatar} alt="" className="h-full w-full object-cover" /> : (u.nickname || 'U')[0].toUpperCase()}
                 </div>
@@ -383,7 +405,7 @@ function UsersTab({ isSuper }: { isSuper: boolean }) {
                     ) : u.verificationStatus === 'REJECTED' ? (
                       <span className="rounded bg-red-100 px-1.5 py-0.5 text-xs text-red-600">已驳回</span>
                     ) : null}
-                    <span className="rounded bg-blue-100 px-1.5 py-0.5 text-xs text-blue-700">{roleLabel[u.role] || u.role}</span>
+                    <span className="rounded bg-blue-100 px-1.5 py-0.5 text-xs text-blue-700">{u.customRole?.name || roleLabel[u.role] || u.role}</span>
                     <span className={`rounded px-1.5 py-0.5 text-xs ${userStatus(u).color}`}>{userStatus(u).label}</span>
                   </div>
                   <p className="mt-0.5 text-xs text-gray-400">
@@ -398,7 +420,7 @@ function UsersTab({ isSuper }: { isSuper: boolean }) {
                   <button onClick={() => api.del(`/api/admin/users/${u.id}/ban`).then(() => load()).catch(e => setErr(e.message))} className="rounded-lg bg-green-50 px-3 py-1.5 text-xs text-green-600 hover:bg-green-100">解封</button>
                 )}
                 <button onClick={() => setBanUser(u)} className="rounded-lg bg-orange-50 px-3 py-1.5 text-xs text-orange-600 hover:bg-orange-100">封禁</button>
-                <button onClick={() => setDeleteTarget(u)} className="rounded-lg bg-red-50 px-3 py-1.5 text-xs text-red-600 hover:bg-red-100">删除</button>
+                {isSuper && <button onClick={() => setDeleteTarget(u)} className="rounded-lg bg-red-50 px-3 py-1.5 text-xs text-red-600 hover:bg-red-100">删除</button>}
                 <button onClick={() => setEditUser(u)} className="rounded-lg bg-blue-50 px-4 py-1.5 text-xs text-blue-600 hover:bg-blue-100">编辑</button>
               </div>
             </div>
@@ -416,6 +438,9 @@ function UsersTab({ isSuper }: { isSuper: boolean }) {
       {editUser && <EditUserModal user={editUser} onClose={() => setEditUser(null)} onSaved={load} isSuper={isSuper} />}
       {banUser && <BanUserModal user={banUser} onClose={() => setBanUser(null)} onDone={load} />}
       {deleteTarget && <DeleteConfirmModal user={deleteTarget} onClose={() => setDeleteTarget(null)} onDone={load} />}
+      {showCreate && <CreateUserModal onClose={() => setShowCreate(false)} onDone={load} isSuper={isSuper} />}
+      {showBatch && <BatchUpdateModal selectedIds={selected} onClose={() => setShowBatch(false)} onDone={() => { load(); setSelected(new Set()); }} />}
+      {showImport && <ImportModal onClose={() => setShowImport(false)} onDone={load} />}
     </div>
   );
 }
@@ -430,7 +455,9 @@ function EditUserModal({ user, onClose, onSaved, isSuper }: { user: any; onClose
   const [className, setClassName] = useState(user.className || '');
   const [remark, setRemark] = useState(user.remark || '');
   const [status, setStatus] = useState(user.status || 'NORMAL');
-  const [role, setRole] = useState(user.role || 'STUDENT');
+  // 角色选择值: 系统角色直接用枚举; 自定义角色用 "custom:<id>"
+  const [roleVal, setRoleVal] = useState(user.roleId ? `custom:${user.roleId}` : (user.role || 'STUDENT'));
+  const [customRoles, setCustomRoles] = useState<{ id: string; name: string }[]>([]);
   const [verified, setVerified] = useState(!!user.verified);
   const [rejectReason, setRejectReason] = useState('');
   const [avatar, setAvatar] = useState(user.avatar || '');
@@ -439,6 +466,12 @@ function EditUserModal({ user, onClose, onSaved, isSuper }: { user: any; onClose
 
   const vStatus = user.verificationStatus || 'NONE';
   const isPending = vStatus === 'PENDING';
+
+  useEffect(() => {
+    api.get<{ roles: { id: string; name: string; isSystem: boolean }[] }>('/api/admin/roles')
+      .then(data => setCustomRoles(data.roles.filter(r => !r.isSystem)))
+      .catch(() => {});
+  }, []);
 
   const handleAvatarFile = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -451,7 +484,14 @@ function EditUserModal({ user, onClose, onSaved, isSuper }: { user: any; onClose
   const save = async () => {
     setSaving(true); setErr('');
     try {
-      const payload: any = { realName, grade, className, remark, status, role, avatar, verified };
+      const payload: any = { realName, grade, className, remark, status, avatar, verified };
+      // 角色: 系统角色 or 自定义角色
+      if (roleVal.startsWith('custom:')) {
+        payload.roleId = roleVal.slice(7);
+      } else {
+        payload.role = roleVal;
+        payload.roleId = null;
+      }
       // 若处于待审核, 按当前 verified 状态决定通过/驳回
       if (isPending) {
         if (verified) {
@@ -549,11 +589,21 @@ function EditUserModal({ user, onClose, onSaved, isSuper }: { user: any; onClose
 
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">身份</label>
-            <select value={role} onChange={e => setRole(e.target.value)} disabled={!isSuper && user.role === 'SUPER_ADMIN'} className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm disabled:opacity-50">
-              <option value="STUDENT">学生</option>
-              <option value="TEACHER">教师</option>
-              <option value="ADMIN">管理员</option>
-              {isSuper && <option value="SUPER_ADMIN">超级管理员</option>}
+            <select value={roleVal} onChange={e => setRoleVal(e.target.value)} disabled={!isSuper && user.role === 'SUPER_ADMIN'} className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm disabled:opacity-50">
+              <optgroup label="系统角色">
+                <option value="STUDENT">学生</option>
+                <option value="TEACHER">教师</option>
+                <option value="ADMIN">管理员</option>
+                <option value="USER">用户</option>
+                {isSuper && <option value="SUPER_ADMIN">超级管理员</option>}
+              </optgroup>
+              {customRoles.length > 0 && (
+                <optgroup label="自定义角色">
+                  {customRoles.map(r => (
+                    <option key={r.id} value={`custom:${r.id}`}>{r.name}</option>
+                  ))}
+                </optgroup>
+              )}
             </select>
           </div>
 
@@ -880,6 +930,228 @@ function DeleteConfirmModal({ user, onClose, onDone }: { user: any; onClose: () 
             {saving ? '删除中...' : '确定删除'}
           </button>
         </div>
+      </div>
+    </div>
+  );
+}
+
+// ---------- 新增用户弹窗 ----------
+function CreateUserModal({ onClose, onDone, isSuper }: { onClose: () => void; onDone: () => void; isSuper: boolean }) {
+  const [email, setEmail] = useState('');
+  const [nickname, setNickname] = useState('');
+  const [password, setPassword] = useState('');
+  const [realName, setRealName] = useState('');
+  const [grade, setGrade] = useState('');
+  const [className, setClassName] = useState('');
+  const [roleVal, setRoleVal] = useState('STUDENT');
+  const [customRoles, setCustomRoles] = useState<{ id: string; name: string }[]>([]);
+  const [status, setStatus] = useState('NORMAL');
+  const [remark, setRemark] = useState('');
+  const [verified, setVerified] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [err, setErr] = useState('');
+  const [result, setResult] = useState('');
+
+  useEffect(() => {
+    api.get<{ roles: { id: string; name: string; isSystem: boolean }[] }>('/api/admin/roles')
+      .then(data => setCustomRoles(data.roles.filter(r => !r.isSystem)))
+      .catch(() => {});
+  }, []);
+
+  const save = async () => {
+    setSaving(true); setErr(''); setResult('');
+    try {
+      const body: any = {};
+      if (email.trim()) body.email = email.trim();
+      if (nickname.trim()) body.nickname = nickname.trim();
+      if (password.trim()) body.password = password.trim();
+      if (realName.trim()) body.realName = realName.trim();
+      if (grade.trim()) body.grade = grade.trim();
+      if (className.trim()) body.className = className.trim();
+      if (remark.trim()) body.remark = remark.trim();
+      // 角色: 自定义 or 系统
+      if (roleVal.startsWith('custom:')) {
+        body.roleId = roleVal.slice(7);
+      } else {
+        body.role = roleVal;
+      }
+      body.status = status;
+      body.verified = verified;
+      const res: any = await api.post('/api/admin/users', body);
+      setResult(res.message || '创建成功');
+      onDone();
+    } catch (e: any) { setErr(e.message); } finally { setSaving(false); }
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/50 sm:items-center" onClick={onClose}>
+      <div className="w-full max-w-lg rounded-t-3xl bg-white p-6 pb-8 sm:rounded-2xl" onClick={e => e.stopPropagation()}>
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="text-lg font-bold text-gray-900">新增用户</h3>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600 text-xl">✕</button>
+        </div>
+        <div className="grid grid-cols-2 gap-3">
+          <div><label className="block text-xs text-gray-500 mb-1">昵称 (留空自动生成)</label><input value={nickname} onChange={e => setNickname(e.target.value)} className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm" placeholder="如 张三" /></div>
+          <div><label className="block text-xs text-gray-500 mb-1">邮箱 (可选)</label><input value={email} onChange={e => setEmail(e.target.value)} type="email" className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm" placeholder="可选" /></div>
+          <div><label className="block text-xs text-gray-500 mb-1">密码 (留空默认 123456)</label><input value={password} onChange={e => setPassword(e.target.value)} className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm" placeholder="可选, 至少6位" /></div>
+          <div><label className="block text-xs text-gray-500 mb-1">真实姓名 (可选)</label><input value={realName} onChange={e => setRealName(e.target.value)} className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm" placeholder="可选" /></div>
+          <div><label className="block text-xs text-gray-500 mb-1">年级 (可选)</label><input value={grade} onChange={e => setGrade(e.target.value)} list="grades" className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm" placeholder="可选" /></div>
+          <div><label className="block text-xs text-gray-500 mb-1">班级 (可选)</label><input value={className} onChange={e => setClassName(e.target.value)} list="classes" className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm" placeholder="可选" /></div>
+          <div><label className="block text-xs text-gray-500 mb-1">身份</label><select value={roleVal} onChange={e => setRoleVal(e.target.value)} className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm">
+            <optgroup label="系统角色">
+              <option value="STUDENT">学生</option><option value="TEACHER">教师</option><option value="USER">用户</option><option value="ADMIN">管理员</option>{isSuper && <option value="SUPER_ADMIN">超级管理员</option>}
+            </optgroup>
+            {customRoles.length > 0 && (
+              <optgroup label="自定义角色">
+                {customRoles.map(r => <option key={r.id} value={`custom:${r.id}`}>{r.name}</option>)}
+              </optgroup>
+            )}
+          </select></div>
+          <div><label className="block text-xs text-gray-500 mb-1">状态</label><select value={status} onChange={e => setStatus(e.target.value)} className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"><option value="NORMAL">正常</option><option value="GRADUATED">毕业生</option><option value="BANNED">封禁</option></select></div>
+          <div className="col-span-2"><label className="block text-xs text-gray-500 mb-1">备注 (可选)</label><input value={remark} onChange={e => setRemark(e.target.value)} className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm" placeholder="可选" /></div>
+          <div className="col-span-2 flex items-center gap-2">
+            <input type="checkbox" id="verified-create" checked={verified} onChange={e => setVerified(e.target.checked)} className="h-4 w-4 rounded border-gray-300 text-blue-600" />
+            <label htmlFor="verified-create" className="text-sm text-gray-600">已认证 (管理员身份默认已认证)</label>
+          </div>
+        </div>
+        <datalist id="grades"><option value="高一" /><option value="高二" /><option value="高三" /><option value="初一" /><option value="初二" /><option value="初三" /></datalist>
+        <datalist id="classes"><option value="1班" /><option value="2班" /><option value="3班" /><option value="4班" /><option value="5班" /><option value="6班" /></datalist>
+        {err && <p className="mt-3 text-sm text-red-500">{err}</p>}
+        {result && <p className="mt-3 text-sm text-green-600">{result}</p>}
+        <div className="mt-4 flex gap-3">
+          <button onClick={onClose} className="flex-1 rounded-lg bg-gray-100 py-2.5 text-sm text-gray-700 hover:bg-gray-200">关闭</button>
+          <button onClick={save} disabled={saving} className="flex-1 rounded-lg bg-blue-600 py-2.5 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50">{saving ? '创建中…' : '创建用户'}</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ---------- 批量更新弹窗 ----------
+function BatchUpdateModal({ selectedIds, onClose, onDone }: { selectedIds: Set<string>; onClose: () => void; onDone: () => void }) {
+  const [role, setRole] = useState('');
+  const [status, setStatus] = useState('');
+  const [grade, setGrade] = useState('');
+  const [className, setClassName] = useState('');
+  const [verified, setVerified] = useState<string>('');
+  const [remark, setRemark] = useState('');
+  const [saving, setSaving] = useState(false);
+  const [err, setErr] = useState('');
+  const [result, setResult] = useState('');
+
+  const save = async () => {
+    setSaving(true); setErr(''); setResult('');
+    const items = Array.from(selectedIds).map(userId => {
+      const item: any = { userId };
+      if (role) item.role = role;
+      if (status) item.status = status;
+      if (grade !== undefined) item.grade = grade;
+      if (className !== undefined) item.className = className;
+      if (remark !== undefined) item.remark = remark;
+      if (verified !== '') item.verified = verified === 'true';
+      return item;
+    });
+    try {
+      const res: any = await api.post('/api/admin/users/batch', { items });
+      setResult(res.message || '更新成功');
+      onDone();
+    } catch (e: any) { setErr(e.message); } finally { setSaving(false); }
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/50 sm:items-center" onClick={onClose}>
+      <div className="w-full max-w-md rounded-t-3xl bg-white p-6 pb-8 sm:rounded-2xl" onClick={e => e.stopPropagation()}>
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="text-lg font-bold text-gray-900">批量更新 ({selectedIds.size} 人)</h3>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600 text-xl">✕</button>
+        </div>
+        <p className="text-xs text-gray-400 mb-3">仅更新下方选择了的字段, 未选择的字段保持不变</p>
+        <div className="space-y-3">
+          <div><label className="block text-xs text-gray-500 mb-1">身份 (不变)</label><select value={role} onChange={e => setRole(e.target.value)} className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"><option value="">不变</option><option value="STUDENT">学生</option><option value="TEACHER">教师</option><option value="USER">用户</option><option value="ADMIN">管理员</option></select></div>
+          <div><label className="block text-xs text-gray-500 mb-1">状态 (不变)</label><select value={status} onChange={e => setStatus(e.target.value)} className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"><option value="">不变</option><option value="NORMAL">正常</option><option value="GRADUATED">毕业生</option><option value="BANNED">封禁</option></select></div>
+          <div><label className="block text-xs text-gray-500 mb-1">年级 (留空=不变)</label><input value={grade} onChange={e => setGrade(e.target.value)} className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm" placeholder="留空=不变" /></div>
+          <div><label className="block text-xs text-gray-500 mb-1">班级 (留空=不变)</label><input value={className} onChange={e => setClassName(e.target.value)} className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm" placeholder="留空=不变" /></div>
+          <div><label className="block text-xs text-gray-500 mb-1">认证状态 (不变)</label><select value={verified} onChange={e => setVerified(e.target.value)} className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"><option value="">不变</option><option value="true">已认证</option><option value="false">未认证</option></select></div>
+          <div><label className="block text-xs text-gray-500 mb-1">备注 (留空=不变)</label><input value={remark} onChange={e => setRemark(e.target.value)} className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm" placeholder="留空=不变" /></div>
+        </div>
+        {err && <p className="mt-3 text-sm text-red-500">{err}</p>}
+        {result && <p className="mt-3 text-sm text-green-600">{result}</p>}
+        <div className="mt-4 flex gap-3">
+          <button onClick={onClose} className="flex-1 rounded-lg bg-gray-100 py-2.5 text-sm text-gray-700 hover:bg-gray-200">取消</button>
+          <button onClick={save} disabled={saving} className="flex-1 rounded-lg bg-amber-500 py-2.5 text-sm font-medium text-white hover:bg-amber-600 disabled:opacity-50">{saving ? '更新中…' : '批量更新'}</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ---------- Excel 导入弹窗 ----------
+function ImportModal({ onClose, onDone }: { onClose: () => void; onDone: () => void }) {
+  const [file, setFile] = useState<File | null>(null);
+  const [saving, setSaving] = useState(false);
+  const [err, setErr] = useState('');
+  const [result, setResult] = useState<any>(null);
+
+  const submit = async () => {
+    if (!file) { setErr('请先选择 Excel 文件'); return; }
+    setSaving(true); setErr(''); setResult(null);
+    try {
+      const fd = new FormData();
+      fd.append('file', file);
+      const res: any = await api.post('/api/admin/users/import', fd);
+      setResult(res);
+      onDone();
+    } catch (e: any) { setErr(e.message); } finally { setSaving(false); }
+  };
+
+  const downloadTemplate = async () => {
+    try {
+      const res = await fetch('/api/admin/users/template', { headers: { Authorization: `Bearer ${localStorage.getItem('token')}` } });
+      if (!res.ok) throw new Error('下载失败');
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'user-import-template.xlsx';
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch (e: any) { setErr(e.message); }
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/50 sm:items-center" onClick={onClose}>
+      <div className="w-full max-w-md rounded-t-3xl bg-white p-6 pb-8 sm:rounded-2xl" onClick={e => e.stopPropagation()}>
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="text-lg font-bold text-gray-900">Excel 导入用户</h3>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600 text-xl">✕</button>
+        </div>
+        <div className="rounded-xl bg-blue-50 p-3 mb-3">
+          <p className="text-xs text-blue-700">填写说明: 昵称必填, 密码留空默认 123456, 身份可选 学生/教师/管理员/用户, 状态可选 正常/毕业生/封禁</p>
+        </div>
+        <label className="flex flex-col items-center justify-center w-full rounded-xl border-2 border-dashed border-gray-300 py-8 mb-3 cursor-pointer hover:border-green-400 hover:bg-green-50/50 transition">
+          <svg className="h-10 w-10 text-gray-400 mb-2" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" strokeLinecap="round" strokeLinejoin="round"/><path d="M17 8l-5-5-5 5" strokeLinecap="round" strokeLinejoin="round"/><path d="M12 3v12" strokeLinecap="round" strokeLinejoin="round"/></svg>
+          <span className="text-sm text-green-600 font-medium">{file ? file.name : '点击选择 Excel 文件'}</span>
+          <input type="file" accept=".xlsx,.xls" className="hidden" onChange={e => { setFile(e.target.files?.[0] || null); setResult(null); }} />
+        </label>
+        {err && <p className="mb-3 text-sm text-red-500">{err}</p>}
+        {result && (
+          <div className="mb-3 rounded-xl bg-gray-50 p-3">
+            <p className="text-sm font-medium text-gray-900">{result.message}</p>
+            {result.errors?.length > 0 && (
+              <details className="mt-2">
+                <summary className="text-xs text-gray-500 cursor-pointer">查看错误明细 ({result.errors.length})</summary>
+                <div className="mt-1 space-y-0.5 max-h-32 overflow-y-auto">
+                  {result.errors.map((e: string, i: number) => <p key={i} className="text-xs text-red-400">{e}</p>)}
+                </div>
+              </details>
+            )}
+          </div>
+        )}
+        <div className="flex gap-3">
+          <button onClick={onClose} className="flex-1 rounded-lg bg-gray-100 py-2.5 text-sm text-gray-700 hover:bg-gray-200">关闭</button>
+          <button onClick={submit} disabled={saving || !file} className="flex-1 rounded-lg bg-green-600 py-2.5 text-sm font-medium text-white hover:bg-green-700 disabled:opacity-50">{saving ? '导入中…' : '开始导入'}</button>
+        </div>
+        <button onClick={downloadTemplate} className="mt-3 w-full text-center text-xs text-blue-500 hover:text-blue-600 hover:underline">点击下载导入模板</button>
       </div>
     </div>
   );
@@ -1749,6 +2021,175 @@ function BanAppealsTab() {
   );
 }
 
+// ---------- 角色与权限管理 (超级管理员) ----------
+interface RoleItem {
+  id: string; code: string; name: string;
+  permissions: string[]; isSystem: boolean; isDefault: boolean;
+  userCount: number; createdAt: string;
+}
+
+function RolesManager() {
+  const [roles, setRoles] = useState<RoleItem[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [editing, setEditing] = useState<RoleItem | null>(null);
+  const [creating, setCreating] = useState(false);
+  const [msg, setMsg] = useState('');
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    try {
+      const data = await api.get<{ roles: RoleItem[] }>('/api/admin/roles');
+      setRoles(data.roles);
+    } finally { setLoading(false); }
+  }, []);
+
+  useEffect(() => { load(); }, [load]);
+
+  const handleDelete = async (r: RoleItem) => {
+    if (!confirm(`确认删除角色「${r.name}」? 关联用户将重置为系统角色。`)) return;
+    try {
+      await api.del(`/api/admin/roles/${r.id}`);
+      setMsg('删除成功'); load();
+    } catch (e: any) { setMsg(e.message); }
+  };
+
+  return (
+    <div>
+      <div className="flex items-center justify-between mb-4">
+        <SectionTitle title="角色与权限管理" desc="自定义角色名称, 为每个角色开启/关闭功能权限。系统内置角色不可删除。" />
+        <button onClick={() => setCreating(true)} className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700">+ 新建角色</button>
+      </div>
+      {msg && <div className="mb-3 rounded-lg bg-blue-50 px-3 py-2 text-sm text-blue-700">{msg}</div>}
+      {loading ? <div className="text-gray-400">加载中…</div> : (
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b text-left text-gray-500">
+                <th className="py-2 px-2">角色名称</th>
+                <th className="py-2 px-2">类型</th>
+                <th className="py-2 px-2">用户数</th>
+                <th className="py-2 px-2">权限数</th>
+                <th className="py-2 px-2">操作</th>
+              </tr>
+            </thead>
+            <tbody>
+              {roles.map(r => (
+                <tr key={r.id} className="border-b hover:bg-gray-50">
+                  <td className="py-2 px-2 font-medium">{r.name}</td>
+                  <td className="py-2 px-2">
+                    {r.isSystem
+                      ? <span className="rounded bg-gray-100 px-2 py-0.5 text-xs text-gray-600">系统</span>
+                      : <span className="rounded bg-blue-50 px-2 py-0.5 text-xs text-blue-600">自定义</span>}
+                    {r.isDefault && <span className="ml-1 rounded bg-green-50 px-2 py-0.5 text-xs text-green-600">默认</span>}
+                  </td>
+                  <td className="py-2 px-2">{r.userCount}</td>
+                  <td className="py-2 px-2">{r.permissions.length}</td>
+                  <td className="py-2 px-2 space-x-2">
+                    <button onClick={() => setEditing(r)} className="text-blue-600 hover:underline">编辑</button>
+                    {!r.isSystem && <button onClick={() => handleDelete(r)} className="text-red-500 hover:underline">删除</button>}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+      {(editing || creating) && (
+        <RoleEditModal
+          role={editing}
+          onClose={() => { setEditing(null); setCreating(false); }}
+          onSaved={() => { load(); setEditing(null); setCreating(false); }}
+        />
+      )}
+    </div>
+  );
+}
+
+function RoleEditModal({ role, onClose, onSaved }: { role: RoleItem | null; onClose: () => void; onSaved: () => void }) {
+  const [name, setName] = useState(role?.name || '');
+  const [perms, setPerms] = useState<Set<string>>(new Set(role?.permissions || []));
+  const [saving, setSaving] = useState(false);
+  const [err, setErr] = useState('');
+
+  const toggle = (code: string) => {
+    const ns = new Set(perms);
+    if (ns.has(code)) ns.delete(code); else ns.add(code);
+    setPerms(ns);
+  };
+
+  const save = async () => {
+    if (!name.trim()) { setErr('请输入角色名称'); return; }
+    setSaving(true); setErr('');
+    try {
+      const body = { name: name.trim(), permissions: Array.from(perms) };
+      if (role) {
+        await api.patch(`/api/admin/roles/${role.id}`, body);
+      } else {
+        await api.post('/api/admin/roles', body);
+      }
+      onSaved();
+    } catch (e: any) { setErr(e.message); }
+    finally { setSaving(false); }
+  };
+
+  // 全选 / 全不选
+  const allCodes = PERMISSIONS.map(p => p.code);
+  const allChecked = allCodes.every(c => perms.has(c));
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={onClose}>
+      <div className="max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-2xl bg-white p-6" onClick={e => e.stopPropagation()}>
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="text-lg font-bold">{role ? '编辑角色' : '新建角色'}</h3>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600">✕</button>
+        </div>
+
+        <label className="block text-sm font-medium text-gray-700 mb-1">角色名称</label>
+        <input value={name} onChange={e => setName(e.target.value)} maxLength={20}
+          className="mb-4 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm" placeholder="如: 内容审核员" />
+
+        <div className="mb-2 flex items-center justify-between">
+          <span className="text-sm font-medium text-gray-700">功能权限开关</span>
+          <button onClick={() => setPerms(allChecked ? new Set() : new Set(allCodes))}
+            className="text-xs text-blue-600 hover:underline">{allChecked ? '全部取消' : '全部开启'}</button>
+        </div>
+
+        <div className="space-y-4">
+          {Object.entries(PERMISSIONS_BY_GROUP).map(([group, items]) => (
+            <div key={group}>
+              <h4 className="mb-2 text-sm font-semibold text-gray-800">{group}</h4>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                {items.map(p => {
+                  const locked = SUPER_ADMIN_ONLY_PERMISSIONS.has(p.code);
+                  const checked = perms.has(p.code);
+                  return (
+                    <label key={p.code} className={`flex items-center gap-2 rounded-lg border px-3 py-2 text-sm ${checked ? 'border-blue-300 bg-blue-50' : 'border-gray-200'} ${locked ? 'opacity-60' : ''}`}>
+                      <input type="checkbox" checked={checked} disabled={locked}
+                        onChange={() => toggle(p.code)}
+                        className="h-4 w-4 rounded border-gray-300 text-blue-600" />
+                      <span className="flex-1">{p.name}</span>
+                      {locked && <span className="text-xs text-amber-600">仅超管</span>}
+                    </label>
+                  );
+                })}
+              </div>
+            </div>
+          ))}
+        </div>
+
+        {err && <div className="mt-3 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-600">{err}</div>}
+        <div className="mt-5 flex justify-end gap-2">
+          <button onClick={onClose} className="rounded-lg border border-gray-300 px-4 py-2 text-sm hover:bg-gray-50">取消</button>
+          <button onClick={save} disabled={saving}
+            className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50">
+            {saving ? '保存中…' : '保存'}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ---------- 管理后台主组件 ----------
 export function AdminPanel({ tab, isSuper }: { tab: AdminTab; isSuper: boolean }) {
   switch (tab) {
@@ -1762,6 +2203,7 @@ export function AdminPanel({ tab, isSuper }: { tab: AdminTab; isSuper: boolean }
     case 'settings': return <SiteSettings />;
     case 'email': return <EmailSettings />;
     case 'agreement': return <AgreementManager />;
+    case 'roles': return <RolesManager />;
     default: return <OverviewTab />;
   }
 }

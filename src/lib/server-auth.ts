@@ -3,6 +3,8 @@ import jwt from 'jsonwebtoken';
 import { NextRequest } from 'next/server';
 import { prisma } from './prisma';
 import { UserRole, UserStatus } from '@prisma/client';
+import { DEFAULT_ROLE_PERMISSIONS, PERMISSION_CODES } from './permissions';
+import { seedRoles } from './role-service';
 
 export interface JwtPayload {
   sub: string;
@@ -14,6 +16,7 @@ export interface ReqUser {
   id: string;
   email: string | null;
   role: UserRole;
+  roleId: string | null;
   nickname: string;
   bannedUntil: Date | null;
   verified: boolean;
@@ -44,7 +47,35 @@ export async function getUserFromRequest(req: Request | NextRequest): Promise<Re
   if (!user || user.status === UserStatus.BANNED) return null;
   // 管理员/超级管理员默认已认证 (无需走认证流程)
   const autoVerified = user.role === UserRole.ADMIN || user.role === UserRole.SUPER_ADMIN;
-  return { id: user.id, email: user.email, role: user.role, nickname: user.nickname, bannedUntil: user.bannedUntil, verified: autoVerified || user.verified };
+  return {
+    id: user.id, email: user.email, role: user.role, roleId: user.roleId,
+    nickname: user.nickname, bannedUntil: user.bannedUntil,
+    verified: autoVerified || user.verified,
+  };
+}
+
+// 获取用户的有效权限码集合:
+// 1. SUPER_ADMIN 永远全权限
+// 2. 有自定义角色时使用自定义角色的 permissions
+// 3. 否则使用系统角色的默认权限
+export async function getUserPermissions(user: ReqUser): Promise<Set<string>> {
+  await seedRoles(); // 确保系统角色存在
+  if (user.role === UserRole.SUPER_ADMIN) {
+    return new Set(PERMISSION_CODES);
+  }
+  if (user.roleId) {
+    const customRole = await prisma.role.findUnique({ where: { id: user.roleId } });
+    if (customRole?.permissions && Array.isArray(customRole.permissions)) {
+      return new Set(customRole.permissions as string[]);
+    }
+  }
+  return new Set(DEFAULT_ROLE_PERMISSIONS[user.role] || []);
+}
+
+// 判断用户是否拥有某权限
+export async function can(user: ReqUser, permission: string): Promise<boolean> {
+  const perms = await getUserPermissions(user);
+  return perms.has(permission);
 }
 
 class HttpError extends Error {
@@ -62,11 +93,20 @@ export async function requireUser(req: Request | NextRequest): Promise<ReqUser> 
   return user;
 }
 
-// 强制角色, 否则抛 403
+// 强制角色, 否则抛 403 (保留兼容: 基于系统角色枚举)
 export async function requireRole(req: Request | NextRequest, ...roles: UserRole[]): Promise<ReqUser> {
   const user = await requireUser(req);
   if (!roles.includes(user.role)) {
     throw new HttpError('权限不足, 需要角色: ' + roles.join(', '), 403);
+  }
+  return user;
+}
+
+// 强制权限: 校验当前用户是否拥有指定权限码, 否则抛 403
+export async function requirePermission(req: Request | NextRequest, permission: string): Promise<ReqUser> {
+  const user = await requireUser(req);
+  if (!(await can(user, permission))) {
+    throw new HttpError('权限不足, 需要权限: ' + permission, 403);
   }
   return user;
 }

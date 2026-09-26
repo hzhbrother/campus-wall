@@ -3,14 +3,14 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { UserRole } from '@prisma/client';
 import { prisma } from '@/lib/prisma';
-import { requireRole } from '@/lib/server-auth';
+import { requirePermission } from '@/lib/server-auth';
 import { errorResponse } from '@/lib/api-response';
 import { unbanUser } from '@/lib/admin-service';
 
 // GET: 申诉列表
 export async function GET(req: NextRequest) {
   try {
-    const me = await requireRole(req, UserRole.ADMIN, UserRole.SUPER_ADMIN);
+    const me = await requirePermission(req, 'appeal.view');
     const { searchParams } = new URL(req.url);
     const status = searchParams.get('status'); // PENDING | APPROVED | REJECTED | ALL
 
@@ -36,7 +36,7 @@ export async function GET(req: NextRequest) {
 // PATCH: 审核申诉
 export async function PATCH(req: NextRequest) {
   try {
-    const me = await requireRole(req, UserRole.ADMIN, UserRole.SUPER_ADMIN);
+    const me = await requirePermission(req, 'appeal.handle');
     const { id, action, reviewerNote } = await req.json().catch(() => ({}));
     if (!id || !action || !['APPROVE', 'REJECT'].includes(action)) {
       return NextResponse.json({ message: '参数错误' }, { status: 400 });

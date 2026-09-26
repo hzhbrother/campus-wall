@@ -112,7 +112,8 @@ model User {
   grade        String?          // 年级
   className    String?          // 班级
   remark       String?          // 备注
-  role         UserRole         @default(STUDENT)
+  role         UserRole         @default(STUDENT) // 系统内置角色 (快速判断用)
+  roleId       String?          // 自定义角色 ID (优先于 role 字段的权限)
   status       UserStatus       @default(NORMAL)
   bannedUntil  DateTime?        // 封禁到期时间 (null=未临时封禁)
   banReason    String?          // 封禁原因
@@ -137,10 +138,27 @@ model User {
   violations   ViolationRecord[]
   notifications Notification[]
   notificationSettings NotificationSetting?
+  customRole   Role?            @relation(fields: [roleId], references: [id])
 
   @@index([email])
   @@index([role])
   @@index([status])
+  @@index([roleId])
+}
+
+// ---- 角色 (支持超级管理员自定义角色名称与权限) ----
+
+model Role {
+  id          String   @id @default(cuid())
+  code        String   @unique  // 系统角色: SUPER_ADMIN/ADMIN/TEACHER/STUDENT/USER; 自定义: CUSTOM_xxx
+  name        String            // 显示名称 (可被超级管理员修改)
+  permissions Json     @default("[]") // 权限码数组, 如 ["user.view", "post.moderate"]
+  isSystem    Boolean  @default(false) // 系统内置角色不可删除
+  isDefault   Boolean  @default(false) // 新注册用户的默认角色 (仅 STUDENT 一个)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  users       User[]
 }
 
 // 第三方账号绑定 (一个用户可绑定多个平台)

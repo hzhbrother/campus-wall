@@ -149,7 +149,7 @@ export async function listUsers(page: number, pageSize: number, role?: UserRole,
       orderBy: { createdAt: 'desc' },
       skip: (page - 1) * pageSize,
       take: pageSize,
-      select: { id: true, email: true, nickname: true, realName: true, avatar: true, role: true, status: true, grade: true, className: true, remark: true, bannedUntil: true, banReason: true, credibilityScore: true, verified: true, verifiedAt: true, verificationStatus: true, verificationPhoto: true, verificationRejectReason: true, createdAt: true, _count: { select: { posts: true } } },
+      select: { id: true, email: true, nickname: true, realName: true, avatar: true, role: true, roleId: true, customRole: { select: { id: true, name: true } }, status: true, grade: true, className: true, remark: true, bannedUntil: true, banReason: true, credibilityScore: true, verified: true, verifiedAt: true, verificationStatus: true, verificationPhoto: true, verificationRejectReason: true, createdAt: true, _count: { select: { posts: true } } },
     }),
     prisma.user.count({ where }),
   ]);

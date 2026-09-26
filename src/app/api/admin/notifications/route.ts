@@ -3,7 +3,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import { UserRole, NotificationType } from '@prisma/client';
-import { requireRole } from '@/lib/server-auth';
+import { requirePermission } from '@/lib/server-auth';
 import { createNotification } from '@/lib/notification-service';
 import { prisma } from '@/lib/prisma';
 import { errorResponse } from '@/lib/api-response';
@@ -22,7 +22,7 @@ const Schema = z.object({
 
 export async function GET(req: NextRequest) {
   try {
-    await requireRole(req, UserRole.ADMIN, UserRole.SUPER_ADMIN);
+    await requirePermission(req, 'notification.send');
     // 获取所有通知 (按时间倒序, 置顶优先)
     const items = await prisma.notification.findMany({
       orderBy: [{ pinned: 'desc' }, { createdAt: 'desc' }],
@@ -36,7 +36,7 @@ export async function GET(req: NextRequest) {
 
 export async function POST(req: NextRequest) {
   try {
-    await requireRole(req, UserRole.ADMIN, UserRole.SUPER_ADMIN);
+    await requirePermission(req, 'notification.send');
     const dto = Schema.parse(await req.json());
 
     let targetRole: UserRole | undefined;

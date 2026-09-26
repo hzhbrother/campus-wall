@@ -18,6 +18,8 @@ export interface AuthUser {
   className?: string | null;
   remark?: string | null;
   role: Role;
+  roleId?: string | null;
+  customRole?: { id: string; name: string; permissions: string[] } | null;
   verified?: boolean;
   verificationStatus?: string;
   verificationRejectReason?: string | null;

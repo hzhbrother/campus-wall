@@ -3,7 +3,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import { UserRole, UserStatus, VerificationStatus } from '@prisma/client';
-import { requireRole } from '@/lib/server-auth';
+import { requireRole, requirePermission } from '@/lib/server-auth';
 import { updateUser, deleteUser } from '@/lib/admin-service';
 import { errorResponse } from '@/lib/api-response';
 
@@ -23,7 +23,7 @@ const Schema = z.object({
 
 export async function PATCH(req: NextRequest, { params }: { params: { id: string } }) {
   try {
-    const me = await requireRole(req, UserRole.ADMIN, UserRole.SUPER_ADMIN);
+    const me = await requirePermission(req, 'user.edit');
     const dto = Schema.parse(await req.json());
     const data: any = {};
     if (dto.realName !== undefined) data.realName = dto.realName || null;
@@ -58,7 +58,8 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
 
 export async function DELETE(req: NextRequest, { params }: { params: { id: string } }) {
   try {
-    const me = await requireRole(req, UserRole.ADMIN, UserRole.SUPER_ADMIN);
+    // 仅超级管理员可删除用户
+    const me = await requireRole(req, UserRole.SUPER_ADMIN);
     return NextResponse.json(await deleteUser(params.id, me.id));
   } catch (e) {
     return errorResponse(e);
