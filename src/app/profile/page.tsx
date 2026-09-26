@@ -464,7 +464,7 @@ function ProfilePageInner() {
 
   // ---- 签到积分视图 ----
   if (view === 'checkin') {
-    return <CheckInView onBack={() => setView('home')} />;
+    return <CheckInView onBack={() => setView('home')} onPointsChanged={() => refreshUser()} />;
   }
 
   // ---- 联系我们视图 ----
@@ -871,7 +871,7 @@ function VerificationModal({ user, onClose, onVerified, onSubmitted }: { user: a
 
   return (
     <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/50 sm:items-center" onClick={onClose}>
-      <div className="w-full max-w-md rounded-t-3xl bg-white p-5 pb-8 sm:rounded-2xl" onClick={e => e.stopPropagation()}>
+      <div className="w-full max-w-sm rounded-t-3xl bg-white p-4 pb-6 sm:rounded-2xl" onClick={e => e.stopPropagation()}>
         <div className="flex items-center justify-between mb-4">
           <h3 className="text-lg font-bold text-gray-900">{verifyLabel}</h3>
           <button onClick={onClose} className="text-gray-400 hover:text-gray-600 text-xl">✕</button>

@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { api } from '@/lib/api';
 
-export function CheckInView({ onBack }: { onBack: () => void }) {
+export function CheckInView({ onBack, onPointsChanged }: { onBack: () => void; onPointsChanged?: () => void }) {
   const [checkedIn, setCheckedIn] = useState(false);
   const [streak, setStreak] = useState(0);
   const [points, setPoints] = useState(0);
@@ -31,6 +31,8 @@ export function CheckInView({ onBack }: { onBack: () => void }) {
       if (res.newBadges && res.newBadges.length > 0) {
         setNewBadge(res.newBadges[0]);
       }
+      // 签到成功后刷新全局用户状态, 让"我的"页顶部积分同步更新
+      onPointsChanged?.();
     } catch (e: any) {
       setMsg(e.message || '签到失败');
     } finally { setBusy(false); }
