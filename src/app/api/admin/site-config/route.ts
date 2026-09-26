@@ -20,11 +20,17 @@ const CONFIG_KEYS = [
   'about_content',
 ];
 
-export async function GET() {
-  const rows = await prisma.siteConfig.findMany({ where: { key: { in: CONFIG_KEYS } } });
-  const map: Record<string, string> = {};
-  rows.forEach(r => { map[r.key] = r.value; });
-  return NextResponse.json(map);
+export async function GET(req: NextRequest) {
+  try {
+    // 站点配置含 SMTP 密码等敏感信息, 仅超级管理员可查看
+    await requireRole(req, UserRole.SUPER_ADMIN);
+    const rows = await prisma.siteConfig.findMany({ where: { key: { in: CONFIG_KEYS } } });
+    const map: Record<string, string> = {};
+    rows.forEach(r => { map[r.key] = r.value; });
+    return NextResponse.json(map);
+  } catch (e) {
+    return errorResponse(e);
+  }
 }
 
 export async function PATCH(req: NextRequest) {
