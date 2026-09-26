@@ -518,6 +518,11 @@ function ProfilePageInner() {
                   )}
                 </div>
                 <div className="text-sm text-white/80 mt-0.5">{user.email || '未绑定邮箱'}</div>
+                {user.userNumber != null && (
+                  <div className="text-xs text-white/60 mt-0.5 tracking-wide">
+                    <span className="text-white/40">Nº</span> {user.verified ? 'XY' : 'XYS'}{user.userNumber >= 100000001 ? user.userNumber : String(user.userNumber).padStart(5, '0')}
+                  </div>
+                )}
                 <div className="mt-1.5 flex items-center gap-2">
                   <span className="inline-flex items-center gap-1 rounded-full bg-yellow-400/90 px-2 py-0.5 text-xs font-medium text-yellow-900">🪙 {user.points || 0} 积分</span>
                 </div>

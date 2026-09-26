@@ -9,6 +9,7 @@ import { verifyEmailCode } from '@/lib/email-verify';
 import { errorResponse } from '@/lib/api-response';
 import { getSiteConfigBool } from '@/lib/site-config';
 import { createNotification } from '@/lib/notification-service';
+import { generateUserNumber } from '@/lib/user-number';
 
 const Schema = z.object({
   nickname: z.string().min(2, '账号名至少2位').max(32),
@@ -42,6 +43,7 @@ export async function POST(req: NextRequest) {
     if (!valid) return NextResponse.json({ message: '验证码错误或已过期' }, { status: 400 });
 
     const password = await bcrypt.hash(dto.password, 10);
+    const userNumber = await generateUserNumber(UserRole.STUDENT);
     const user = await prisma.user.create({
       data: {
         nickname: dto.nickname,
@@ -51,6 +53,7 @@ export async function POST(req: NextRequest) {
         grade: dto.grade || null,
         className: dto.className || null,
         remark: dto.remark || null,
+        userNumber,
       },
     });
     await prisma.account.create({

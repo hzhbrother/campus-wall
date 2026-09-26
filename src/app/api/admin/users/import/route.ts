@@ -6,6 +6,7 @@ import bcrypt from 'bcryptjs';
 import { requirePermission } from '@/lib/server-auth';
 import { prisma } from '@/lib/prisma';
 import { errorResponse } from '@/lib/api-response';
+import { generateUserNumber } from '@/lib/user-number';
 
 const COL_NICKNAME = '昵称*';
 const COL_EMAIL = '邮箱';
@@ -76,6 +77,7 @@ export async function POST(req: NextRequest) {
             realName, grade, className, role, status, remark,
             verified: isAutoVerified,
             verifiedAt: isAutoVerified ? new Date() : null,
+            userNumber: await generateUserNumber(role),
           },
         });
         created++;

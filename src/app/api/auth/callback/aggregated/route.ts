@@ -5,6 +5,7 @@ import { prisma } from '@/lib/prisma';
 import { signToken } from '@/lib/server-auth';
 import { getAggregatedUserInfo, getJuheTypeMeta } from '@/lib/aggregated-login';
 import { requestOrigin } from '@/lib/api-response';
+import { generateUserNumber } from '@/lib/user-number';
 
 export async function GET(req: NextRequest) {
   const origin = requestOrigin(req);
@@ -47,8 +48,9 @@ export async function GET(req: NextRequest) {
         i += 1;
         nickname = `${baseName.slice(0, 20)}_${i}`;
       }
+      const userNumber = await generateUserNumber('STUDENT');
       user = await prisma.user.create({
-        data: { nickname, avatar: info.faceimg || null },
+        data: { nickname, avatar: info.faceimg || null, userNumber },
       });
       await prisma.account.create({
         data: {

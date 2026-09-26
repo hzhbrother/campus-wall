@@ -20,6 +20,7 @@ interface UserProfile {
   qualificationType: string | null;
   qualificationVerified: boolean;
   points: number;
+  userNumber: number | null;
   createdAt: string;
   _count: { posts: number; comments: number; favorites: number; likesReceived: number };
 }
@@ -39,6 +40,14 @@ interface Comment {
   content: string;
   createdAt: string;
   post: { id: string; title: string };
+}
+
+// 用户编号展示: 未认证=XYS, 已认证=XY
+function formatUserCode(userNumber: number | null | undefined, verified: boolean): string {
+  if (userNumber == null) return '';
+  const prefix = verified ? 'XY' : 'XYS';
+  const padded = userNumber >= 100000001 ? String(userNumber) : String(userNumber).padStart(5, '0');
+  return `${prefix}${padded}`;
 }
 
 export default function UserProfilePage() {
@@ -173,6 +182,15 @@ export default function UserProfilePage() {
                 <span className="rounded-full bg-purple-100 px-2 py-0.5 text-xs text-purple-600">🏅 {profile.qualificationType}</span>
               )}
             </div>
+            {(() => {
+              const code = formatUserCode(profile.userNumber, profile.verified);
+              if (!code) return null;
+              return (
+                <div className="mt-1 text-xs text-gray-400 tracking-wide">
+                  <span className="text-gray-300">Nº</span> {code}
+                </div>
+              );
+            })()}
             <div className="mt-1 flex items-center gap-2">
               <span className="inline-flex items-center gap-1 rounded-full bg-yellow-50 px-2 py-0.5 text-xs font-medium text-yellow-700">🪙 {profile.points || 0} 积分</span>
             </div>

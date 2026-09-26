@@ -5,6 +5,7 @@ import { prisma } from '@/lib/prisma';
 import { signToken, sanitize } from '@/lib/server-auth';
 import { fetchProfile } from '@/lib/oauth';
 import { requestOrigin } from '@/lib/api-response';
+import { generateUserNumber } from '@/lib/user-number';
 
 const MAP: Record<string, AccountProvider> = {
   github: AccountProvider.GITHUB,
@@ -58,8 +59,9 @@ export async function GET(req: NextRequest, { params }: { params: { provider: st
         i += 1;
         nickname = `${baseName.slice(0, 20)}_${i}`;
       }
+      const userNumber = await generateUserNumber('STUDENT');
       user = await prisma.user.create({
-        data: { email: profile.email || null, nickname, avatar: profile.avatar },
+        data: { email: profile.email || null, nickname, avatar: profile.avatar, userNumber },
       });
       await prisma.account.create({
         data: { userId: user.id, provider, providerUid: profile.providerUid, rawProfile: profile.raw as any },

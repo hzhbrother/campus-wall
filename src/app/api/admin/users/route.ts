@@ -8,6 +8,7 @@ import { requireRole, requirePermission } from '@/lib/server-auth';
 import { listUsers } from '@/lib/admin-service';
 import { prisma } from '@/lib/prisma';
 import { errorResponse } from '@/lib/api-response';
+import { generateUserNumber } from '@/lib/user-number';
 
 const CreateSchema = z.object({
   email: z.string().email().optional().or(z.literal('')),
@@ -84,6 +85,7 @@ export async function POST(req: NextRequest) {
     // 管理员认证状态: ADMIN/SUPER_ADMIN 默认已认证
     const isAutoVerified = finalRole === UserRole.ADMIN || finalRole === UserRole.SUPER_ADMIN;
 
+    const userNumber = await generateUserNumber(finalRole);
     const user = await prisma.user.create({
       data: {
         email,
@@ -99,6 +101,7 @@ export async function POST(req: NextRequest) {
         avatar: dto.avatar || null,
         verified: dto.verified ?? isAutoVerified,
         verifiedAt: (dto.verified ?? isAutoVerified) ? new Date() : null,
+        userNumber,
       },
       select: { id: true, email: true, nickname: true, role: true, roleId: true, createdAt: true },
     });

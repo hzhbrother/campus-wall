@@ -33,6 +33,7 @@ export interface AuthUser {
   createdAt?: string;
   bannedUntil?: string | null;
   points?: number;
+  userNumber?: number | null;
   credibilityScore?: number;
   banReason?: string | null;
   _count?: { posts: number; comments: number; likes: number; likesReceived: number };

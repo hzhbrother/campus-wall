@@ -11,7 +11,7 @@ export async function GET(_req: NextRequest, { params }: { params: { id: string 
         id: true, nickname: true, avatar: true, coverImage: true,
         role: true, grade: true, className: true, verified: true, verificationStatus: true,
         qualificationType: true, qualificationVerified: true,
-        points: true,
+        points: true, userNumber: true,
         createdAt: true,
         _count: { select: { posts: true, comments: true, favorites: true } },
       },

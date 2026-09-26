@@ -147,6 +147,7 @@ model User {
   qualificationRejectReason String? // 资质认证驳回原因
   lastReadNotificationsAt DateTime? // 上次标记全部已读的时间 (用于广播通知未读计算)
   points Int @default(0) // 积分 (签到等获得)
+  userNumber Int? // 用户编号 (顺序号, 用于生成 XYS/XY 编号)
   createdAt    DateTime         @default(now())
   updatedAt    DateTime         @updatedAt
 
