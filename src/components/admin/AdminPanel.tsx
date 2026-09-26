@@ -1059,9 +1059,30 @@ function EmailSettings() {
   const [testEmail, setTestEmail] = useState('');
   const [testing, setTesting] = useState(false);
   const [testMsg, setTestMsg] = useState('');
+  const [connecting, setConnecting] = useState(false);
+  const [connectMsg, setConnectMsg] = useState('');
+
+  // 模板相关
+  const [templates, setTemplates] = useState<any[]>([]);
+  const [selectedKey, setSelectedKey] = useState<string>('');
+  const [tplName, setTplName] = useState('');
+  const [tplSubject, setTplSubject] = useState('');
+  const [tplHtml, setTplHtml] = useState('');
+  const [tplSaving, setTplSaving] = useState(false);
+  const [tplMsg, setTplMsg] = useState('');
 
   useEffect(() => {
     api.get('/api/admin/site-config').then(setCfg).catch(console.error).finally(() => setLoading(false));
+    api.get<{ templates: any[] }>('/api/admin/email-templates').then(r => {
+      setTemplates(r.templates || []);
+      if (r.templates?.length) {
+        const first = r.templates[0];
+        setSelectedKey(first.key);
+        setTplName(first.name);
+        setTplSubject(first.subject);
+        setTplHtml(first.html);
+      }
+    }).catch(console.error);
   }, []);
 
   const set = (k: string, v: string) => setCfg({ ...cfg, [k]: v });
@@ -1073,6 +1094,14 @@ function EmailSettings() {
     catch (e: any) { setMsg(e.message); } finally { setSaving(false); }
   };
 
+  const testConnection = async () => {
+    setConnecting(true); setConnectMsg('');
+    try {
+      const r = await api.post<{ message?: string }>('/api/admin/site-config/test-connection', {});
+      setConnectMsg(r.message || '连接成功');
+    } catch (e: any) { setConnectMsg(e.message); } finally { setConnecting(false); }
+  };
+
   const sendTest = async () => {
     if (!testEmail) { setTestMsg('请输入收件邮箱'); return; }
     setTesting(true); setTestMsg('');
@@ -1082,11 +1111,31 @@ function EmailSettings() {
     } catch (e: any) { setTestMsg(e.message); } finally { setTesting(false); }
   };
 
+  // 选择模板
+  const selectTemplate = (t: any) => {
+    setSelectedKey(t.key);
+    setTplName(t.name);
+    setTplSubject(t.subject);
+    setTplHtml(t.html);
+    setTplMsg('');
+  };
+
+  // 保存模板
+  const saveTemplate = async () => {
+    if (!selectedKey) return;
+    setTplSaving(true); setTplMsg('');
+    try {
+      await api.post('/api/admin/email-templates', { key: selectedKey, name: tplName, subject: tplSubject, html: tplHtml });
+      setTplMsg('模板已保存');
+      setTemplates(prev => prev.map(t => t.key === selectedKey ? { ...t, name: tplName, subject: tplSubject, html: tplHtml, isOverridden: true } : t));
+    } catch (e: any) { setTplMsg(e.message); } finally { setTplSaving(false); }
+  };
+
   if (loading) return <p className="py-6 text-center text-gray-400">加载中…</p>;
 
   return (
     <div>
-      <SectionTitle title="邮件配置" desc="配置 SMTP 邮件服务，用于密码重置、通知推送等" />
+      <SectionTitle title="邮件配置" desc="配置 SMTP 邮件服务、连接测试与邮件模板，用于密码重置、通知推送等" />
       {msg && <div className={`mb-3 text-sm ${msg.includes('成功') ? 'text-green-600' : 'text-red-500'}`}>{msg}</div>}
 
       <div className="space-y-5">
@@ -1146,11 +1195,61 @@ function EmailSettings() {
             <span>📤</span> 服务测试
           </h3>
           <div className="space-y-3">
+            {/* 连接测试 */}
             <div className="flex gap-2">
-              <input value={testEmail} onChange={e => setTestEmail(e.target.value)} placeholder="输入收件邮箱测试" className="flex-1 rounded-lg border border-gray-300 px-3 py-2 text-sm" />
+              <button onClick={testConnection} disabled={connecting || !enabled} className="flex-1 rounded-lg bg-blue-500 px-4 py-2 text-sm font-medium text-white disabled:opacity-50 hover:bg-blue-600">{connecting ? '测试中…' : '测试连接'}</button>
+              <input value={testEmail} onChange={e => setTestEmail(e.target.value)} placeholder="输入收件邮箱发送测试" className="flex-1 rounded-lg border border-gray-300 px-3 py-2 text-sm" />
               <button onClick={sendTest} disabled={testing || !enabled} className="rounded-lg bg-green-600 px-4 py-2 text-sm font-medium text-white disabled:opacity-50 hover:bg-green-700">{testing ? '发送中…' : '发送测试'}</button>
             </div>
-            {testMsg && <p className={`text-xs ${testMsg.includes('成功') || testMsg.includes('已') ? 'text-green-600' : 'text-red-500'}`}>{testMsg}</p>}
+            {connectMsg && <p className={`text-xs ${connectMsg.includes('成功') ? 'text-green-600' : 'text-red-500'}`}>连接: {connectMsg}</p>}
+            {testMsg && <p className={`text-xs ${testMsg.includes('成功') || testMsg.includes('已') ? 'text-green-600' : 'text-red-500'}`}>邮件: {testMsg}</p>}
+          </div>
+        </div>
+
+        {/* 邮件模板 */}
+        <div className="rounded-xl border border-gray-100 p-4">
+          <h3 className="font-semibold text-gray-900 mb-3 flex items-center gap-2">
+            <span>📝</span> 邮件模板
+          </h3>
+          <p className="text-xs text-gray-400 mb-3">支持变量 <code className="bg-gray-100 px-1 rounded">{'{{purpose}}'}</code> <code className="bg-gray-100 px-1 rounded">{'{{code}}'}</code> <code className="bg-gray-100 px-1 rounded">{'{{expiresInMinutes}}'}</code> <code className="bg-gray-100 px-1 rounded">{'{{email}}'}</code></p>
+
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+            {/* 模板列表 */}
+            <div className="md:col-span-1 space-y-1">
+              {templates.map(t => (
+                <button
+                  key={t.key}
+                  onClick={() => selectTemplate(t)}
+                  className={`w-full text-left rounded-lg px-3 py-2 text-sm ${selectedKey === t.key ? 'bg-blue-50 text-blue-600 border border-blue-200' : 'hover:bg-gray-50 border border-transparent'}`}
+                >
+                  <div className="flex items-center justify-between">
+                    <span className="font-medium">{t.name}</span>
+                    {t.isOverridden && <span className="text-[10px] text-green-600">已自定义</span>}
+                  </div>
+                  <div className="text-xs text-gray-400 font-mono">{t.key}</div>
+                </button>
+              ))}
+            </div>
+
+            {/* 模板编辑器 */}
+            <div className="md:col-span-3 space-y-3">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">模板名称</label>
+                <input value={tplName} onChange={e => setTplName(e.target.value)} className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm" />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">邮件主题</label>
+                <input value={tplSubject} onChange={e => setTplSubject(e.target.value)} className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm" placeholder="支持变量" />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">邮件内容 (HTML)</label>
+                <textarea value={tplHtml} onChange={e => setTplHtml(e.target.value)} rows={12} className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm font-mono text-xs" />
+              </div>
+              <div className="flex gap-2">
+                <button onClick={saveTemplate} disabled={tplSaving} className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white disabled:opacity-50 hover:bg-blue-700">{tplSaving ? '保存中…' : '保存模板'}</button>
+                {tplMsg && <span className={`self-center text-xs ${tplMsg.includes('已') ? 'text-green-600' : 'text-red-500'}`}>{tplMsg}</span>}
+              </div>
+            </div>
           </div>
         </div>
 

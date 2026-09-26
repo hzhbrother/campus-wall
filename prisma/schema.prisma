@@ -342,7 +342,7 @@ model ViolationRecord {
   @@index([userId, createdAt])
 }
 
-// ---- 邮箱验证码 (用于忘记密码、绑定邮箱等) ----
+// ---- 邮件验证码 (用于忘记密码、绑定邮箱等) ----
 
 model EmailVerificationCode {
   id        String   @id @default(cuid())
@@ -354,6 +354,16 @@ model EmailVerificationCode {
   createdAt DateTime @default(now())
 
   @@index([email, purpose, createdAt])
+}
+
+// ---- 邮件模板 (管理员可自定义邮件内容) ----
+
+model EmailTemplate {
+  key       String   @id        // 模板唯一键, 如 verification-code / notification
+  name      String              // 模板名称
+  subject   String              // 邮件主题 (支持变量)
+  html      String              // 邮件 HTML 内容 (支持变量)
+  updatedAt DateTime @updatedAt
 }
 
 // ---- 站点配置 (键值对存储, 含 SMTP 等) ----

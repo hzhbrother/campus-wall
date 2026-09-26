@@ -1,10 +1,18 @@
 // 邮箱验证码服务: 生成/发送/校验邮箱验证码 (用于忘记密码、绑定邮箱等)
 import { prisma } from './prisma';
 import { sendEmail } from './email-service';
+import { getTemplate, renderTemplate } from './email-templates';
 
 const CODE_EXPIRE_MINUTES = 10;   // 验证码有效期 10 分钟
 const RESEND_INTERVAL_SEC = 60;   // 同邮箱重发间隔 60 秒
 const MAX_CODES_PER_HOUR = 10;    // 同邮箱每小时最多 10 条
+
+// 用途中文映射
+const PURPOSE_LABEL: Record<string, string> = {
+  'reset-password': '重置密码',
+  'bind-email': '绑定邮箱',
+  'change-email': '变更邮箱',
+};
 
 // 生成 6 位数字验证码
 function generateCode(): string {
@@ -41,32 +49,23 @@ export async function sendEmailCode(email: string, purpose: string): Promise<{ s
     data: { email, code, purpose, expiresAt },
   });
 
-  // 4. 发送邮件
-  const subject = purpose === 'reset-password' ? '【校园墙】重置密码验证码' : '【校园墙】邮箱验证码';
-  const html = `
-    <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; max-width: 480px; margin: 0 auto;">
-      <div style="background: linear-gradient(135deg, #3b82f6, #6366f1); padding: 32px; border-radius: 12px 12px 0 0; text-align: center;">
-        <h1 style="color: white; margin: 0; font-size: 20px;">校园墙</h1>
-      </div>
-      <div style="background: #f9fafb; padding: 32px; border-radius: 0 0 12px 12px;">
-        <p style="color: #374151; font-size: 14px; line-height: 1.6;">您好，</p>
-        <p style="color: #374151; font-size: 14px; line-height: 1.6;">
-          ${purpose === 'reset-password' ? '您正在重置密码，' : '您正在进行邮箱验证，'}
-          请使用以下验证码完成操作：
-        </p>
-        <div style="text-align: center; margin: 24px 0;">
-          <span style="display: inline-block; background: #eff6ff; color: #2563eb; font-size: 32px; font-weight: bold; letter-spacing: 8px; padding: 16px 32px; border-radius: 8px;">${code}</span>
-        </div>
-        <p style="color: #6b7280; font-size: 12px; line-height: 1.6;">
-          验证码有效期为 ${CODE_EXPIRE_MINUTES} 分钟，请尽快使用。如非本人操作，请忽略此邮件。
-        </p>
-      </div>
-    </div>
-  `;
+  // 4. 获取邮件模板并渲染
+  const template = await getTemplate('verification-code');
+  const purposeLabel = PURPOSE_LABEL[purpose] || '邮箱验证';
+  const vars = {
+    purpose: purposeLabel,
+    code,
+    expiresInMinutes: String(CODE_EXPIRE_MINUTES),
+    email,
+  };
+  const subject = template ? renderTemplate(template.subject, vars) : `【校园墙】${purposeLabel}验证码`;
+  const html = template
+    ? renderTemplate(template.html, vars)
+    : `<p>您的${purposeLabel}验证码是：<b>${code}</b>，${CODE_EXPIRE_MINUTES}分钟内有效。</p>`;
 
+  // 5. 发送邮件
   const ok = await sendEmail(email, subject, html);
   if (!ok) {
-    // 发送失败, 删除刚创建的记录
     await prisma.emailVerificationCode.deleteMany({ where: { email, purpose, code } }).catch(() => {});
     return { success: false, message: '邮件发送失败, 请稍后重试' };
   }
