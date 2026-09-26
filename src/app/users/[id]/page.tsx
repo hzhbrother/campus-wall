@@ -51,7 +51,7 @@ export default function UserProfilePage() {
   const [comments, setComments] = useState<Comment[]>([]);
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState('');
-  const [tab, setTab] = useState<'posts' | 'comments'>('posts');
+  const [tab, setTab] = useState<'posts' | 'likes' | 'favorites' | 'comments'>('posts');
   const [savingCover, setSavingCover] = useState(false);
   const [showAvatarLightbox, setShowAvatarLightbox] = useState(false);
   const [badges, setBadges] = useState<{ badge: { id: string; name: string; icon: string | null; description: string | null }; earnedAt: string }[]>([]);
@@ -205,24 +205,23 @@ export default function UserProfilePage() {
           <span className="rounded-full bg-blue-50 px-2.5 py-0.5 text-xs text-blue-500">墙龄 {wallDays} 天</span>
         </div>
 
-        {/* 统计: 帖子 / 获赞 / 收藏 / 评论 */}
+        {/* 统计: 帖子 / 获赞 / 收藏 / 评论 — 可点击切换内容 */}
         <div className="mt-4 grid grid-cols-4 border-t border-gray-100 pt-3">
-          <div className="flex flex-col items-center">
-            <span className="text-lg font-bold text-gray-900">{counts.posts}</span>
-            <span className="text-xs text-gray-400">帖子</span>
-          </div>
-          <div className="flex flex-col items-center">
-            <span className="text-lg font-bold text-gray-900">{counts.likesReceived}</span>
-            <span className="text-xs text-gray-400">获赞</span>
-          </div>
-          <div className="flex flex-col items-center">
-            <span className="text-lg font-bold text-gray-900">{counts.favorites || 0}</span>
-            <span className="text-xs text-gray-400">收藏</span>
-          </div>
-          <div className="flex flex-col items-center">
-            <span className="text-lg font-bold text-gray-900">{counts.comments}</span>
-            <span className="text-xs text-gray-400">评论</span>
-          </div>
+          {([
+            { key: 'posts', count: counts.posts, label: '帖子' },
+            { key: 'likes', count: counts.likesReceived, label: '获赞' },
+            { key: 'favorites', count: counts.favorites || 0, label: '收藏' },
+            { key: 'comments', count: counts.comments, label: '评论' },
+          ] as const).map(s => (
+            <button
+              key={s.key}
+              onClick={() => setTab(s.key)}
+              className={`flex flex-col items-center py-1 transition ${tab === s.key ? 'scale-105' : 'opacity-70 hover:opacity-100'}`}
+            >
+              <span className={`text-lg font-bold ${tab === s.key ? 'text-blue-500' : 'text-gray-900'}`}>{s.count}</span>
+              <span className={`text-xs ${tab === s.key ? 'text-blue-500 font-medium' : 'text-gray-400'}`}>{s.label}</span>
+            </button>
+          ))}
         </div>
       </div>
 
@@ -262,23 +261,7 @@ export default function UserProfilePage() {
         </div>
       )}
 
-      {/* 帖子 / 评论 Tab */}
-      <div className="sticky top-14 z-10 bg-white/95 backdrop-blur border-b border-gray-100">
-        <div className="flex">
-          {(['posts', 'comments'] as const).map(t => (
-            <button
-              key={t}
-              onClick={() => setTab(t)}
-              className={`relative flex-1 py-3 text-center text-base ${tab === t ? 'text-blue-500 font-medium' : 'text-gray-400'}`}
-            >
-              {t === 'posts' ? `帖子 ${counts.posts}` : `评论 ${counts.comments}`}
-              {tab === t && <span className="absolute bottom-0 left-1/2 h-0.5 w-8 -translate-x-1/2 rounded-full bg-blue-500" />}
-            </button>
-          ))}
-        </div>
-      </div>
-
-      {/* Tab 内容 */}
+      {/* Tab 内容 (由统计行驱动) */}
       <div className="bg-gray-50 min-h-[200px]">
         {tab === 'posts' ? (
           posts.length === 0 ? (
@@ -307,7 +290,7 @@ export default function UserProfilePage() {
               ))}
             </div>
           )
-        ) : (
+        ) : tab === 'comments' ? (
           comments.length === 0 ? (
             <div className="py-20 flex flex-col items-center gap-2 text-gray-400">
               <svg className="h-12 w-12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
@@ -328,6 +311,15 @@ export default function UserProfilePage() {
               ))}
             </div>
           )
+        ) : (
+          <div className="py-20 flex flex-col items-center gap-2 text-gray-400">
+            <svg className="h-12 w-12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+              <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" strokeLinecap="round" strokeLinejoin="round"/>
+            </svg>
+            <span className="text-sm">
+              {tab === 'likes' ? '该用户的获赞列表暂未公开' : '该用户的收藏列表暂未公开'}
+            </span>
+          </div>
         )}
       </div>
     </div>
