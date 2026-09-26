@@ -760,6 +760,7 @@ function VerificationModal({ user, onClose, onVerified, onSubmitted }: { user: a
 
   const role = user.role || 'STUDENT';
   const isSuperAdmin = role === 'SUPER_ADMIN';
+  const isAdmin = role === 'ADMIN' || role === 'SUPER_ADMIN';
   const currentTypeMeta = VERIFY_TYPE_OPTIONS.find(o => o.value === verifyType);
   const verifyLabel = currentTypeMeta?.label || '认证';
   const isQual = verifyType === 'QUALIFICATION';
@@ -767,6 +768,11 @@ function VerificationModal({ user, onClose, onVerified, onSubmitted }: { user: a
     ? '人脸照片'
     : isQual ? '证明材料' : '校园卡/工牌';
   const isFace = photoType === 'FACE';
+
+  // 管理员无需身份认证, 打开弹窗直接进入资质/荣誉认证
+  useEffect(() => {
+    if (isAdmin && !verifyType) setVerifyType('QUALIFICATION');
+  }, [isAdmin, verifyType]);
 
   // 身份认证 vs 资质认证 使用各自独立的状态字段, 互不污染
   const idStatus = localStatus || user.verificationStatus || 'NONE';
@@ -945,26 +951,28 @@ function VerificationModal({ user, onClose, onVerified, onSubmitted }: { user: a
           </div>
         ) : null}
 
-        {/* 第一步: 选择认证类型 (始终显示, 超管也需要选择资质/荣誉认证) */}
-        <div className="mb-3">
-          <label className="block text-sm font-medium text-gray-700 mb-2">选择认证类型</label>
-          <div className="grid grid-cols-2 gap-2">
-            {VERIFY_TYPE_OPTIONS.map(opt => (
-              <button
-                key={opt.value}
-                onClick={() => { setVerifyType(opt.value); setTemplateId(''); setPhoto(''); }}
-                className={`flex flex-col items-center justify-center rounded-xl border-2 p-3 transition ${
-                  verifyType === opt.value
-                    ? 'border-blue-500 bg-blue-50'
-                    : 'border-gray-200 bg-white hover:border-blue-300'
-                }`}
-              >
-                <div className="text-2xl mb-1">{opt.icon}</div>
-                <div className={`text-xs font-medium ${verifyType === opt.value ? 'text-blue-700' : 'text-gray-700'}`}>{opt.label}</div>
-              </button>
-            ))}
+        {/* 第一步: 选择认证类型 (管理员跳过, 直接走资质/荣誉认证) */}
+        {!isAdmin && (
+          <div className="mb-3">
+            <label className="block text-sm font-medium text-gray-700 mb-2">选择认证类型</label>
+            <div className="grid grid-cols-2 gap-2">
+              {VERIFY_TYPE_OPTIONS.map(opt => (
+                <button
+                  key={opt.value}
+                  onClick={() => { setVerifyType(opt.value); setTemplateId(''); setPhoto(''); }}
+                  className={`flex flex-col items-center justify-center rounded-xl border-2 p-3 transition ${
+                    verifyType === opt.value
+                      ? 'border-blue-500 bg-blue-50'
+                      : 'border-gray-200 bg-white hover:border-blue-300'
+                  }`}
+                >
+                  <div className="text-2xl mb-1">{opt.icon}</div>
+                  <div className={`text-xs font-medium ${verifyType === opt.value ? 'text-blue-700' : 'text-gray-700'}`}>{opt.label}</div>
+                </button>
+              ))}
+            </div>
           </div>
-        </div>
+        )}
 
         {/* 其余表单字段: 仅当选了类型且可提交时显示
             - 资质/荣誉认证: 所有人(含超管)均可随时重复提交
@@ -1013,11 +1021,11 @@ function VerificationModal({ user, onClose, onVerified, onSubmitted }: { user: a
               </div>
             )}
 
-            {/* 第三步: 卡面需选择模板; 人脸直接拍照 */}
+            {/* 第三步: 仅身份认证的卡面需选择模板; 资质/荣誉认证不需要模板 */}
             {verifyType && (
               <>
-                {/* 卡面: 选择模板 + 显示案例图 */}
-                {!isFace && (
+                {/* 卡面: 选择模板 + 显示案例图 (资质/荣誉认证跳过) */}
+                {!isQual && !isFace && (
                   <div className="mb-3">
                     <label className="block text-sm font-medium text-gray-700 mb-1">选择模板</label>
                     {templates.length === 0 ? (
@@ -1039,8 +1047,8 @@ function VerificationModal({ user, onClose, onVerified, onSubmitted }: { user: a
                   </div>
                 )}
 
-                {/* 卡面: 选中模板后显示案例图 */}
-                {!isFace && selectedTemplate && selectedTemplate.image && (
+                {/* 卡面: 选中模板后显示案例图 (资质/荣誉认证跳过) */}
+                {!isQual && !isFace && selectedTemplate && selectedTemplate.image && (
                   <div className="mb-3">
                     <div className="text-xs font-medium text-gray-600 mb-1.5">模板示例 (请参照此样式拍摄)</div>
                     {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -1048,10 +1056,18 @@ function VerificationModal({ user, onClose, onVerified, onSubmitted }: { user: a
                   </div>
                 )}
 
-                {/* 拍摄注意事项 (卡面 / 人脸不同) */}
+                {/* 拍摄注意事项 (资质材料 / 卡面 / 人脸不同) */}
                 <div className="rounded-xl bg-amber-50 p-3 mb-3">
                   <div className="text-sm font-medium text-amber-800 mb-1.5">📸 拍摄注意事项</div>
-                  {isFace ? (
+                  {isQual ? (
+                    <ul className="text-xs text-amber-700 space-y-1 list-disc list-inside">
+                      <li>请将{photoLabel}完整拍摄, 确保文字、印章、头像清晰可辨认</li>
+                      <li>光线充足均匀, 避免反光、阴影遮挡关键信息</li>
+                      <li>画面端正, 不要倾斜或模糊</li>
+                      <li>只拍摄{photoLabel}本身, 不要包含其他杂物</li>
+                      <li>支持证书、奖状、聘书、证明文件等证明材料</li>
+                    </ul>
+                  ) : isFace ? (
                     <ul className="text-xs text-amber-700 space-y-1 list-disc list-inside">
                       <li>请正对镜头, 露出完整面部 (额头、眼睛、鼻子、嘴巴)</li>
                       <li>光线充足均匀, 避免逆光、阴影遮挡脸部</li>
@@ -1121,7 +1137,7 @@ function VerificationModal({ user, onClose, onVerified, onSubmitted }: { user: a
 
                 {msg && <p className={`mb-3 text-sm ${msg.includes('已提交') ? 'text-green-600' : 'text-red-500'}`}>{msg}</p>}
 
-                <button onClick={submit} disabled={busy || !photo || (!isFace && !templateId)} className="w-full rounded-full bg-blue-600 py-3 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50">
+                <button onClick={submit} disabled={busy || !photo || (!isQual && !isFace && !templateId)} className="w-full rounded-full bg-blue-600 py-3 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50">
                   {busy ? '提交中…' : `提交${verifyLabel}申请`}
                 </button>
               </>
