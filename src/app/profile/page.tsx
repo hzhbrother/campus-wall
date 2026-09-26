@@ -300,9 +300,10 @@ function ProfilePageInner() {
       { key: 'verification', label: '实名认证审核' },
       { key: 'appeals', label: '申诉审核' },
       { key: 'notifications', label: '通知发布' },
-      // 站点配置类 (SMTP/站点信息/协议) + 角色管理 仅超级管理员可见
+      // 站点配置类 (SMTP/站点信息/协议) + 角色管理 + 识别模板 仅超级管理员可见
       ...(isSuper ? [
         { key: 'roles' as AdminTab, label: '角色管理' },
+        { key: 'template' as AdminTab, label: '识别模板' },
         { key: 'email' as AdminTab, label: '邮件配置' },
         { key: 'settings' as AdminTab, label: '站点设置' },
         { key: 'agreement' as AdminTab, label: '协议管理' },

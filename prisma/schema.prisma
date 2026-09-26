@@ -165,6 +165,17 @@ model Role {
   users       User[]
 }
 
+// ---- 实名认证识别模板 (超级管理员上传样图并框选需识别的字段) ----
+model VerificationTemplate {
+  id        String   @id @default(cuid())
+  name      String            // 模板名称, 如 "一中校园卡"
+  image     String            // 样图 base64
+  fields    Json     @default("[]") // [{ name: "姓名", bbox: {x,y,w,h} }] 归一化坐标
+  isActive  Boolean  @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
 // 第三方账号绑定 (一个用户可绑定多个平台)
 model Account {
   id             String           @id @default(cuid())

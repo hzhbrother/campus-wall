@@ -3,8 +3,9 @@
 import { useEffect, useState, useCallback } from 'react';
 import { api } from '@/lib/api';
 import { PERMISSIONS, PERMISSIONS_BY_GROUP, SUPER_ADMIN_ONLY_PERMISSIONS } from '@/lib/permissions';
+import TemplateManager from './TemplateManager';
 
-export type AdminTab = 'overview' | 'posts' | 'moderation' | 'comments' | 'users' | 'verification' | 'appeals' | 'notifications' | 'settings' | 'email' | 'agreement' | 'roles';
+export type AdminTab = 'overview' | 'posts' | 'moderation' | 'comments' | 'users' | 'verification' | 'template' | 'appeals' | 'notifications' | 'settings' | 'email' | 'agreement' | 'roles';
 
 // ---------- 通用 UI ----------
 function SectionTitle({ title, desc }: { title: string; desc?: string }) {
@@ -1910,21 +1911,32 @@ const REJECT_REASONS = [
   '照片已过期',
 ];
 
-const FIELD_LABELS: Record<string, string> = {
-  name: '姓名',
-  studentId: '学号',
-  school: '学校',
-  grade: '年级',
-  className: '班级',
-};
+const FIELD_COLORS = [
+  'border-green-400 bg-green-400/10',
+  'border-blue-400 bg-blue-400/10',
+  'border-purple-400 bg-purple-400/10',
+  'border-orange-400 bg-orange-400/10',
+  'border-pink-400 bg-pink-400/10',
+  'border-cyan-400 bg-cyan-400/10',
+  'border-lime-400 bg-lime-400/10',
+];
+const fieldColor = (i: number) => FIELD_COLORS[i % FIELD_COLORS.length];
 
-const BBOX_COLORS: Record<string, string> = {
-  name: 'border-green-400 bg-green-400/10',
-  studentId: 'border-blue-400 bg-blue-400/10',
-  school: 'border-purple-400 bg-purple-400/10',
-  grade: 'border-orange-400 bg-orange-400/10',
-  className: 'border-pink-400 bg-pink-400/10',
-};
+// 模板字段名 -> 用户资料字段 的映射 (管理员可任意命名字段, 此处尽量匹配常见命名)
+function mapFieldsToUser(fields: Record<string, string>) {
+  const out: any = {};
+  for (const [k, v] of Object.entries(fields)) {
+    const key = k.toLowerCase().replace(/\s+/g, '');
+    const val = v.trim();
+    if (!val) continue;
+    if (['name', '姓名', '名字'].includes(key)) out.realName = val;
+    else if (['studentid', '学号', '编号'].includes(key)) out.studentId = val;
+    else if (['grade', '年级'].includes(key)) out.grade = val;
+    else if (['classname', 'class', '班级'].includes(key)) out.className = val;
+    else if (['school', '学校', '院校'].includes(key)) out.school = val;
+  }
+  return out;
+}
 
 function VerificationReviewTab() {
   const [items, setItems] = useState<any[]>([]);
@@ -1951,14 +1963,27 @@ function VerificationReviewTab() {
 
   const openReview = (u: any) => {
     const ai = u.verificationAiResult || {};
-    const info = ai.info || {};
-    setFields({
-      name: info.name || u.realName || '',
-      studentId: info.studentId || u.studentId || '',
-      school: info.school || '',
-      grade: info.grade || u.grade || '',
-      className: info.className || u.className || '',
-    });
+    const aiFields: Record<string, string> = ai.fields || {};
+    // 字段集合: AI 识别出的字段 + 兜底常用字段
+    const baseFields: Record<string, string> = {
+      姓名: aiFields['姓名'] ?? aiFields['name'] ?? u.realName ?? '',
+      学号: aiFields['学号'] ?? aiFields['studentId'] ?? u.studentId ?? '',
+      学校: aiFields['学校'] ?? aiFields['school'] ?? '',
+      年级: aiFields['年级'] ?? aiFields['grade'] ?? u.grade ?? '',
+      班级: aiFields['班级'] ?? aiFields['className'] ?? u.className ?? '',
+    };
+    // 合并 AI 识别出的所有字段 (含自定义命名), 但去重已知字段
+    const merged: Record<string, string> = { ...baseFields };
+    for (const [k, v] of Object.entries(aiFields)) {
+      const norm = k.toLowerCase().replace(/\s+/g, '');
+      if (['name', '姓名', '名字'].includes(norm)) continue;
+      if (['studentid', '学号', '编号'].includes(norm)) continue;
+      if (['grade', '年级'].includes(norm)) continue;
+      if (['classname', 'class', '班级'].includes(norm)) continue;
+      if (['school', '学校', '院校'].includes(norm)) continue;
+      merged[k] = v;
+    }
+    setFields(merged);
     setRejectMode(false);
     setRejectReason('');
     setCustomReason('');
@@ -1970,12 +1995,13 @@ function VerificationReviewTab() {
     if (!confirm('确认通过该用户的实名认证? 将同步更新其姓名/学号等信息。')) return;
     setBusy(true);
     try {
+      const mapped = mapFieldsToUser(fields);
       await api.patch(`/api/admin/users/${reviewTarget.id}`, {
         verificationStatus: 'APPROVED',
-        realName: fields.name || undefined,
-        studentId: fields.studentId || undefined,
-        grade: fields.grade || undefined,
-        className: fields.className || undefined,
+        realName: mapped.realName || undefined,
+        studentId: mapped.studentId || undefined,
+        grade: mapped.grade || undefined,
+        className: mapped.className || undefined,
       });
       setReviewTarget(null);
       load();
@@ -2098,12 +2124,12 @@ function VerificationReviewTab() {
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img src={reviewTarget.verificationPhoto} alt="认证材料" className="w-full rounded-lg" />
                 {/* AI 边界框 */}
-                {Object.entries(bboxes).map(([key, box]: [string, any]) => {
+                {Object.entries(bboxes).map(([key, box]: [string, any], idx: number) => {
                   if (!box) return null;
                   return (
                     <div
                       key={key}
-                      className={`absolute border-2 rounded ${BBOX_COLORS[key] || 'border-yellow-400 bg-yellow-400/10'}`}
+                      className={`absolute border-2 rounded ${fieldColor(idx)}`}
                       style={{
                         left: `${box.x * 100}%`,
                         top: `${box.y * 100}%`,
@@ -2111,7 +2137,7 @@ function VerificationReviewTab() {
                         height: `${box.h * 100}%`,
                       }}
                     >
-                      <span className="absolute -top-4 left-0 text-[10px] font-medium text-gray-700 bg-white/80 px-1 rounded">{FIELD_LABELS[key] || key}</span>
+                      <span className="absolute -top-4 left-0 text-[10px] font-medium text-gray-700 bg-white/80 px-1 rounded whitespace-nowrap">{key}</span>
                     </div>
                   );
                 })}
@@ -2120,16 +2146,16 @@ function VerificationReviewTab() {
 
             {/* 下方: 可编辑信息 */}
             <div className="mt-4">
-              <div className="mb-2 text-xs font-medium text-gray-500">核对并修正以下信息 (通过后将同步到用户资料)</div>
+              <div className="mb-2 text-xs font-medium text-gray-500">核对并修正以下信息 (字段来自识别模板, 通过后将同步到用户资料)</div>
               <div className="grid grid-cols-2 gap-3">
-                {Object.keys(FIELD_LABELS).map(key => (
+                {Object.keys(fields).map(key => (
                   <div key={key}>
-                    <label className="block text-xs text-gray-500 mb-1">{FIELD_LABELS[key]}</label>
+                    <label className="block text-xs text-gray-500 mb-1">{key}</label>
                     <input
                       value={fields[key] || ''}
                       onChange={e => setFields(prev => ({ ...prev, [key]: e.target.value }))}
                       className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/40"
-                      placeholder={`请输入${FIELD_LABELS[key]}`}
+                      placeholder={`请输入${key}`}
                     />
                   </div>
                 ))}
@@ -2547,6 +2573,7 @@ export function AdminPanel({ tab, isSuper }: { tab: AdminTab; isSuper: boolean }
     case 'comments': return <CommentsTab />;
     case 'users': return <UsersTab isSuper={isSuper} />;
     case 'verification': return <VerificationReviewTab />;
+    case 'template': return <TemplateManager />;
     case 'appeals': return <BanAppealsTab />;
     case 'notifications': return <NotificationSender />;
     case 'settings': return <SiteSettings />;

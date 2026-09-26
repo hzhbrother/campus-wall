@@ -88,7 +88,12 @@ export async function POST(req: NextRequest) {
 
 // AI 初审: 判断是否校园卡 + 清晰度, 通过则进入人工复审, 不通过则直接驳回
 async function runAiReview(userId: string, photo: string) {
-  const result = await preliminaryReview(photo);
+  // 加载激活模板 (超级管理员配置的样图+框选字段)
+  const template = await prisma.verificationTemplate.findFirst({
+    where: { isActive: true },
+    select: { id: true, name: true, image: true, fields: true },
+  });
+  const result = await preliminaryReview(photo, template as any);
   if (!result) {
     // AI 调用失败, 转入人工复审
     await prisma.user.update({

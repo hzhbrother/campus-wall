@@ -18,7 +18,12 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
     if (!user?.verificationPhoto) {
       return NextResponse.json({ message: '该用户未上传认证照片' }, { status: 400 });
     }
-    const result = await extractIdInfo(user.verificationPhoto);
+    // 加载激活模板, 依据模板框选字段动态识别
+    const template = await prisma.verificationTemplate.findFirst({
+      where: { isActive: true },
+      select: { id: true, name: true, image: true, fields: true },
+    });
+    const result = await extractIdInfo(user.verificationPhoto, template as any);
     if (!result) {
       return NextResponse.json({ message: 'AI 识别失败, 请手动审核' }, { status: 502 });
     }
