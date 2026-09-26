@@ -480,6 +480,7 @@ function ProfilePageInner() {
           user={user}
           onClose={() => setShowVerifyModal(false)}
           onVerified={() => { refreshUser(); setShowVerifyModal(false); }}
+          onSubmitted={() => refreshUser()}
         />
       )}
     </div>
@@ -591,7 +592,7 @@ function NotificationSettingsModal({ onClose }: { onClose: () => void }) {
 }
 
 // ---------- 实名认证 / 资质认证弹窗 ----------
-function VerificationModal({ user, onClose, onVerified }: { user: any; onClose: () => void; onVerified: () => void }) {
+function VerificationModal({ user, onClose, onVerified, onSubmitted }: { user: any; onClose: () => void; onVerified: () => void; onSubmitted?: () => void }) {
   const [photo, setPhoto] = useState<string>('');
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState('');
@@ -681,8 +682,9 @@ function VerificationModal({ user, onClose, onVerified }: { user: any; onClose: 
     try {
       const res: any = await api.post('/api/users/me/verification', { photo });
       setMsg(res?.message || '认证申请已提交');
-      // 刷新本地状态以展示进度条, 不关闭弹窗
+      // 刷新弹窗内进度 + 刷新整个资料页 (父页面实名认证状态同步更新)
       await refreshStatus();
+      onSubmitted?.();
       setPhoto('');
     } catch (e: any) { setMsg(e.message); } finally { setBusy(false); }
   };
