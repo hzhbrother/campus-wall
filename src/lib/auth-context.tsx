@@ -34,6 +34,8 @@ export interface AuthUser {
   bannedUntil?: string | null;
   points?: number;
   userNumber?: number | null;
+  school?: { id: string; name: string; gradeCount: number } | null;
+  organization?: { id: string; name: string } | null;
   credibilityScore?: number;
   banReason?: string | null;
   _count?: { posts: number; comments: number; likes: number; likesReceived: number };

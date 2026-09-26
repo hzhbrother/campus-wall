@@ -21,6 +21,8 @@ interface UserProfile {
   qualificationVerified: boolean;
   points: number;
   userNumber: number | null;
+  school: { id: string; name: string; gradeCount: number } | null;
+  organization: { id: string; name: string } | null;
   createdAt: string;
   _count: { posts: number; comments: number; favorites: number; likesReceived: number };
 }
@@ -212,8 +214,14 @@ export default function UserProfilePage() {
           )}
         </div>
 
-        {/* 标签行: 年级 / 班级 / 墙龄 */}
+        {/* 标签行: 学校/团体 / 年级 / 班级 / 墙龄 */}
         <div className="mt-3 flex flex-wrap items-center gap-2">
+          {profile.school && (
+            <span className="rounded-full bg-blue-50 px-2.5 py-0.5 text-xs text-blue-600">🏫 {profile.school.name}</span>
+          )}
+          {profile.organization && (
+            <span className="rounded-full bg-green-50 px-2.5 py-0.5 text-xs text-green-600">👥 {profile.organization.name}</span>
+          )}
           {profile.grade && (
             <span className="rounded-full bg-gray-100 px-2.5 py-0.5 text-xs text-gray-500">{profile.grade}</span>
           )}

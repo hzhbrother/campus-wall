@@ -13,6 +13,8 @@ export async function GET(req: NextRequest) {
       include: {
         _count: { select: { posts: true, comments: true, likes: true, favorites: true } },
         customRole: { select: { id: true, name: true, permissions: true } },
+        school: { select: { id: true, name: true, gradeCount: true } },
+        organization: { select: { id: true, name: true } },
       },
     });
     if (!user) return Response.json(null, { status: 200 });

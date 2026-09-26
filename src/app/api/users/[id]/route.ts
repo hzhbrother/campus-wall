@@ -13,6 +13,8 @@ export async function GET(_req: NextRequest, { params }: { params: { id: string 
         qualificationType: true, qualificationVerified: true,
         points: true, userNumber: true,
         createdAt: true,
+        school: { select: { id: true, name: true, gradeCount: true } },
+        organization: { select: { id: true, name: true } },
         _count: { select: { posts: true, comments: true, favorites: true } },
       },
     });

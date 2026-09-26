@@ -148,6 +148,8 @@ model User {
   lastReadNotificationsAt DateTime? // 上次标记全部已读的时间 (用于广播通知未读计算)
   points Int @default(0) // 积分 (签到等获得)
   userNumber Int? // 用户编号 (顺序号, 用于生成 XYS/XY 编号)
+  schoolId     String?          // 所属学校
+  organizationId String?        // 所属团体
   createdAt    DateTime         @default(now())
   updatedAt    DateTime         @updatedAt
 
@@ -166,11 +168,15 @@ model User {
   customRole   Role?            @relation(fields: [roleId], references: [id])
   userBadges   UserBadge[]
   checkIns     CheckInRecord[]
+  school       School?          @relation(fields: [schoolId], references: [id])
+  organization Organization?    @relation(fields: [organizationId], references: [id])
 
   @@index([email])
   @@index([role])
   @@index([status])
   @@index([roleId])
+  @@index([schoolId])
+  @@index([organizationId])
 }
 
 // ---- 角色 (支持超级管理员自定义角色名称与权限) ----
@@ -488,4 +494,33 @@ model CheckInRecord {
 
   @@unique([userId, date])
   @@index([userId])
+}
+
+// ---- 学校 ----
+
+model School {
+  id          String   @id @default(cuid())
+  name        String            // 学校名称
+  gradeCount  Int      @default(12) // 年级数量 (如 12 代表 1-12 年级)
+  description String?           // 学校简介
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  users       User[]
+
+  @@index([name])
+}
+
+// ---- 团体 (非学校组织, 如社团/救援队/志愿者团队等) ----
+
+model Organization {
+  id          String   @id @default(cuid())
+  name        String            // 团体名称
+  description String?           // 团体简介
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  users       User[]
+
+  @@index([name])
 }

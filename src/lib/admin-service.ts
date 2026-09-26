@@ -138,9 +138,11 @@ export async function listComments(page: number, pageSize: number, kw?: string) 
   return { items, total, page, pageSize };
 }
 
-export async function listUsers(page: number, pageSize: number, role?: UserRole, kw?: string) {
+export async function listUsers(page: number, pageSize: number, role?: UserRole, kw?: string, schoolId?: string, organizationId?: string) {
   const where: Prisma.UserWhereInput = {
     ...(role ? { role } : {}),
+    ...(schoolId ? { schoolId } : {}),
+    ...(organizationId ? { organizationId } : {}),
     ...(kw ? { OR: [{ nickname: { contains: kw } }, { email: { contains: kw } }, { realName: { contains: kw } }] } : {}),
   };
   const [items, total] = await Promise.all([
@@ -149,7 +151,7 @@ export async function listUsers(page: number, pageSize: number, role?: UserRole,
       orderBy: { createdAt: 'desc' },
       skip: (page - 1) * pageSize,
       take: pageSize,
-      select: { id: true, email: true, nickname: true, realName: true, avatar: true, role: true, roleId: true, customRole: { select: { id: true, name: true } }, status: true, grade: true, className: true, remark: true, bannedUntil: true, banReason: true, credibilityScore: true, verified: true, verifiedAt: true, verificationStatus: true, verificationPhoto: true, verificationRejectReason: true, userNumber: true, createdAt: true, _count: { select: { posts: true } } },
+      select: { id: true, email: true, nickname: true, realName: true, avatar: true, role: true, roleId: true, customRole: { select: { id: true, name: true } }, status: true, grade: true, className: true, remark: true, bannedUntil: true, banReason: true, credibilityScore: true, verified: true, verifiedAt: true, verificationStatus: true, verificationPhoto: true, verificationRejectReason: true, userNumber: true, schoolId: true, organizationId: true, createdAt: true, _count: { select: { posts: true } } },
     }),
     prisma.user.count({ where }),
   ]);

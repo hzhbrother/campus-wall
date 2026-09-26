@@ -33,7 +33,9 @@ export async function GET(req: NextRequest) {
     const pageSize = Math.min(50, Math.max(1, Number(sp.get('pageSize') || 10)));
     const role = (sp.get('role') as UserRole) || undefined;
     const q = sp.get('q') || undefined;
-    return NextResponse.json(await listUsers(page, pageSize, role, q));
+    const schoolId = sp.get('schoolId') || undefined;
+    const organizationId = sp.get('organizationId') || undefined;
+    return NextResponse.json(await listUsers(page, pageSize, role, q, schoolId, organizationId));
   } catch (e) {
     return errorResponse(e);
   }

@@ -47,6 +47,10 @@ function EditProfile({ user, onSaved, forcePhone = false }: { user: any; onSaved
   const [className, setClassName] = useState(user?.className || '');
   const [remark, setRemark] = useState(user?.remark || '');
   const [avatar, setAvatar] = useState(user?.avatar || '');
+  const [schoolId, setSchoolId] = useState(user?.school?.id || '');
+  const [organizationId, setOrganizationId] = useState(user?.organization?.id || '');
+  const [schools, setSchools] = useState<{ id: string; name: string }[]>([]);
+  const [organizations, setOrganizations] = useState<{ id: string; name: string }[]>([]);
   const [saving, setSaving] = useState(false);
   const [msg, setMsg] = useState('');
   const [phoneError, setPhoneError] = useState('');
@@ -67,6 +71,12 @@ function EditProfile({ user, onSaved, forcePhone = false }: { user: any; onSaved
     const t = setTimeout(() => setCountdown(c => c - 1), 1000);
     return () => clearTimeout(t);
   }, [countdown]);
+
+  // 加载学校和团体列表
+  useEffect(() => {
+    api.get<{ items: { id: string; name: string }[] }>('/api/schools').then(d => setSchools(d.items || [])).catch(() => {});
+    api.get<{ items: { id: string; name: string }[] }>('/api/orgs').then(d => setOrganizations(d.items || [])).catch(() => {});
+  }, []);
 
   const handleAvatarFile = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -122,6 +132,7 @@ function EditProfile({ user, onSaved, forcePhone = false }: { user: any; onSaved
         phoneNumber: hasPhone ? phoneNumber : '',
         email: email.trim(),
         grade, className, remark, avatar,
+        schoolId, organizationId,
       };
       if (emailChanged) payload.emailCode = emailCode.trim();
       await api.patch('/api/users/me', payload);
@@ -219,6 +230,45 @@ function EditProfile({ user, onSaved, forcePhone = false }: { user: any; onSaved
         </div>
       )}
 
+      {/* 所属学校 / 团体 (互斥) */}
+      <Row label="所属学校" onClick={() => setEditingField(editingField === 'school' ? null : 'school')}>
+        <span className={`text-[15px] ${schoolId ? 'text-gray-900' : 'text-gray-400'}`}>
+          {schools.find(s => s.id === schoolId)?.name || '不选择'}
+        </span>
+        <Arrow />
+      </Row>
+      {editingField === 'school' && (
+        <div className="px-1 py-2 border-b border-gray-100">
+          <select
+            value={schoolId}
+            onChange={e => { const v = e.target.value; setSchoolId(v); if (v) setOrganizationId(''); setEditingField(null); }}
+            className="w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm"
+          >
+            <option value="">不选择</option>
+            {schools.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+          </select>
+        </div>
+      )}
+
+      <Row label="所属团体" onClick={() => setEditingField(editingField === 'org' ? null : 'org')}>
+        <span className={`text-[15px] ${organizationId ? 'text-gray-900' : 'text-gray-400'}`}>
+          {organizations.find(o => o.id === organizationId)?.name || '不选择'}
+        </span>
+        <Arrow />
+      </Row>
+      {editingField === 'org' && (
+        <div className="px-1 py-2 border-b border-gray-100">
+          <select
+            value={organizationId}
+            onChange={e => { const v = e.target.value; setOrganizationId(v); if (v) setSchoolId(''); setEditingField(null); }}
+            className="w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm"
+          >
+            <option value="">不选择</option>
+            {organizations.map(o => <option key={o.id} value={o.id}>{o.name}</option>)}
+          </select>
+        </div>
+      )}
+
       <div className="py-3.5">
         <div className="mb-2 text-[15px] text-gray-800">个人简介</div>
         <textarea value={remark} onChange={e => setRemark(e.target.value.slice(0, 200))} rows={3} className="w-full resize-none rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm outline-none focus:border-blue-400" placeholder="介绍一下自己吧..." />
@@ -308,7 +358,7 @@ function ProfilePageInner() {
   const counts = (user as any)?._count || { posts: 0, comments: 0, likes: 0, favorites: 0 };
 
   // 判断是否为管理后台标签
-  const ADMIN_TABS: AdminTab[] = ['overview', 'posts', 'moderation', 'comments', 'users', 'verification', 'template', 'appeals', 'notifications', 'settings', 'email', 'agreement', 'roles', 'badges'];
+  const ADMIN_TABS: AdminTab[] = ['overview', 'posts', 'moderation', 'comments', 'users', 'verification', 'template', 'appeals', 'notifications', 'settings', 'email', 'agreement', 'roles', 'badges', 'schools', 'orgs'];
   const isAdminView = (v: View): v is AdminTab => ADMIN_TABS.includes(v as AdminTab);
 
   // ---- 管理后台视图 ----
@@ -322,6 +372,8 @@ function ProfilePageInner() {
       { key: 'verification', label: '实名认证审核' },
       { key: 'appeals', label: '申诉审核' },
       { key: 'notifications', label: '通知发布' },
+      { key: 'schools', label: '学校管理' },
+      { key: 'orgs', label: '团体管理' },
       // 站点配置类 (SMTP/站点信息/协议) + 角色管理 + 识别模板 仅超级管理员可见
       ...(isSuper ? [
         { key: 'roles' as AdminTab, label: '角色管理' },
@@ -524,6 +576,12 @@ function ProfilePageInner() {
                   </div>
                 )}
                 <div className="mt-1.5 flex items-center gap-2">
+                  {user.school && (
+                    <span className="inline-flex items-center gap-1 rounded-full bg-blue-400/80 px-2 py-0.5 text-xs font-medium text-white">🏫 {user.school.name}</span>
+                  )}
+                  {user.organization && (
+                    <span className="inline-flex items-center gap-1 rounded-full bg-green-400/80 px-2 py-0.5 text-xs font-medium text-white">👥 {user.organization.name}</span>
+                  )}
                   <span className="inline-flex items-center gap-1 rounded-full bg-yellow-400/90 px-2 py-0.5 text-xs font-medium text-yellow-900">🪙 {user.points || 0} 积分</span>
                 </div>
               </>

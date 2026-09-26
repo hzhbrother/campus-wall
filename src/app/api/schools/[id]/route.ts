@@ -1,0 +1,43 @@
+// PATCH  /api/schools/[id]  更新学校 (ADMIN+)
+// DELETE /api/schools/[id]  删除学校 (ADMIN+)
+import { NextRequest, NextResponse } from 'next/server';
+import { z } from 'zod';
+import { requireRole } from '@/lib/server-auth';
+import { UserRole } from '@prisma/client';
+import { prisma } from '@/lib/prisma';
+import { errorResponse } from '@/lib/api-response';
+
+const UpdateSchema = z.object({
+  name: z.string().min(1).max(100).optional(),
+  gradeCount: z.number().int().min(1).max(20).optional(),
+  description: z.string().max(500).optional().or(z.literal('')),
+});
+
+export async function PATCH(req: NextRequest, { params }: { params: { id: string } }) {
+  try {
+    await requireRole(req, UserRole.ADMIN);
+    const dto = UpdateSchema.parse(await req.json());
+    const school = await prisma.school.update({
+      where: { id: params.id },
+      data: {
+        ...(dto.name !== undefined ? { name: dto.name } : {}),
+        ...(dto.gradeCount !== undefined ? { gradeCount: dto.gradeCount } : {}),
+        ...(dto.description !== undefined ? { description: dto.description || null } : {}),
+      },
+    });
+    return NextResponse.json(school);
+  } catch (e: any) {
+    if (e?.name === 'ZodError') return NextResponse.json({ message: e.errors?.[0]?.message || '参数错误' }, { status: 400 });
+    return errorResponse(e);
+  }
+}
+
+export async function DELETE(req: NextRequest, { params }: { params: { id: string } }) {
+  try {
+    await requireRole(req, UserRole.ADMIN);
+    await prisma.school.delete({ where: { id: params.id } });
+    return NextResponse.json({ message: '已删除' });
+  } catch (e) {
+    return errorResponse(e);
+  }
+}

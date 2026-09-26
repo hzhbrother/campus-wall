@@ -6,7 +6,7 @@ import { PERMISSIONS, PERMISSIONS_BY_GROUP, SUPER_ADMIN_ONLY_PERMISSIONS } from 
 import TemplateManager from './TemplateManager';
 import { BadgesManager } from './BadgesManager';
 
-export type AdminTab = 'overview' | 'posts' | 'moderation' | 'comments' | 'users' | 'verification' | 'template' | 'appeals' | 'notifications' | 'settings' | 'email' | 'agreement' | 'roles' | 'badges';
+export type AdminTab = 'overview' | 'posts' | 'moderation' | 'comments' | 'users' | 'verification' | 'template' | 'appeals' | 'notifications' | 'settings' | 'email' | 'agreement' | 'roles' | 'badges' | 'schools' | 'orgs';
 
 // ---------- 通用 UI ----------
 function SectionTitle({ title, desc }: { title: string; desc?: string }) {
@@ -316,6 +316,10 @@ function UsersTab({ isSuper }: { isSuper: boolean }) {
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
   const [role, setRole] = useState<string>('');
+  const [schoolId, setSchoolId] = useState<string>('');
+  const [organizationId, setOrganizationId] = useState<string>('');
+  const [schools, setSchools] = useState<{ id: string; name: string }[]>([]);
+  const [organizations, setOrganizations] = useState<{ id: string; name: string }[]>([]);
   const [q, setQ] = useState('');
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState('');
@@ -328,14 +332,22 @@ function UsersTab({ isSuper }: { isSuper: boolean }) {
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const pageSize = 10;
 
+  // 加载学校和团体列表用于筛选
+  useEffect(() => {
+    api.get<{ items: { id: string; name: string }[] }>('/api/schools').then(d => setSchools(d.items || [])).catch(() => {});
+    api.get<{ items: { id: string; name: string }[] }>('/api/orgs').then(d => setOrganizations(d.items || [])).catch(() => {});
+  }, []);
+
   const load = useCallback(() => {
     setLoading(true); setErr('');
     const params = new URLSearchParams({ page: String(page), pageSize: String(pageSize) });
     if (role) params.set('role', role);
+    if (schoolId) params.set('schoolId', schoolId);
+    if (organizationId) params.set('organizationId', organizationId);
     if (q) params.set('q', q);
     api.get(`/api/admin/users?${params}`).then((d: any) => { setUsers(d.items); setTotal(d.total); })
       .catch(e => setErr(e.message)).finally(() => setLoading(false));
-  }, [page, role, q]);
+  }, [page, role, schoolId, organizationId, q]);
   useEffect(load, [load]);
 
   const roleLabel: Record<string, string> = { USER: '用户', STUDENT: '学生', TEACHER: '教师', ADMIN: '管理员', SUPER_ADMIN: '超级管理员' };
@@ -368,6 +380,14 @@ function UsersTab({ isSuper }: { isSuper: boolean }) {
           <option value="">全部身份</option>
           <option value="STUDENT">学生</option><option value="TEACHER">教师</option>
           <option value="ADMIN">管理员</option><option value="SUPER_ADMIN">超级管理员</option>
+        </select>
+        <select value={schoolId} onChange={e => { setSchoolId(e.target.value); if (e.target.value) setOrganizationId(''); setPage(1); }} className="rounded-lg border border-gray-300 px-3 py-2 text-sm">
+          <option value="">全部学校</option>
+          {schools.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+        </select>
+        <select value={organizationId} onChange={e => { setOrganizationId(e.target.value); if (e.target.value) setSchoolId(''); setPage(1); }} className="rounded-lg border border-gray-300 px-3 py-2 text-sm">
+          <option value="">全部团体</option>
+          {organizations.map(o => <option key={o.id} value={o.id}>{o.name}</option>)}
         </select>
         <input value={q} onChange={e => { setQ(e.target.value); setPage(1); }} placeholder="搜索昵称/姓名/邮箱" className="flex-1 min-w-[180px] rounded-lg border border-gray-300 px-3 py-2 text-sm" />
         <div className="flex items-center gap-2 ml-auto">
@@ -2792,6 +2812,205 @@ function RoleEditModal({ role, onClose, onSaved }: { role: RoleItem | null; onCl
   );
 }
 
+// ---------- 学校管理 ----------
+function SchoolsManager() {
+  const [items, setItems] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [err, setErr] = useState('');
+  const [name, setName] = useState('');
+  const [gradeCount, setGradeCount] = useState(12);
+  const [description, setDescription] = useState('');
+  const [saving, setSaving] = useState(false);
+  const [editId, setEditId] = useState<string | null>(null);
+  const [editName, setEditName] = useState('');
+  const [editGradeCount, setEditGradeCount] = useState(12);
+  const [editDesc, setEditDesc] = useState('');
+
+  const load = useCallback(() => {
+    setLoading(true);
+    api.get<{ items: any[] }>('/api/schools').then(d => setItems(d.items || [])).catch(e => setErr(e.message)).finally(() => setLoading(false));
+  }, []);
+  useEffect(() => { load(); }, [load]);
+
+  const create = async () => {
+    if (!name.trim()) { setErr('请输入学校名称'); return; }
+    setSaving(true); setErr('');
+    try {
+      await api.post('/api/schools', { name: name.trim(), gradeCount, description: description.trim() });
+      setName(''); setGradeCount(12); setDescription('');
+      load();
+    } catch (e: any) { setErr(e.message); } finally { setSaving(false); }
+  };
+
+  const update = async (id: string) => {
+    if (!editName.trim()) { setErr('请输入学校名称'); return; }
+    setSaving(true); setErr('');
+    try {
+      await api.patch(`/api/schools/${id}`, { name: editName.trim(), gradeCount: editGradeCount, description: editDesc.trim() });
+      setEditId(null);
+      load();
+    } catch (e: any) { setErr(e.message); } finally { setSaving(false); }
+  };
+
+  const remove = async (id: string) => {
+    if (!confirm('确定删除该学校? 关联用户将解除绑定')) return;
+    try { await api.del(`/api/schools/${id}`); load(); } catch (e: any) { setErr(e.message); }
+  };
+
+  if (loading) return <div className="py-8 text-center text-gray-400">加载中…</div>;
+
+  return (
+    <div>
+      <SectionTitle title="学校管理" desc="创建学校并设置年级数量, 用户可在资料中选择所属学校" />
+      {err && <p className="mb-3 text-sm text-red-500">{err}</p>}
+
+      {/* 新建表单 */}
+      <div className="mb-5 rounded-2xl border border-gray-200 p-4">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+          <input value={name} onChange={e => setName(e.target.value)} placeholder="学校名称" className="rounded-lg border border-gray-200 px-3 py-2 text-sm outline-none focus:border-blue-400" />
+          <input type="number" min={1} max={20} value={gradeCount} onChange={e => setGradeCount(Number(e.target.value))} placeholder="年级数量" className="rounded-lg border border-gray-200 px-3 py-2 text-sm outline-none focus:border-blue-400" />
+          <input value={description} onChange={e => setDescription(e.target.value)} placeholder="简介 (选填)" className="rounded-lg border border-gray-200 px-3 py-2 text-sm outline-none focus:border-blue-400" />
+        </div>
+        <button onClick={create} disabled={saving} className="mt-3 rounded-lg bg-blue-500 px-4 py-2 text-sm font-medium text-white hover:bg-blue-600 disabled:opacity-50">
+          {saving ? '创建中…' : '+ 添加学校'}
+        </button>
+      </div>
+
+      {/* 列表 */}
+      <div className="space-y-2">
+        {items.length === 0 && <p className="py-8 text-center text-sm text-gray-400">暂无学校</p>}
+        {items.map(s => (
+          <div key={s.id} className="rounded-2xl border border-gray-200 p-4">
+            {editId === s.id ? (
+              <div className="space-y-3">
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+                  <input value={editName} onChange={e => setEditName(e.target.value)} className="rounded-lg border border-gray-200 px-3 py-2 text-sm outline-none focus:border-blue-400" />
+                  <input type="number" min={1} max={20} value={editGradeCount} onChange={e => setEditGradeCount(Number(e.target.value))} className="rounded-lg border border-gray-200 px-3 py-2 text-sm outline-none focus:border-blue-400" />
+                  <input value={editDesc} onChange={e => setEditDesc(e.target.value)} className="rounded-lg border border-gray-200 px-3 py-2 text-sm outline-none focus:border-blue-400" />
+                </div>
+                <div className="flex gap-2">
+                  <button onClick={() => update(s.id)} disabled={saving} className="rounded-lg bg-blue-500 px-3 py-1.5 text-sm text-white disabled:opacity-50">保存</button>
+                  <button onClick={() => setEditId(null)} className="rounded-lg border border-gray-200 px-3 py-1.5 text-sm text-gray-600">取消</button>
+                </div>
+              </div>
+            ) : (
+              <div className="flex items-center justify-between">
+                <div>
+                  <div className="font-medium text-gray-900">{s.name}</div>
+                  <div className="mt-0.5 text-xs text-gray-400">
+                    {s.gradeCount} 个年级 · {s._count?.users || 0} 名成员
+                    {s.description && ` · ${s.description}`}
+                  </div>
+                </div>
+                <div className="flex gap-2">
+                  <button onClick={() => { setEditId(s.id); setEditName(s.name); setEditGradeCount(s.gradeCount); setEditDesc(s.description || ''); }} className="rounded-lg border border-gray-200 px-3 py-1.5 text-sm text-gray-600 hover:bg-gray-50">编辑</button>
+                  <button onClick={() => remove(s.id)} className="rounded-lg border border-red-200 px-3 py-1.5 text-sm text-red-500 hover:bg-red-50">删除</button>
+                </div>
+              </div>
+            )}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// ---------- 团体管理 ----------
+function OrgsManager() {
+  const [items, setItems] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [err, setErr] = useState('');
+  const [name, setName] = useState('');
+  const [description, setDescription] = useState('');
+  const [saving, setSaving] = useState(false);
+  const [editId, setEditId] = useState<string | null>(null);
+  const [editName, setEditName] = useState('');
+  const [editDesc, setEditDesc] = useState('');
+
+  const load = useCallback(() => {
+    setLoading(true);
+    api.get<{ items: any[] }>('/api/orgs').then(d => setItems(d.items || [])).catch(e => setErr(e.message)).finally(() => setLoading(false));
+  }, []);
+  useEffect(() => { load(); }, [load]);
+
+  const create = async () => {
+    if (!name.trim()) { setErr('请输入团体名称'); return; }
+    setSaving(true); setErr('');
+    try {
+      await api.post('/api/orgs', { name: name.trim(), description: description.trim() });
+      setName(''); setDescription('');
+      load();
+    } catch (e: any) { setErr(e.message); } finally { setSaving(false); }
+  };
+
+  const update = async (id: string) => {
+    if (!editName.trim()) { setErr('请输入团体名称'); return; }
+    setSaving(true); setErr('');
+    try {
+      await api.patch(`/api/orgs/${id}`, { name: editName.trim(), description: editDesc.trim() });
+      setEditId(null);
+      load();
+    } catch (e: any) { setErr(e.message); } finally { setSaving(false); }
+  };
+
+  const remove = async (id: string) => {
+    if (!confirm('确定删除该团体? 关联用户将解除绑定')) return;
+    try { await api.del(`/api/orgs/${id}`); load(); } catch (e: any) { setErr(e.message); }
+  };
+
+  if (loading) return <div className="py-8 text-center text-gray-400">加载中…</div>;
+
+  return (
+    <div>
+      <SectionTitle title="团体管理" desc="创建非学校类团体 (如社团/救援队/志愿者团队等), 用户可选择归属" />
+      {err && <p className="mb-3 text-sm text-red-500">{err}</p>}
+
+      <div className="mb-5 rounded-2xl border border-gray-200 p-4">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+          <input value={name} onChange={e => setName(e.target.value)} placeholder="团体名称" className="rounded-lg border border-gray-200 px-3 py-2 text-sm outline-none focus:border-blue-400" />
+          <input value={description} onChange={e => setDescription(e.target.value)} placeholder="简介 (选填)" className="rounded-lg border border-gray-200 px-3 py-2 text-sm outline-none focus:border-blue-400" />
+        </div>
+        <button onClick={create} disabled={saving} className="mt-3 rounded-lg bg-blue-500 px-4 py-2 text-sm font-medium text-white hover:bg-blue-600 disabled:opacity-50">
+          {saving ? '创建中…' : '+ 添加团体'}
+        </button>
+      </div>
+
+      <div className="space-y-2">
+        {items.length === 0 && <p className="py-8 text-center text-sm text-gray-400">暂无团体</p>}
+        {items.map(o => (
+          <div key={o.id} className="rounded-2xl border border-gray-200 p-4">
+            {editId === o.id ? (
+              <div className="space-y-3">
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                  <input value={editName} onChange={e => setEditName(e.target.value)} className="rounded-lg border border-gray-200 px-3 py-2 text-sm outline-none focus:border-blue-400" />
+                  <input value={editDesc} onChange={e => setEditDesc(e.target.value)} className="rounded-lg border border-gray-200 px-3 py-2 text-sm outline-none focus:border-blue-400" />
+                </div>
+                <div className="flex gap-2">
+                  <button onClick={() => update(o.id)} disabled={saving} className="rounded-lg bg-blue-500 px-3 py-1.5 text-sm text-white disabled:opacity-50">保存</button>
+                  <button onClick={() => setEditId(null)} className="rounded-lg border border-gray-200 px-3 py-1.5 text-sm text-gray-600">取消</button>
+                </div>
+              </div>
+            ) : (
+              <div className="flex items-center justify-between">
+                <div>
+                  <div className="font-medium text-gray-900">{o.name}</div>
+                  <div className="mt-0.5 text-xs text-gray-400">
+                    {o._count?.users || 0} 名成员{o.description && ` · ${o.description}`}
+                  </div>
+                </div>
+                <div className="flex gap-2">
+                  <button onClick={() => { setEditId(o.id); setEditName(o.name); setEditDesc(o.description || ''); }} className="rounded-lg border border-gray-200 px-3 py-1.5 text-sm text-gray-600 hover:bg-gray-50">编辑</button>
+                  <button onClick={() => remove(o.id)} className="rounded-lg border border-red-200 px-3 py-1.5 text-sm text-red-500 hover:bg-red-50">删除</button>
+                </div>
+              </div>
+            )}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 // ---------- 管理后台主组件 ----------
 export function AdminPanel({ tab, isSuper }: { tab: AdminTab; isSuper: boolean }) {
   switch (tab) {
@@ -2809,6 +3028,8 @@ export function AdminPanel({ tab, isSuper }: { tab: AdminTab; isSuper: boolean }
     case 'agreement': return <AgreementManager />;
     case 'roles': return <RolesManager />;
     case 'badges': return <BadgesManager />;
+    case 'schools': return <SchoolsManager />;
+    case 'orgs': return <OrgsManager />;
     default: return <OverviewTab />;
   }
 }

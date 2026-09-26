@@ -19,6 +19,8 @@ const UpdateSchema = z.object({
   grade: z.string().max(20).optional().or(z.literal('')),
   className: z.string().max(20).optional().or(z.literal('')),
   remark: z.string().max(200).optional().or(z.literal('')),
+  schoolId: z.string().max(100).optional().or(z.literal('')),
+  organizationId: z.string().max(100).optional().or(z.literal('')),
   // 邮箱变更时需携带的验证码
   emailCode: z.string().length(6, '验证码为6位数字').optional(),
 });
@@ -31,6 +33,8 @@ export async function GET(req: NextRequest) {
       include: {
         _count: { select: { posts: true, comments: true, likes: true } },
         customRole: { select: { id: true, name: true, permissions: true } },
+        school: { select: { id: true, name: true, gradeCount: true } },
+        organization: { select: { id: true, name: true } },
       },
     });
     return NextResponse.json(sanitize(user));
@@ -58,6 +62,16 @@ export async function PATCH(req: NextRequest) {
 
     // 移除 emailCode (不存入数据库)
     const { emailCode, ...data } = dto;
+
+    // 学校与团体互斥: 设置一个时清空另一个
+    if (data.schoolId !== undefined) {
+      data.organizationId = null;
+      data.schoolId = data.schoolId || null;
+    }
+    if (data.organizationId !== undefined) {
+      data.schoolId = null;
+      data.organizationId = data.organizationId || null;
+    }
 
     const user = await prisma.user.update({ where: { id: me.id }, data });
     return NextResponse.json(sanitize(user));
