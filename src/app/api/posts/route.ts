@@ -2,13 +2,14 @@
 // POST /api/posts           发布帖子 (普通用户待审核, 管理员直通)
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
-import { PostStatus, UserRole } from '@prisma/client';
+import { PostStatus, UserRole, NotificationType } from '@prisma/client';
 import { Prisma } from '@prisma/client';
 import { prisma } from '@/lib/prisma';
 import { getUserFromRequest } from '@/lib/server-auth';
 import { errorResponse } from '@/lib/api-response';
 import { getSiteConfigBool, getSiteConfigValue, getPostCategories } from '@/lib/site-config';
 import { isUserBanned } from '@/lib/server-auth';
+import { createNotification } from '@/lib/notification-service';
 
 export async function GET(req: NextRequest) {
   try {
@@ -127,6 +128,27 @@ export async function POST(req: NextRequest) {
       },
       include: { author: { select: { id: true, nickname: true, avatar: true } } },
     });
+
+    // 帖子待审核时通知所有管理员
+    if (status === PostStatus.PENDING) {
+      const submitTime = new Date().toLocaleString('zh-CN');
+      const notifContent = `用户「${me.nickname || me.email}」于 ${submitTime} 发布了帖子「${dto.title}」，等待审核。\n点击查看详情并审核。`;
+      await createNotification({
+        targetRole: UserRole.SUPER_ADMIN,
+        type: NotificationType.SYSTEM,
+        title: '新帖子待审核',
+        content: notifContent,
+        link: '/profile?tab=moderation',
+      });
+      await createNotification({
+        targetRole: UserRole.ADMIN,
+        type: NotificationType.SYSTEM,
+        title: '新帖子待审核',
+        content: notifContent,
+        link: '/profile?tab=moderation',
+      });
+    }
+
     return NextResponse.json(post);
   } catch (e: any) {
     if (e?.name === 'ZodError') {

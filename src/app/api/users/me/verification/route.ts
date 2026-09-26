@@ -5,8 +5,9 @@ import { z } from 'zod';
 import { getUserFromRequest } from '@/lib/server-auth';
 import { prisma } from '@/lib/prisma';
 import { errorResponse } from '@/lib/api-response';
-import { VerificationStatus } from '@prisma/client';
+import { VerificationStatus, UserRole, NotificationType } from '@prisma/client';
 import { isVisionEnabled, preliminaryReview } from '@/lib/ai-vision';
+import { createNotification } from '@/lib/notification-service';
 
 // 校园卡照片上限 5MB (base64 后约 6.7MB)
 const MAX_PHOTO_BYTES = 5 * 1024 * 1024;
@@ -73,6 +74,24 @@ export async function POST(req: NextRequest) {
     if (isVisionEnabled()) {
       runAiReview(me.id, dto.photo, dto.templateId || null).catch(e => console.error('[verification] AI review failed:', e));
     }
+
+    // 通知所有管理员: 有新的实名认证申请待审核
+    const submitTime = new Date().toLocaleString('zh-CN');
+    const notifContent = `用户「${me.nickname || me.email}」于 ${submitTime} 提交了实名认证申请。\n点击查看详情并审核。`;
+    await createNotification({
+      targetRole: UserRole.SUPER_ADMIN,
+      type: NotificationType.SYSTEM,
+      title: '新的实名认证待审核',
+      content: notifContent,
+      link: '/profile?tab=verification',
+    });
+    await createNotification({
+      targetRole: UserRole.ADMIN,
+      type: NotificationType.SYSTEM,
+      title: '新的实名认证待审核',
+      content: notifContent,
+      link: '/profile?tab=verification',
+    });
 
     return NextResponse.json({
       message: initStatus === VerificationStatus.AI_REVIEWING

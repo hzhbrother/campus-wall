@@ -2,12 +2,13 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import bcrypt from 'bcryptjs';
-import { AccountProvider } from '@prisma/client';
+import { AccountProvider, UserRole, NotificationType } from '@prisma/client';
 import { prisma } from '@/lib/prisma';
 import { signToken, sanitize } from '@/lib/server-auth';
 import { verifyEmailCode } from '@/lib/email-verify';
 import { errorResponse } from '@/lib/api-response';
 import { getSiteConfigBool } from '@/lib/site-config';
+import { createNotification } from '@/lib/notification-service';
 
 const Schema = z.object({
   nickname: z.string().min(2, '账号名至少2位').max(32),
@@ -54,6 +55,24 @@ export async function POST(req: NextRequest) {
     });
     await prisma.account.create({
       data: { userId: user.id, provider: AccountProvider.LOCAL, providerUid: user.nickname },
+    });
+
+    // 通知所有管理员: 有新用户注册
+    const regTime = new Date().toLocaleString('zh-CN');
+    const notifContent = `新用户「${user.nickname}」于 ${regTime} 完成注册。\n邮箱: ${user.email}`;
+    await createNotification({
+      targetRole: UserRole.SUPER_ADMIN,
+      type: NotificationType.SYSTEM,
+      title: '新用户注册',
+      content: notifContent,
+      link: '/profile?tab=users',
+    });
+    await createNotification({
+      targetRole: UserRole.ADMIN,
+      type: NotificationType.SYSTEM,
+      title: '新用户注册',
+      content: notifContent,
+      link: '/profile?tab=users',
     });
 
     const token = signToken({ sub: user.id, email: user.email, role: user.role });

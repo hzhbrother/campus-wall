@@ -291,9 +291,9 @@ function ProfilePageInner() {
     }
     // 通过通知链接直接打开管理后台的申诉审核
     const tab = searchParams.get('tab');
-    if (tab === 'appeals') {
-      setAdminTab('appeals');
-      setView('appeals');
+    if (tab === 'appeals' || tab === 'verification' || tab === 'moderation' || tab === 'users') {
+      setAdminTab(tab);
+      setView(tab);
       router.replace('/profile', { scroll: false });
     }
   }, [searchParams]);
