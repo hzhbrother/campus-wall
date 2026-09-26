@@ -56,6 +56,12 @@ export async function POST(req: NextRequest) {
     if (!me) return NextResponse.json({ message: '未登录' }, { status: 401 });
     if (isUserBanned(me)) return NextResponse.json({ message: '账号已被封禁, 暂不能发帖' }, { status: 403 });
 
+    // 发帖需实名认证 (管理员/超级管理员绕过)
+    const isAdmin = me.role === UserRole.ADMIN || me.role === UserRole.SUPER_ADMIN;
+    if (!isAdmin && !me.verified) {
+      return NextResponse.json({ message: '请先完成实名认证后再发帖', status: 'UNVERIFIED' }, { status: 403 });
+    }
+
     // 读取站点配置
     const [categories, allowAnonymous, requiresApproval, dailyLimit, sensitiveWords] = await Promise.all([
       getPostCategories(),
@@ -97,7 +103,6 @@ export async function POST(req: NextRequest) {
     }
 
     // 审核状态: 管理员直通, 普通用户按配置决定是否审核
-    const isAdmin = me.role === UserRole.ADMIN || me.role === UserRole.SUPER_ADMIN;
     const status = isAdmin || !requiresApproval ? PostStatus.APPROVED : PostStatus.PENDING;
 
     const post = await prisma.post.create({

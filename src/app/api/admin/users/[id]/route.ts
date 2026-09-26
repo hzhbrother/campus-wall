@@ -2,7 +2,7 @@
 // DELETE /api/admin/users/:id 删除用户 (ADMIN+)
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
-import { UserRole, UserStatus } from '@prisma/client';
+import { UserRole, UserStatus, VerificationStatus } from '@prisma/client';
 import { requireRole } from '@/lib/server-auth';
 import { updateUser, deleteUser } from '@/lib/admin-service';
 import { errorResponse } from '@/lib/api-response';
@@ -16,6 +16,9 @@ const Schema = z.object({
   status: z.enum(['NORMAL', 'GRADUATED', 'BANNED']).optional(),
   role: z.enum(['USER', 'STUDENT', 'TEACHER', 'ADMIN', 'SUPER_ADMIN']).optional(),
   verified: z.boolean().optional(),
+  // 认证审核: APPROVED 通过 / REJECTED 驳回 (驳回时需传 rejectReason)
+  verificationStatus: z.enum(['APPROVED', 'REJECTED']).optional(),
+  verificationRejectReason: z.string().max(200).optional().or(z.literal('')),
 });
 
 export async function PATCH(req: NextRequest, { params }: { params: { id: string } }) {
@@ -33,6 +36,18 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
     if (dto.verified !== undefined) {
       data.verified = dto.verified;
       data.verifiedAt = dto.verified ? new Date() : null;
+    }
+    // 认证审核流转
+    if (dto.verificationStatus === 'APPROVED') {
+      data.verified = true;
+      data.verifiedAt = new Date();
+      data.verificationStatus = VerificationStatus.APPROVED;
+      data.verificationRejectReason = null;
+    } else if (dto.verificationStatus === 'REJECTED') {
+      data.verified = false;
+      data.verifiedAt = null;
+      data.verificationStatus = VerificationStatus.REJECTED;
+      data.verificationRejectReason = dto.verificationRejectReason || null;
     }
     return NextResponse.json(await updateUser(params.id, data, me.id));
   } catch (e: any) {

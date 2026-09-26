@@ -376,7 +376,13 @@ function UsersTab({ isSuper }: { isSuper: boolean }) {
                 <div>
                   <div className="flex items-center gap-2 flex-wrap">
                     <span className="font-semibold text-gray-900">{u.nickname}</span>
-                    {u.verified && <span className="inline-flex items-center gap-0.5 rounded bg-green-100 px-1.5 py-0.5 text-xs text-green-700"><svg className="h-3 w-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="m5 12 5 5L20 7" strokeLinecap="round" strokeLinejoin="round"/></svg>已认证</span>}
+                    {u.verified ? (
+                      <span className="inline-flex items-center gap-0.5 rounded bg-green-100 px-1.5 py-0.5 text-xs text-green-700"><svg className="h-3 w-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="m5 12 5 5L20 7" strokeLinecap="round" strokeLinejoin="round"/></svg>已认证</span>
+                    ) : u.verificationStatus === 'PENDING' ? (
+                      <span className="rounded bg-amber-100 px-1.5 py-0.5 text-xs text-amber-700">待审核</span>
+                    ) : u.verificationStatus === 'REJECTED' ? (
+                      <span className="rounded bg-red-100 px-1.5 py-0.5 text-xs text-red-600">已驳回</span>
+                    ) : null}
                     <span className="rounded bg-blue-100 px-1.5 py-0.5 text-xs text-blue-700">{roleLabel[u.role] || u.role}</span>
                     <span className={`rounded px-1.5 py-0.5 text-xs ${userStatus(u).color}`}>{userStatus(u).label}</span>
                   </div>
@@ -426,9 +432,13 @@ function EditUserModal({ user, onClose, onSaved, isSuper }: { user: any; onClose
   const [status, setStatus] = useState(user.status || 'NORMAL');
   const [role, setRole] = useState(user.role || 'STUDENT');
   const [verified, setVerified] = useState(!!user.verified);
+  const [rejectReason, setRejectReason] = useState('');
   const [avatar, setAvatar] = useState(user.avatar || '');
   const [saving, setSaving] = useState(false);
   const [err, setErr] = useState('');
+
+  const vStatus = user.verificationStatus || 'NONE';
+  const isPending = vStatus === 'PENDING';
 
   const handleAvatarFile = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -441,7 +451,17 @@ function EditUserModal({ user, onClose, onSaved, isSuper }: { user: any; onClose
   const save = async () => {
     setSaving(true); setErr('');
     try {
-      await api.patch(`/api/admin/users/${user.id}`, { realName, grade, className, remark, status, role, avatar, verified });
+      const payload: any = { realName, grade, className, remark, status, role, avatar, verified };
+      // 若处于待审核, 按当前 verified 状态决定通过/驳回
+      if (isPending) {
+        if (verified) {
+          payload.verificationStatus = 'APPROVED';
+        } else {
+          payload.verificationStatus = 'REJECTED';
+          payload.verificationRejectReason = rejectReason.trim() || '照片不清晰或信息不全';
+        }
+      }
+      await api.patch(`/api/admin/users/${user.id}`, payload);
       onSaved();
       onClose();
     } catch (e: any) { setErr(e.message); } finally { setSaving(false); }
@@ -540,7 +560,9 @@ function EditUserModal({ user, onClose, onSaved, isSuper }: { user: any; onClose
           <div className="flex items-center justify-between rounded-lg border border-gray-200 px-3 py-2.5">
             <div>
               <div className="text-sm font-medium text-gray-700">实名认证</div>
-              <div className="text-xs text-gray-400">通过后用户主页显示「已认证」标识</div>
+              <div className="text-xs text-gray-400">
+                {isPending ? '该用户提交了认证申请, 开启开关=通过, 关闭=驳回' : '通过后用户主页显示「已认证」标识'}
+              </div>
             </div>
             <button
               type="button"
@@ -550,6 +572,32 @@ function EditUserModal({ user, onClose, onSaved, isSuper }: { user: any; onClose
               <span className={`absolute top-0.5 h-5 w-5 rounded-full bg-white shadow transition-transform ${verified ? 'translate-x-5' : 'translate-x-0.5'}`} />
             </button>
           </div>
+
+          {/* 待审核: 显示校园卡照片 + 驳回原因 */}
+          {isPending && (
+            <div className="space-y-2">
+              {user.verificationPhoto && (
+                <div>
+                  <div className="text-xs text-gray-500 mb-1">校园卡照片</div>
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={user.verificationPhoto} alt="校园卡" className="w-full rounded-lg border border-gray-200" />
+                </div>
+              )}
+              {!verified && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">驳回原因</label>
+                  <input value={rejectReason} onChange={e => setRejectReason(e.target.value)} className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm" placeholder="请填写驳回原因 (将通知用户)" />
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* 已驳回: 显示原因 */}
+          {vStatus === 'REJECTED' && user.verificationRejectReason && (
+            <div className="rounded-lg bg-red-50 px-3 py-2 text-xs text-red-600">
+              上次驳回原因: {user.verificationRejectReason}
+            </div>
+          )}
 
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">备注</label>

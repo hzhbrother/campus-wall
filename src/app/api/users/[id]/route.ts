@@ -9,7 +9,7 @@ export async function GET(_req: NextRequest, { params }: { params: { id: string 
       where: { id: params.id },
       select: {
         id: true, nickname: true, avatar: true, coverImage: true,
-        role: true, grade: true, className: true, verified: true,
+        role: true, grade: true, className: true, verified: true, verificationStatus: true,
         createdAt: true,
         _count: { select: { posts: true, comments: true } },
       },

@@ -1,6 +1,6 @@
 'use client';
 
-import { Suspense, useEffect, useState } from 'react';
+import { Suspense, useEffect, useState, useRef } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import dynamic from 'next/dynamic';
 import { useAuth } from '@/lib/auth-context';
@@ -266,6 +266,7 @@ function ProfilePageInner() {
   const [adminTab, setAdminTab] = useState<AdminTab>('overview');
   const [showPwdModal, setShowPwdModal] = useState(false);
   const [showNotifModal, setShowNotifModal] = useState(false);
+  const [showVerifyModal, setShowVerifyModal] = useState(false);
 
   const isAdmin = user?.role === 'ADMIN' || user?.role === 'SUPER_ADMIN';
   const isSuper = user?.role === 'SUPER_ADMIN';
@@ -349,6 +350,7 @@ function ProfilePageInner() {
   const menuItems = [
     { key: 'homepage', label: '我的主页', icon: '🏠' },
     { key: 'favorites', label: '我的收藏', icon: '⭐' },
+    { key: 'verification', label: '实名认证', icon: '✅' },
     { key: 'password', label: '修改密码', icon: '🔑' },
     { key: 'notif-settings', label: '通知设置', icon: '🔔' },
     { key: 'violations', label: '违规记录', icon: '📋' },
@@ -367,6 +369,7 @@ function ProfilePageInner() {
     if (key === 'ban-appeal') { router.push('/profile/ban-appeal'); return; }
     if (key === 'password') { setShowPwdModal(true); return; }
     if (key === 'notif-settings') { setShowNotifModal(true); return; }
+    if (key === 'verification') { setShowVerifyModal(true); return; }
     if (key === 'agreement') { router.push('/agreement'); return; }
     if (key === 'privacy') { router.push('/privacy'); return; }
     if (key === 'about') { router.push('/about'); return; }
@@ -388,7 +391,17 @@ function ProfilePageInner() {
           <div className="flex-1">
             {user ? (
               <>
-                <div className="text-lg font-bold text-white">{user.nickname}</div>
+                <div className="flex items-center gap-1.5">
+                  <span className="text-lg font-bold text-white">{user.nickname}</span>
+                  {user.verified ? (
+                    <span className="inline-flex items-center gap-0.5 rounded-full bg-white/25 px-1.5 py-0.5 text-xs text-white">
+                      <svg className="h-3 w-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="m5 12 5 5L20 7" strokeLinecap="round" strokeLinejoin="round"/></svg>
+                      已认证
+                    </span>
+                  ) : user.verificationStatus === 'PENDING' ? (
+                    <span className="rounded-full bg-amber-400/90 px-1.5 py-0.5 text-xs text-white">审核中</span>
+                  ) : null}
+                </div>
                 <div className="text-sm text-white/80">{user.email || '未绑定邮箱'}</div>
               </>
             ) : (
@@ -452,6 +465,15 @@ function ProfilePageInner() {
 
       {/* 通知设置弹窗 */}
       {showNotifModal && <NotificationSettingsModal onClose={() => setShowNotifModal(false)} />}
+
+      {/* 实名认证弹窗 */}
+      {showVerifyModal && user && (
+        <VerificationModal
+          user={user}
+          onClose={() => setShowVerifyModal(false)}
+          onVerified={() => { refreshUser(); setShowVerifyModal(false); }}
+        />
+      )}
     </div>
   );
 }
@@ -555,6 +577,149 @@ function NotificationSettingsModal({ onClose }: { onClose: () => void }) {
           </div>
         )}
         <button onClick={save} disabled={saving} className="mt-4 w-full rounded-lg bg-blue-600 py-2.5 text-sm font-medium text-white disabled:opacity-50">{saving ? '保存中…' : '保存'}</button>
+      </div>
+    </div>
+  );
+}
+
+// ---------- 实名认证弹窗 ----------
+function VerificationModal({ user, onClose, onVerified }: { user: any; onClose: () => void; onVerified: () => void }) {
+  const [photo, setPhoto] = useState<string>('');
+  const [busy, setBusy] = useState(false);
+  const [msg, setMsg] = useState('');
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  const status = user.verificationStatus || 'NONE';
+  const isApproved = user.verified || status === 'APPROVED';
+  const isPending = status === 'PENDING';
+  const isRejected = status === 'REJECTED';
+
+  // 压缩图片至最大边 1280px
+  const compress = (file: File): Promise<string> => new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onerror = () => reject(new Error('读取失败'));
+    reader.onload = () => {
+      const img = new Image();
+      img.onerror = () => reject(new Error('加载失败'));
+      img.onload = () => {
+        const MAX = 1280;
+        let { width, height } = img;
+        if (width > MAX || height > MAX) {
+          if (width >= height) { height = Math.round(height * (MAX / width)); width = MAX; }
+          else { width = Math.round(width * (MAX / height)); height = MAX; }
+        }
+        const canvas = document.createElement('canvas');
+        canvas.width = width; canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        if (!ctx) { resolve(reader.result as string); return; }
+        ctx.drawImage(img, 0, 0, width, height);
+        resolve(canvas.toDataURL('image/jpeg', 0.8));
+      };
+      img.src = reader.result as string;
+    };
+    reader.readAsDataURL(file);
+  });
+
+  const onCapture = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setMsg('');
+    try {
+      const dataUrl = await compress(file);
+      setPhoto(dataUrl);
+    } catch {
+      setMsg('图片处理失败, 请重试');
+    }
+    e.target.value = '';
+  };
+
+  const submit = async () => {
+    if (!photo) { setMsg('请先拍摄校园卡照片'); return; }
+    setBusy(true); setMsg('');
+    try {
+      await api.post('/api/users/me/verification', { photo });
+      setMsg('认证申请已提交, 等待管理员审核');
+      onVerified();
+    } catch (e: any) { setMsg(e.message); } finally { setBusy(false); }
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/50 sm:items-center" onClick={onClose}>
+      <div className="w-full max-w-md rounded-t-3xl bg-white p-5 pb-8 sm:rounded-2xl" onClick={e => e.stopPropagation()}>
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="text-lg font-bold text-gray-900">实名认证</h3>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600 text-xl">✕</button>
+        </div>
+
+        {/* 状态展示 */}
+        {isApproved ? (
+          <div className="rounded-xl bg-green-50 p-4 text-center">
+            <div className="text-3xl mb-1">✅</div>
+            <div className="text-sm font-medium text-green-700">已认证</div>
+            {user.verifiedAt && <div className="text-xs text-green-600 mt-1">认证时间: {new Date(user.verifiedAt).toLocaleDateString('zh-CN')}</div>}
+          </div>
+        ) : isPending ? (
+          <div className="rounded-xl bg-amber-50 p-4 text-center">
+            <div className="text-3xl mb-1">⏳</div>
+            <div className="text-sm font-medium text-amber-700">审核中</div>
+            <div className="text-xs text-amber-600 mt-1">管理员正在审核您的认证申请, 请耐心等待</div>
+          </div>
+        ) : isRejected ? (
+          <div className="rounded-xl bg-red-50 p-4 mb-3">
+            <div className="text-sm font-medium text-red-700">❌ 认证被驳回</div>
+            {user.verificationRejectReason && <div className="text-xs text-red-600 mt-1">原因: {user.verificationRejectReason}</div>}
+            <div className="text-xs text-red-500 mt-1">请重新拍摄清晰的校园卡照片后再次提交</div>
+          </div>
+        ) : null}
+
+        {/* 未通过时可重新提交 */}
+        {!isApproved && !isPending && (
+          <>
+            <div className="rounded-xl bg-blue-50 p-3 mb-3">
+              <div className="text-sm font-medium text-blue-800 mb-1">拍摄要求</div>
+              <ul className="text-xs text-blue-700 space-y-0.5 list-disc pl-4">
+                <li>请拍摄校园卡<span className="font-semibold">带人像的一面</span></li>
+                <li>照片中需清晰可见: <span className="font-semibold">头像、姓名、卡号、班级</span></li>
+                <li>仅支持手机现场拍照, 不支持从相册选择</li>
+              </ul>
+            </div>
+
+            {photo ? (
+              <div className="relative mb-3">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={photo} alt="校园卡" className="w-full rounded-xl border border-gray-200" />
+                <button onClick={() => setPhoto('')} className="absolute top-2 right-2 h-7 w-7 rounded-full bg-black/60 text-white text-sm">✕</button>
+              </div>
+            ) : (
+              <label className="flex flex-col items-center justify-center w-full rounded-xl border-2 border-dashed border-gray-300 py-8 mb-3 cursor-pointer hover:border-blue-400 hover:bg-blue-50/50 transition">
+                <svg className="h-10 w-10 text-gray-400 mb-2" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+                  <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z" strokeLinecap="round" strokeLinejoin="round"/>
+                  <circle cx="12" cy="13" r="4"/>
+                </svg>
+                <span className="text-sm text-blue-600 font-medium">点击拍摄校园卡</span>
+                <span className="text-xs text-gray-400 mt-1">仅支持拍照, 不支持相册</span>
+                <input
+                  ref={inputRef}
+                  type="file"
+                  accept="image/*"
+                  capture="environment"
+                  className="hidden"
+                  onChange={onCapture}
+                />
+              </label>
+            )}
+
+            {msg && <p className={`mb-3 text-sm ${msg.includes('已提交') ? 'text-green-600' : 'text-red-500'}`}>{msg}</p>}
+
+            <button onClick={submit} disabled={busy || !photo} className="w-full rounded-full bg-blue-600 py-3 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50">
+              {busy ? '提交中…' : '提交认证申请'}
+            </button>
+          </>
+        )}
+
+        {isPending && (
+          <p className="mt-3 text-center text-xs text-gray-400">审核期间无法重复提交, 请等待结果</p>
+        )}
       </div>
     </div>
   );

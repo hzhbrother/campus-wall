@@ -17,6 +17,7 @@ export interface ReqUser {
   role: UserRole;
   nickname: string;
   bannedUntil: Date | null;
+  verified: boolean;
 }
 
 const SECRET = process.env.JWT_SECRET || 'dev-secret-change-me';
@@ -42,7 +43,7 @@ export async function getUserFromRequest(req: Request | NextRequest): Promise<Re
   if (!payload) return null;
   const user = await prisma.user.findUnique({ where: { id: payload.sub } });
   if (!user || user.status === UserStatus.BANNED) return null;
-  return { id: user.id, email: user.email, role: user.role, nickname: user.nickname, bannedUntil: user.bannedUntil };
+  return { id: user.id, email: user.email, role: user.role, nickname: user.nickname, bannedUntil: user.bannedUntil, verified: user.verified };
 }
 
 class HttpError extends Error {
