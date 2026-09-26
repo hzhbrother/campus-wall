@@ -627,6 +627,7 @@ function VerificationModal({ user, onClose, onVerified, onSubmitted }: { user: a
   const [photo, setPhoto] = useState<string>('');
   const [templateId, setTemplateId] = useState<string>('');
   const [verifyType, setVerifyType] = useState<VerifyType | ''>('');
+  const [photoType, setPhotoType] = useState<'CARD' | 'FACE'>('CARD');
   const [templates, setTemplates] = useState<{ id: string; name: string; type: string; image: string; isActive: boolean }[]>([]);
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState('');
@@ -656,7 +657,10 @@ function VerificationModal({ user, onClose, onVerified, onSubmitted }: { user: a
   const isSuperAdmin = role === 'SUPER_ADMIN';
   const currentTypeMeta = VERIFY_TYPE_OPTIONS.find(o => o.value === verifyType);
   const verifyLabel = currentTypeMeta?.label || '认证';
-  const photoLabel = verifyType === 'STUDENT' ? '校园卡' : verifyType === 'TEACHER' ? '工作证' : '证明材料';
+  const photoLabel = photoType === 'FACE'
+    ? '人脸照片'
+    : verifyType === 'STUDENT' ? '校园卡' : verifyType === 'TEACHER' ? '工作证' : '证明材料';
+  const isFace = photoType === 'FACE';
 
   const status = localStatus || user.verificationStatus || 'NONE';
   const isApproved = user.verified || status === 'APPROVED';
@@ -715,11 +719,13 @@ function VerificationModal({ user, onClose, onVerified, onSubmitted }: { user: a
   };
 
   const submit = async () => {
-    if (!templateId) { setMsg('请先选择模板'); return; }
-    if (!photo) { setMsg(`请先拍摄${photoLabel}照片`); return; }
+    if (!isFace && !templateId) { setMsg('请先选择模板'); return; }
+    if (!photo) { setMsg(`请先拍摄${photoLabel}`); return; }
     setBusy(true); setMsg('');
     try {
-      const res: any = await api.post('/api/users/me/verification', { photo, templateId });
+      const payload: any = { photo, photoType };
+      if (!isFace) payload.templateId = templateId;
+      const res: any = await api.post('/api/users/me/verification', payload);
       setMsg(res?.message || '认证申请已提交');
       await refreshStatus();
       onSubmitted?.();
@@ -824,31 +830,61 @@ function VerificationModal({ user, onClose, onVerified, onSubmitted }: { user: a
               </div>
             </div>
 
-            {/* 第二步: 选择模板 + 显示案例图 + 注意事项 */}
+            {/* 第二步: 选择照片类型 (卡面 / 人脸) */}
+            {verifyType && (
+              <div className="mb-3">
+                <label className="block text-sm font-medium text-gray-700 mb-2">上传方式</label>
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    onClick={() => { setPhotoType('CARD'); setPhoto(''); }}
+                    className={`flex flex-col items-center justify-center rounded-xl border-2 p-3 transition ${
+                      photoType === 'CARD' ? 'border-blue-500 bg-blue-50' : 'border-gray-200 bg-white hover:border-blue-300'
+                    }`}
+                  >
+                    <div className="text-2xl mb-1">💳</div>
+                    <div className={`text-xs font-medium ${photoType === 'CARD' ? 'text-blue-700' : 'text-gray-700'}`}>证件卡面</div>
+                  </button>
+                  <button
+                    onClick={() => { setPhotoType('FACE'); setTemplateId(''); setPhoto(''); }}
+                    className={`flex flex-col items-center justify-center rounded-xl border-2 p-3 transition ${
+                      photoType === 'FACE' ? 'border-blue-500 bg-blue-50' : 'border-gray-200 bg-white hover:border-blue-300'
+                    }`}
+                  >
+                    <div className="text-2xl mb-1">😊</div>
+                    <div className={`text-xs font-medium ${photoType === 'FACE' ? 'text-blue-700' : 'text-gray-700'}`}>人脸照片</div>
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* 第三步: 卡面需选择模板; 人脸直接拍照 */}
             {verifyType && (
               <>
-                <div className="mb-3">
-                  <label className="block text-sm font-medium text-gray-700 mb-1">选择模板</label>
-                  {templates.length === 0 ? (
-                    <div className="rounded-xl bg-gray-50 p-4 text-center text-xs text-gray-400">
-                      暂无{currentTypeMeta?.label}模板, 请联系管理员添加
-                    </div>
-                  ) : (
-                    <select
-                      value={templateId}
-                      onChange={e => setTemplateId(e.target.value)}
-                      className="w-full rounded-xl border border-gray-300 px-3 py-2.5 text-sm focus:border-blue-500 focus:outline-none"
-                    >
-                      <option value="">请选择模板</option>
-                      {templates.map(t => (
-                        <option key={t.id} value={t.id}>{t.name}</option>
-                      ))}
-                    </select>
-                  )}
-                </div>
+                {/* 卡面: 选择模板 + 显示案例图 */}
+                {!isFace && (
+                  <div className="mb-3">
+                    <label className="block text-sm font-medium text-gray-700 mb-1">选择模板</label>
+                    {templates.length === 0 ? (
+                      <div className="rounded-xl bg-gray-50 p-4 text-center text-xs text-gray-400">
+                        暂无{currentTypeMeta?.label}模板, 请联系管理员添加
+                      </div>
+                    ) : (
+                      <select
+                        value={templateId}
+                        onChange={e => setTemplateId(e.target.value)}
+                        className="w-full rounded-xl border border-gray-300 px-3 py-2.5 text-sm focus:border-blue-500 focus:outline-none"
+                      >
+                        <option value="">请选择模板</option>
+                        {templates.map(t => (
+                          <option key={t.id} value={t.id}>{t.name}</option>
+                        ))}
+                      </select>
+                    )}
+                  </div>
+                )}
 
-                {/* 选中模板后显示案例图 + 注意事项 */}
-                {selectedTemplate && selectedTemplate.image && (
+                {/* 卡面: 选中模板后显示案例图 */}
+                {!isFace && selectedTemplate && selectedTemplate.image && (
                   <div className="mb-3">
                     <div className="text-xs font-medium text-gray-600 mb-1.5">模板示例 (请参照此样式拍摄)</div>
                     {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -856,16 +892,26 @@ function VerificationModal({ user, onClose, onVerified, onSubmitted }: { user: a
                   </div>
                 )}
 
-                {/* 拍摄注意事项 */}
+                {/* 拍摄注意事项 (卡面 / 人脸不同) */}
                 <div className="rounded-xl bg-amber-50 p-3 mb-3">
                   <div className="text-sm font-medium text-amber-800 mb-1.5">📸 拍摄注意事项</div>
-                  <ul className="text-xs text-amber-700 space-y-1 list-disc list-inside">
-                    <li>请将{photoLabel}平放, 保持画面端正, 不要倾斜</li>
-                    <li>确保照片清晰, 文字和头像可辨认, 避免模糊</li>
-                    <li>光线充足, 避免反光、阴影遮挡关键信息</li>
-                    <li>只拍摄{photoLabel}本身, 不要包含其他杂物</li>
-                    <li>照片需完整显示{photoLabel}的全部内容</li>
-                  </ul>
+                  {isFace ? (
+                    <ul className="text-xs text-amber-700 space-y-1 list-disc list-inside">
+                      <li>请正对镜头, 露出完整面部 (额头、眼睛、鼻子、嘴巴)</li>
+                      <li>光线充足均匀, 避免逆光、阴影遮挡脸部</li>
+                      <li>表情自然, 不要戴墨镜、帽子等遮挡物</li>
+                      <li>人脸占画面比例适中 (约 1/3 到 1/2)</li>
+                      <li>照片清晰, 五官可辨认, 避免模糊</li>
+                    </ul>
+                  ) : (
+                    <ul className="text-xs text-amber-700 space-y-1 list-disc list-inside">
+                      <li>请将{photoLabel}平放, 保持画面端正, 不要倾斜</li>
+                      <li>确保照片清晰, 文字和头像可辨认, 避免模糊</li>
+                      <li>光线充足, 避免反光、阴影遮挡关键信息</li>
+                      <li>只拍摄{photoLabel}本身, 不要包含其他杂物</li>
+                      <li>照片需完整显示{photoLabel}的全部内容</li>
+                    </ul>
+                  )}
                 </div>
 
                 {photo ? (
@@ -894,7 +940,7 @@ function VerificationModal({ user, onClose, onVerified, onSubmitted }: { user: a
 
                 {msg && <p className={`mb-3 text-sm ${msg.includes('已提交') ? 'text-green-600' : 'text-red-500'}`}>{msg}</p>}
 
-                <button onClick={submit} disabled={busy || !photo || !templateId} className="w-full rounded-full bg-blue-600 py-3 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50">
+                <button onClick={submit} disabled={busy || !photo || (!isFace && !templateId)} className="w-full rounded-full bg-blue-600 py-3 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50">
                   {busy ? '提交中…' : `提交${verifyLabel}申请`}
                 </button>
               </>

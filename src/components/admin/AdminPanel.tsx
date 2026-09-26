@@ -2207,6 +2207,11 @@ function VerificationReviewTab() {
                             {u.verificationTemplate.type === 'STUDENT' ? '学生认证' : u.verificationTemplate.type === 'TEACHER' ? '老师认证' : '资质认证'}
                           </span>
                         )}
+                        {u.verificationPhotoType && (
+                          <span className={`text-[10px] px-1.5 py-0.5 rounded ${u.verificationPhotoType === 'FACE' ? 'bg-purple-100 text-purple-700' : 'bg-green-100 text-green-700'}`}>
+                            {u.verificationPhotoType === 'FACE' ? '😊 人脸' : '💳 卡面'}
+                          </span>
+                        )}
                       </div>
                       <div className="text-xs text-gray-400">{u.realName || '未填写真名'} {u.studentId ? `· 学号 ${u.studentId}` : ''} {u.grade ? `· ${u.grade}${u.className || ''}` : ''}</div>
                     </div>

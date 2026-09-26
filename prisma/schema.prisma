@@ -128,7 +128,8 @@ model User {
   credibilityScore Int          @default(100) // 诚信分 (0-100)
   verified      Boolean        @default(false) // 是否已认证 (实名/学生认证)
   verifiedAt    DateTime?      // 认证通过时间
-  verificationPhoto String?    // 校园卡照片 (base64, 待审核/已驳回时保留)
+  verificationPhoto String?    // 认证照片 (base64, 卡面或人脸)
+  verificationPhotoType String? // 照片类型: CARD(卡面) / FACE(人脸)
   verificationTemplateId String? // 用户认证时选择的学校模板 ID
   verificationTemplate   VerificationTemplate? @relation(fields: [verificationTemplateId], references: [id])
   verificationStatus VerificationStatus @default(NONE) // 认证审核状态

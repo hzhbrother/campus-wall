@@ -55,7 +55,9 @@ export interface AiReviewResult {
   rejectReason?: string;          // 初审驳回原因
   fields: Record<string, string>; // 字段名 -> 识别值 (字段名来自模板)
   bboxes: Record<string, BBox>;   // 字段名 -> 用户图中对应位置 (归一化)
-  avatarBbox?: BBox;              // 头像区域的归一化坐标 (模板中名为"头像"的字段)
+  avatarBbox?: BBox;              // 头像区域的归一化坐标 (模板中名为"头像"的字段或人脸检测)
+  hasFace?: boolean;              // 是否检测到人脸
+  faceBbox?: BBox;                // 人脸区域的归一化坐标 (人脸检测)
   confidence: 'high' | 'medium' | 'low';
   rawText: string;                // OCR 全文 (供人工复核参考)
 }
@@ -341,6 +343,60 @@ async function visionJudge(photoBase64: string): Promise<{ isIdCard: boolean; is
 }
 
 // =====================================================================
+// 人脸检测: 用视觉大模型判断是否有人脸并返回人脸区域坐标
+// =====================================================================
+async function detectFace(photoBase64: string): Promise<{ hasFace: boolean; faceBbox?: BBox } | null> {
+  if (!VISION_API_KEY) return null;
+  const prompt = `请检测这张图片中是否有人脸。
+如果有人脸, 请返回人脸在图片中的归一化边界框 (x, y, w, h), 取值范围 0-1, x/y 为左上角坐标。
+请以严格 JSON 返回 (不要任何解释文字):
+{
+  "hasFace": true/false,
+  "faceBbox": { "x": 0.1, "y": 0.1, "w": 0.3, "h": 0.3 }
+}
+如果没有人脸, faceBbox 为 null。`;
+  try {
+    const res = await fetch(`${VISION_BASE_URL}/chat/completions`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${VISION_API_KEY}` },
+      body: JSON.stringify({
+        model: VISION_MODEL,
+        messages: [{ role: 'user', content: [
+          { type: 'text', text: prompt },
+          { type: 'image_url', image_url: { url: toBase64(photoBase64), detail: 'low' } },
+        ]}],
+        max_tokens: 300,
+        temperature: 0,
+      }),
+    });
+    if (!res.ok) {
+      console.error('[detect-face] request failed:', res.status);
+      return null;
+    }
+    const data = await res.json();
+    const text = data.choices?.[0]?.message?.content || '';
+    const m = text.match(/\{[\s\S]*\}/);
+    if (!m) return null;
+    const parsed = JSON.parse(m[0]);
+    const hasFace = !!parsed.hasFace;
+    const fb = parsed.faceBbox;
+    let faceBbox: BBox | undefined;
+    if (hasFace && fb && typeof fb.x === 'number' && typeof fb.y === 'number' && typeof fb.w === 'number' && typeof fb.h === 'number') {
+      faceBbox = {
+        x: Math.max(0, Math.min(1, fb.x)),
+        y: Math.max(0, Math.min(1, fb.y)),
+        w: Math.max(0, Math.min(1, fb.w)),
+        h: Math.max(0, Math.min(1, fb.h)),
+      };
+    }
+    return { hasFace, faceBbox };
+  } catch (e) {
+    console.error('[detect-face] error:', e);
+    return null;
+  }
+}
+
+// =====================================================================
 // OCR 统一入口
 // =====================================================================
 async function recognizeText(photoBase64: string): Promise<OcrResult | null> {
@@ -524,6 +580,52 @@ export async function preliminaryReview(
     avatarBbox,
     confidence,
     rawText,
+  };
+}
+
+// =====================================================================
+// 人脸照片初审: 检测人脸 + 清晰度判断
+// =====================================================================
+export async function preliminaryFaceReview(
+  photoBase64: string,
+): Promise<AiReviewResult | null> {
+  if (!hasVision) return null;
+
+  // 1. 人脸检测
+  const face = await detectFace(photoBase64);
+  const hasFace = face?.hasFace ?? false;
+  const faceBbox = face?.faceBbox;
+
+  // 2. 图片清晰度判断 (用视觉模型判断是否清晰)
+  let isClear = true;
+  let rejectReason: string | undefined;
+  const vj = await visionJudge(photoBase64);
+  if (vj) {
+    isClear = vj.isClear;
+    if (!isClear) rejectReason = '人脸照片不清晰, 请重新拍摄';
+  }
+
+  if (!hasFace) {
+    rejectReason = '未检测到人脸, 请上传清晰的人脸照片';
+  }
+
+  // 人脸照片通过条件: 检测到人脸 + 清晰
+  const isIdCard = hasFace; // 复用字段表示"照片符合要求"
+
+  // 把人脸区域作为头像
+  const avatarBbox = faceBbox;
+
+  return {
+    isIdCard,
+    isClear,
+    rejectReason,
+    fields: {},
+    bboxes: faceBbox ? { '人脸': faceBbox } : {},
+    avatarBbox,
+    hasFace,
+    faceBbox,
+    confidence: hasFace && isClear ? 'high' : 'low',
+    rawText: '',
   };
 }
 

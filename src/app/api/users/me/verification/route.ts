@@ -6,15 +6,16 @@ import { getUserFromRequest } from '@/lib/server-auth';
 import { prisma } from '@/lib/prisma';
 import { errorResponse } from '@/lib/api-response';
 import { VerificationStatus, UserRole, NotificationType } from '@prisma/client';
-import { isVisionEnabled, preliminaryReview } from '@/lib/ai-vision';
+import { isVisionEnabled, preliminaryReview, preliminaryFaceReview } from '@/lib/ai-vision';
 import { createNotification } from '@/lib/notification-service';
 
-// 校园卡照片上限 5MB (base64 后约 6.7MB)
+// 照片上限 5MB (base64 后约 6.7MB)
 const MAX_PHOTO_BYTES = 5 * 1024 * 1024;
 
 const SubmitSchema = z.object({
   photo: z.string().min(1).max(Math.ceil(MAX_PHOTO_BYTES * 4 / 3) + 100),
   templateId: z.string().optional(),
+  photoType: z.enum(['CARD', 'FACE']).optional(), // 卡面 / 人脸
 });
 
 export async function GET(req: NextRequest) {
@@ -63,7 +64,8 @@ export async function POST(req: NextRequest) {
       where: { id: me.id },
       data: {
         verificationPhoto: dto.photo,
-        verificationTemplateId: dto.templateId || null,
+        verificationPhotoType: dto.photoType || 'CARD',
+        verificationTemplateId: dto.photoType === 'FACE' ? null : (dto.templateId || null),
         verificationStatus: initStatus,
         verificationRejectReason: null,
         verificationAiResult: null,
@@ -72,12 +74,14 @@ export async function POST(req: NextRequest) {
 
     // 异步触发 AI 初审 (不阻塞响应)
     if (isVisionEnabled()) {
-      runAiReview(me.id, dto.photo, dto.templateId || null).catch(e => console.error('[verification] AI review failed:', e));
+      const isFace = dto.photoType === 'FACE';
+      runAiReview(me.id, dto.photo, dto.photoType === 'FACE' ? null : (dto.templateId || null), isFace).catch(e => console.error('[verification] AI review failed:', e));
     }
 
     // 通知所有管理员: 有新的实名认证申请待审核
     const submitTime = new Date().toLocaleString('zh-CN');
-    const notifContent = `用户「${me.nickname || me.email}」于 ${submitTime} 提交了实名认证申请。\n点击查看详情并审核。`;
+    const photoTypeText = dto.photoType === 'FACE' ? '人脸照片' : '证件照片';
+    const notifContent = `用户「${me.nickname || me.email}」于 ${submitTime} 提交了认证申请 (${photoTypeText})。\n点击查看详情并审核。`;
     await createNotification({
       targetRole: UserRole.SUPER_ADMIN,
       type: NotificationType.SYSTEM,
@@ -108,22 +112,29 @@ export async function POST(req: NextRequest) {
 }
 
 // AI 初审: 判断是否校园卡 + 清晰度, 通过则进入人工复审, 不通过则直接驳回
-async function runAiReview(userId: string, photo: string, templateId: string | null) {
-  // 优先使用用户选择的学校模板, 没选则用全局激活的模板
-  let template: any = null;
-  if (templateId) {
-    template = await prisma.verificationTemplate.findUnique({
-      where: { id: templateId },
-      select: { id: true, name: true, image: true, fields: true },
-    });
+async function runAiReview(userId: string, photo: string, templateId: string | null, isFace: boolean) {
+  let result;
+  if (isFace) {
+    // 人脸照片: 检测人脸 + 清晰度
+    result = await preliminaryFaceReview(photo);
+  } else {
+    // 卡面照片: 加载模板 + OCR 文字提取
+    let template: any = null;
+    if (templateId) {
+      template = await prisma.verificationTemplate.findUnique({
+        where: { id: templateId },
+        select: { id: true, name: true, image: true, fields: true },
+      });
+    }
+    if (!template) {
+      template = await prisma.verificationTemplate.findFirst({
+        where: { isActive: true },
+        select: { id: true, name: true, image: true, fields: true },
+      });
+    }
+    result = await preliminaryReview(photo, template as any);
   }
-  if (!template) {
-    template = await prisma.verificationTemplate.findFirst({
-      where: { isActive: true },
-      select: { id: true, name: true, image: true, fields: true },
-    });
-  }
-  const result = await preliminaryReview(photo, template as any);
+
   if (!result) {
     // AI 调用失败, 转入人工复审
     await prisma.user.update({
@@ -147,7 +158,7 @@ async function runAiReview(userId: string, photo: string, templateId: string | n
       where: { id: userId },
       data: {
         verificationStatus: VerificationStatus.REJECTED,
-        verificationRejectReason: result.rejectReason || '照片不符合要求 (非校园卡或不清晰)',
+        verificationRejectReason: result.rejectReason || (isFace ? '未检测到人脸或照片不清晰' : '照片不符合要求 (非校园卡或不清晰)'),
         verificationAiResult: result as any,
       },
     });
