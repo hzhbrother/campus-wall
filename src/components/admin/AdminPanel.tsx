@@ -2408,6 +2408,7 @@ function RolesManager() {
   const [editing, setEditing] = useState<RoleItem | null>(null);
   const [creating, setCreating] = useState(false);
   const [msg, setMsg] = useState('');
+  const [selected, setSelected] = useState<Set<string>>(new Set());
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -2419,11 +2420,56 @@ function RolesManager() {
 
   useEffect(() => { load(); }, [load]);
 
+  // 清除已不存在的选中项
+  useEffect(() => {
+    setSelected(prev => {
+      const validIds = new Set(roles.map(r => r.id));
+      let changed = false;
+      const next = new Set<string>();
+      prev.forEach(id => { if (validIds.has(id)) next.add(id); else changed = true; });
+      return changed ? next : prev;
+    });
+  }, [roles]);
+
+  const customRoles = roles.filter(r => !r.isSystem);
+  const allCustomSelected = customRoles.length > 0 && customRoles.every(r => selected.has(r.id));
+
+  const toggleSelect = (id: string) => {
+    setSelected(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  };
+
+  const toggleSelectAll = () => {
+    if (allCustomSelected) {
+      setSelected(new Set());
+    } else {
+      setSelected(new Set(customRoles.map(r => r.id)));
+    }
+  };
+
   const handleDelete = async (r: RoleItem) => {
     if (!confirm(`确认删除角色「${r.name}」? 关联用户将重置为系统角色。`)) return;
     try {
       await api.del(`/api/admin/roles/${r.id}`);
       setMsg('删除成功'); load();
+    } catch (e: any) { setMsg(e.message); }
+  };
+
+  const handleBatchDelete = async () => {
+    const ids = Array.from(selected).filter(id => {
+      const r = roles.find(x => x.id === id);
+      return r && !r.isSystem;
+    });
+    if (ids.length === 0) { setMsg('请先选择要删除的自定义角色'); return; }
+    if (!confirm(`确认删除选中的 ${ids.length} 个角色? 关联用户将重置为系统角色。`)) return;
+    try {
+      const res: any = await api.post('/api/admin/roles/batch-delete', { ids });
+      setMsg(res?.message || '批量删除成功');
+      setSelected(new Set());
+      load();
     } catch (e: any) { setMsg(e.message); }
   };
 
@@ -2439,6 +2485,15 @@ function RolesManager() {
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b text-left text-gray-500">
+                <th className="py-2 px-2 w-10">
+                  <input
+                    type="checkbox"
+                    checked={allCustomSelected}
+                    onChange={toggleSelectAll}
+                    className="rounded border-gray-300"
+                    title="全选自定义角色"
+                  />
+                </th>
                 <th className="py-2 px-2">角色名称</th>
                 <th className="py-2 px-2">类型</th>
                 <th className="py-2 px-2">用户数</th>
@@ -2449,6 +2504,18 @@ function RolesManager() {
             <tbody>
               {roles.map(r => (
                 <tr key={r.id} className="border-b hover:bg-gray-50">
+                  <td className="py-2 px-2">
+                    {r.isSystem ? (
+                      <span className="text-gray-300" title="系统角色不可删除">—</span>
+                    ) : (
+                      <input
+                        type="checkbox"
+                        checked={selected.has(r.id)}
+                        onChange={() => toggleSelect(r.id)}
+                        className="rounded border-gray-300"
+                      />
+                    )}
+                  </td>
                   <td className="py-2 px-2 font-medium">{r.name}</td>
                   <td className="py-2 px-2">
                     {r.isSystem
@@ -2466,6 +2533,15 @@ function RolesManager() {
               ))}
             </tbody>
           </table>
+        </div>
+      )}
+      {selected.size > 0 && (
+        <div className="mt-3 flex items-center gap-3 rounded-lg bg-amber-50 px-3 py-2 text-sm">
+          <span className="text-amber-700">已选 {selected.size} 项</span>
+          <button onClick={handleBatchDelete} className="rounded bg-red-500 px-3 py-1 text-xs font-medium text-white hover:bg-red-600">
+            批量删除
+          </button>
+          <button onClick={() => setSelected(new Set())} className="text-gray-500 hover:underline text-xs">取消选择</button>
         </div>
       )}
       {(editing || creating) && (
