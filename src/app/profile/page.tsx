@@ -945,32 +945,32 @@ function VerificationModal({ user, onClose, onVerified, onSubmitted }: { user: a
           </div>
         ) : null}
 
-        {/* 可提交条件:
+        {/* 第一步: 选择认证类型 (始终显示, 超管也需要选择资质/荣誉认证) */}
+        <div className="mb-3">
+          <label className="block text-sm font-medium text-gray-700 mb-2">选择认证类型</label>
+          <div className="grid grid-cols-2 gap-2">
+            {VERIFY_TYPE_OPTIONS.map(opt => (
+              <button
+                key={opt.value}
+                onClick={() => { setVerifyType(opt.value); setTemplateId(''); setPhoto(''); }}
+                className={`flex flex-col items-center justify-center rounded-xl border-2 p-3 transition ${
+                  verifyType === opt.value
+                    ? 'border-blue-500 bg-blue-50'
+                    : 'border-gray-200 bg-white hover:border-blue-300'
+                }`}
+              >
+                <div className="text-2xl mb-1">{opt.icon}</div>
+                <div className={`text-xs font-medium ${verifyType === opt.value ? 'text-blue-700' : 'text-gray-700'}`}>{opt.label}</div>
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* 其余表单字段: 仅当选了类型且可提交时显示
             - 资质/荣誉认证: 所有人(含超管)均可随时重复提交
             - 身份认证: 非超管且未通过、非审核中时可提交 */}
-        {(isQual || (!isSuperAdmin && !isApproved && !isPending && !isAiReviewing)) && (
+        {verifyType && (isQual || (!isSuperAdmin && !isApproved && !isPending && !isAiReviewing)) && (
           <>
-            {/* 第一步: 选择认证类型 */}
-            <div className="mb-3">
-              <label className="block text-sm font-medium text-gray-700 mb-2">选择认证类型</label>
-              <div className="grid grid-cols-2 gap-2">
-                {VERIFY_TYPE_OPTIONS.map(opt => (
-                  <button
-                    key={opt.value}
-                    onClick={() => { setVerifyType(opt.value); setTemplateId(''); setPhoto(''); }}
-                    className={`flex flex-col items-center justify-center rounded-xl border-2 p-3 transition ${
-                      verifyType === opt.value
-                        ? 'border-blue-500 bg-blue-50'
-                        : 'border-gray-200 bg-white hover:border-blue-300'
-                    }`}
-                  >
-                    <div className="text-2xl mb-1">{opt.icon}</div>
-                    <div className={`text-xs font-medium ${verifyType === opt.value ? 'text-blue-700' : 'text-gray-700'}`}>{opt.label}</div>
-                  </button>
-                ))}
-              </div>
-            </div>
-
             {/* 资质/荣誉认证: 填写名称 */}
             {isQual && (
               <div className="mb-3">
