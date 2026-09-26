@@ -13,6 +13,7 @@ const MAX_PHOTO_BYTES = 5 * 1024 * 1024;
 
 const SubmitSchema = z.object({
   photo: z.string().min(1).max(Math.ceil(MAX_PHOTO_BYTES * 4 / 3) + 100),
+  templateId: z.string().optional(),
 });
 
 export async function GET(req: NextRequest) {
@@ -61,6 +62,7 @@ export async function POST(req: NextRequest) {
       where: { id: me.id },
       data: {
         verificationPhoto: dto.photo,
+        verificationTemplateId: dto.templateId || null,
         verificationStatus: initStatus,
         verificationRejectReason: null,
         verificationAiResult: null,
@@ -69,7 +71,7 @@ export async function POST(req: NextRequest) {
 
     // 异步触发 AI 初审 (不阻塞响应)
     if (isVisionEnabled()) {
-      runAiReview(me.id, dto.photo).catch(e => console.error('[verification] AI review failed:', e));
+      runAiReview(me.id, dto.photo, dto.templateId || null).catch(e => console.error('[verification] AI review failed:', e));
     }
 
     return NextResponse.json({
@@ -87,12 +89,21 @@ export async function POST(req: NextRequest) {
 }
 
 // AI 初审: 判断是否校园卡 + 清晰度, 通过则进入人工复审, 不通过则直接驳回
-async function runAiReview(userId: string, photo: string) {
-  // 加载激活模板 (超级管理员配置的样图+框选字段)
-  const template = await prisma.verificationTemplate.findFirst({
-    where: { isActive: true },
-    select: { id: true, name: true, image: true, fields: true },
-  });
+async function runAiReview(userId: string, photo: string, templateId: string | null) {
+  // 优先使用用户选择的学校模板, 没选则用全局激活的模板
+  let template: any = null;
+  if (templateId) {
+    template = await prisma.verificationTemplate.findUnique({
+      where: { id: templateId },
+      select: { id: true, name: true, image: true, fields: true },
+    });
+  }
+  if (!template) {
+    template = await prisma.verificationTemplate.findFirst({
+      where: { isActive: true },
+      select: { id: true, name: true, image: true, fields: true },
+    });
+  }
   const result = await preliminaryReview(photo, template as any);
   if (!result) {
     // AI 调用失败, 转入人工复审

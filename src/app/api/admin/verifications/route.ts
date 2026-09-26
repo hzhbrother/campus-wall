@@ -32,6 +32,7 @@ export async function GET(req: NextRequest) {
         verified: true,
         verifiedAt: true,
         verificationPhoto: true,
+        verificationTemplateId: true,
         verificationStatus: true,
         verificationRejectReason: true,
         verificationAiResult: true,

@@ -594,12 +594,21 @@ function NotificationSettingsModal({ onClose }: { onClose: () => void }) {
 // ---------- 实名认证 / 资质认证弹窗 ----------
 function VerificationModal({ user, onClose, onVerified, onSubmitted }: { user: any; onClose: () => void; onVerified: () => void; onSubmitted?: () => void }) {
   const [photo, setPhoto] = useState<string>('');
+  const [templateId, setTemplateId] = useState<string>('');
+  const [schools, setSchools] = useState<{ id: string; name: string }[]>([]);
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState('');
   const inputRef = useRef<HTMLInputElement>(null);
   // 本地认证状态 (提交后用于实时展示进度, 轮询刷新)
   const [localStatus, setLocalStatus] = useState<string>(user.verificationStatus || 'NONE');
   const [localRejectReason, setLocalRejectReason] = useState<string>(user.verificationRejectReason || '');
+
+  // 加载学校列表
+  useEffect(() => {
+    api.get<{ templates: { id: string; name: string }[] }>('/api/verification-templates')
+      .then(d => setSchools(d.templates || []))
+      .catch(() => {});
+  }, []);
 
   const refreshStatus = useCallback(async () => {
     try {
@@ -617,8 +626,8 @@ function VerificationModal({ user, onClose, onVerified, onSubmitted }: { user: a
   const verifyLabel = isQualification ? '资质认证' : '实名认证';
   const photoLabel = isQualification ? '证明材料' : '校园卡';
   const photoDesc = isQualification
-    ? '请拍摄能证明您管理员身份的材料 (如工作证、聘书、在职证明等)'
-    : '请拍摄校园卡带人像的一面 (头像、姓名、卡号、班级清晰)';
+    ? '请拍摄能证明您管理员身份的材料'
+    : '请拍摄清晰的校园卡照片';
 
   const status = localStatus || user.verificationStatus || 'NONE';
   const isApproved = user.verified || status === 'APPROVED';
@@ -677,10 +686,11 @@ function VerificationModal({ user, onClose, onVerified, onSubmitted }: { user: a
   };
 
   const submit = async () => {
+    if (!templateId) { setMsg('请先选择学校'); return; }
     if (!photo) { setMsg('请先拍摄校园卡照片'); return; }
     setBusy(true); setMsg('');
     try {
-      const res: any = await api.post('/api/users/me/verification', { photo });
+      const res: any = await api.post('/api/users/me/verification', { photo, templateId });
       setMsg(res?.message || '认证申请已提交');
       // 刷新弹窗内进度 + 刷新整个资料页 (父页面实名认证状态同步更新)
       await refreshStatus();
@@ -767,8 +777,24 @@ function VerificationModal({ user, onClose, onVerified, onSubmitted }: { user: a
             <div className="rounded-xl bg-blue-50 p-3 mb-3">
               <div className="text-sm font-medium text-blue-800 mb-1">拍摄要求</div>
               <p className="text-xs text-blue-700">{photoDesc}</p>
-              <p className="text-xs text-blue-500 mt-1">仅支持手机现场拍照, 不支持从相册选择</p>
             </div>
+
+            {/* 学校选择 */}
+            {!isQualification && (
+              <div className="mb-3">
+                <label className="block text-sm font-medium text-gray-700 mb-1">选择学校</label>
+                <select
+                  value={templateId}
+                  onChange={e => setTemplateId(e.target.value)}
+                  className="w-full rounded-xl border border-gray-300 px-3 py-2.5 text-sm focus:border-blue-500 focus:outline-none"
+                >
+                  <option value="">请选择学校</option>
+                  {schools.map(s => (
+                    <option key={s.id} value={s.id}>{s.name}</option>
+                  ))}
+                </select>
+              </div>
+            )}
 
             {photo ? (
               <div className="relative mb-3">
@@ -783,7 +809,6 @@ function VerificationModal({ user, onClose, onVerified, onSubmitted }: { user: a
                   <circle cx="12" cy="13" r="4"/>
                 </svg>
                 <span className="text-sm text-blue-600 font-medium">点击拍摄{photoLabel}</span>
-                <span className="text-xs text-gray-400 mt-1">仅支持拍照, 不支持相册</span>
                 <input
                   ref={inputRef}
                   type="file"
@@ -797,7 +822,7 @@ function VerificationModal({ user, onClose, onVerified, onSubmitted }: { user: a
 
             {msg && <p className={`mb-3 text-sm ${msg.includes('已提交') ? 'text-green-600' : 'text-red-500'}`}>{msg}</p>}
 
-            <button onClick={submit} disabled={busy || !photo} className="w-full rounded-full bg-blue-600 py-3 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50">
+            <button onClick={submit} disabled={busy || !photo || (!isQualification && !templateId)} className="w-full rounded-full bg-blue-600 py-3 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50">
               {busy ? '提交中…' : '提交认证申请'}
             </button>
           </>

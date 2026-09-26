@@ -122,6 +122,7 @@ model User {
   verified      Boolean        @default(false) // 是否已认证 (实名/学生认证)
   verifiedAt    DateTime?      // 认证通过时间
   verificationPhoto String?    // 校园卡照片 (base64, 待审核/已驳回时保留)
+  verificationTemplateId String? // 用户认证时选择的学校模板 ID
   verificationStatus VerificationStatus @default(NONE) // 认证审核状态
   verificationRejectReason String? // 驳回原因
   verificationAiResult Json?  // AI 初审识别结果 (信息+边界框), 供人工复核参考
