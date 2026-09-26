@@ -91,6 +91,13 @@ enum VerificationStatus {
   REJECTED     // 已驳回 (AI 初审驳回 或 人工驳回)
 }
 
+// 认证模板类型: 学生认证(校园卡) / 老师认证(工作证) / 资质认证(学生会/广播站等岗位证明)
+enum VerificationTemplateType {
+  STUDENT
+  TEACHER
+  QUALIFICATION
+}
+
 enum NotificationTarget {
   ALL      // 全体用户
   ROLE     // 按角色
@@ -123,6 +130,7 @@ model User {
   verifiedAt    DateTime?      // 认证通过时间
   verificationPhoto String?    // 校园卡照片 (base64, 待审核/已驳回时保留)
   verificationTemplateId String? // 用户认证时选择的学校模板 ID
+  verificationTemplate   VerificationTemplate? @relation(fields: [verificationTemplateId], references: [id])
   verificationStatus VerificationStatus @default(NONE) // 认证审核状态
   verificationRejectReason String? // 驳回原因
   verificationAiResult Json?  // AI 初审识别结果 (信息+边界框), 供人工复核参考
@@ -174,11 +182,14 @@ model Role {
 model VerificationTemplate {
   id        String   @id @default(cuid())
   name      String            // 模板名称, 如 "一中校园卡"
+  type      VerificationTemplateType @default(STUDENT) // 学生认证 / 老师认证
   image     String            // 样图 base64
   fields    Json     @default("[]") // [{ name: "姓名", bbox: {x,y,w,h} }] 归一化坐标
   isActive  Boolean  @default(false)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+
+  users     User[]
 }
 
 // 第三方账号绑定 (一个用户可绑定多个平台)

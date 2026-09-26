@@ -38,6 +38,7 @@ export async function GET(req: NextRequest) {
         verificationAiResult: true,
         createdAt: true,
         updatedAt: true,
+        verificationTemplate: { select: { id: true, name: true, type: true } },
       },
       take: 100,
     });

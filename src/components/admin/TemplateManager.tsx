@@ -11,11 +11,18 @@ interface TplField {
 interface Tpl {
   id: string;
   name: string;
+  type: 'STUDENT' | 'TEACHER' | 'QUALIFICATION';
   image: string;
   fields: TplField[];
   isActive: boolean;
   createdAt: string;
 }
+
+const TYPE_LABELS: Record<string, string> = {
+  STUDENT: '学生认证',
+  TEACHER: '老师认证',
+  QUALIFICATION: '资质认证',
+};
 
 const COLORS = ['#10b981', '#3b82f6', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899', '#06b6d4', '#84cc16'];
 
@@ -30,6 +37,7 @@ export default function TemplateManager() {
 
   // 新建模板表单
   const [tplName, setTplName] = useState('');
+  const [tplType, setTplType] = useState<'STUDENT' | 'TEACHER' | 'QUALIFICATION'>('STUDENT');
   const [image, setImage] = useState<string>('');
   const [fields, setFields] = useState<TplField[]>([]);
 
@@ -122,7 +130,7 @@ export default function TemplateManager() {
   };
 
   const resetForm = () => {
-    setCreating(false); setTplName(''); setImage(''); setFields([]);
+    setCreating(false); setTplName(''); setTplType('STUDENT'); setImage(''); setFields([]);
     setCurBox(null); setDrawing(null); setShowNameDialog(false);
   };
 
@@ -131,7 +139,7 @@ export default function TemplateManager() {
     if (!image) { alert('请上传样图'); return; }
     if (fields.length === 0) { alert('请至少框选一个字段'); return; }
     try {
-      await api.post('/api/admin/verification-templates', { name: tplName.trim(), image, fields });
+      await api.post('/api/admin/verification-templates', { name: tplName.trim(), type: tplType, image, fields });
       resetForm();
       await load();
     } catch (e: any) { alert(e.message || '保存失败'); }
@@ -179,8 +187,9 @@ export default function TemplateManager() {
               <div key={t.id} className="border border-gray-200 rounded-xl p-3 flex gap-3 items-center">
                 <img src={t.image} alt="" className="w-24 h-16 object-cover rounded border" />
                 <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-2 flex-wrap">
                     <span className="font-medium">{t.name}</span>
+                    <span className="text-xs bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded">{TYPE_LABELS[t.type] || t.type}</span>
                     {t.isActive && <span className="text-xs bg-green-100 text-green-700 px-1.5 py-0.5 rounded">已激活</span>}
                   </div>
                   <div className="text-xs text-gray-500 mt-1">
@@ -203,13 +212,22 @@ export default function TemplateManager() {
       {/* 新建模板 */}
       {creating && (
         <div className="space-y-4">
-          <div className="flex gap-3 items-center">
+          <div className="flex gap-3 items-center flex-wrap">
             <input
               value={tplName}
               onChange={(e) => setTplName(e.target.value)}
               placeholder="模板名称, 如: 一中校园卡"
-              className="flex-1 px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-500"
+              className="flex-1 min-w-[140px] px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-500"
             />
+            <select
+              value={tplType}
+              onChange={(e) => setTplType(e.target.value as any)}
+              className="px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-500"
+            >
+              <option value="STUDENT">学生认证</option>
+              <option value="TEACHER">老师认证</option>
+              <option value="QUALIFICATION">资质认证</option>
+            </select>
             <label className="px-3 py-2 text-sm bg-gray-100 rounded-lg cursor-pointer hover:bg-gray-200">
               {image ? '重新上传样图' : '上传样图'}
               <input type="file" accept="image/*" onChange={onUpload} className="hidden" />

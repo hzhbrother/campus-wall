@@ -370,11 +370,10 @@ function ProfilePageInner() {
   }
 
   // ---- 首页视图 ----
-  const verifyMenuLabel = user?.role === 'ADMIN' ? '资质认证' : user?.role === 'SUPER_ADMIN' ? '资质认证' : '实名认证';
   const menuItems = [
     { key: 'homepage', label: '我的主页', icon: '🏠' },
     { key: 'favorites', label: '我的收藏', icon: '⭐' },
-    { key: 'verification', label: verifyMenuLabel, icon: '✅' },
+    { key: 'verification', label: '认证', icon: '✅' },
     { key: 'password', label: '修改密码', icon: '🔑' },
     { key: 'notif-settings', label: '通知设置', icon: '🔔' },
     { key: 'violations', label: '违规记录', icon: '📋' },
@@ -615,11 +614,20 @@ function NotificationSettingsModal({ onClose }: { onClose: () => void }) {
   );
 }
 
-// ---------- 实名认证 / 资质认证弹窗 ----------
+// ---------- 认证弹窗 (学生认证 / 老师认证 / 资质认证) ----------
+type VerifyType = 'STUDENT' | 'TEACHER' | 'QUALIFICATION';
+
+const VERIFY_TYPE_OPTIONS: { value: VerifyType; label: string; icon: string; desc: string }[] = [
+  { value: 'STUDENT', label: '学生认证', icon: '🎓', desc: '上传校园卡 / 学生证' },
+  { value: 'TEACHER', label: '老师认证', icon: '👨‍🏫', desc: '上传教师工作证 / 工牌' },
+  { value: 'QUALIFICATION', label: '资质认证', icon: '🏅', desc: '学生会 / 广播站等岗位证明' },
+];
+
 function VerificationModal({ user, onClose, onVerified, onSubmitted }: { user: any; onClose: () => void; onVerified: () => void; onSubmitted?: () => void }) {
   const [photo, setPhoto] = useState<string>('');
   const [templateId, setTemplateId] = useState<string>('');
-  const [schools, setSchools] = useState<{ id: string; name: string }[]>([]);
+  const [verifyType, setVerifyType] = useState<VerifyType | ''>('');
+  const [templates, setTemplates] = useState<{ id: string; name: string; type: string; image: string; isActive: boolean }[]>([]);
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState('');
   const inputRef = useRef<HTMLInputElement>(null);
@@ -627,12 +635,13 @@ function VerificationModal({ user, onClose, onVerified, onSubmitted }: { user: a
   const [localStatus, setLocalStatus] = useState<string>(user.verificationStatus || 'NONE');
   const [localRejectReason, setLocalRejectReason] = useState<string>(user.verificationRejectReason || '');
 
-  // 加载学校列表
+  // 根据所选认证类型加载对应模板
   useEffect(() => {
-    api.get<{ templates: { id: string; name: string }[] }>('/api/verification-templates')
-      .then(d => setSchools(d.templates || []))
-      .catch(() => {});
-  }, []);
+    if (!verifyType) { setTemplates([]); return; }
+    api.get<{ templates: { id: string; name: string; type: string; image: string; isActive: boolean }[] }>(`/api/verification-templates?type=${verifyType}`)
+      .then(d => setTemplates(d.templates || []))
+      .catch(() => setTemplates([]));
+  }, [verifyType]);
 
   const refreshStatus = useCallback(async () => {
     try {
@@ -644,14 +653,10 @@ function VerificationModal({ user, onClose, onVerified, onSubmitted }: { user: a
   }, [onVerified]);
 
   const role = user.role || 'STUDENT';
-  // 认证类型: 学生/教师走实名认证(校园卡), 管理员走资质认证(证明材料), 超级管理员自动已认证
-  const isQualification = role === 'ADMIN';
   const isSuperAdmin = role === 'SUPER_ADMIN';
-  const verifyLabel = isQualification ? '资质认证' : '实名认证';
-  const photoLabel = isQualification ? '证明材料' : '校园卡';
-  const photoDesc = isQualification
-    ? '请拍摄能证明您管理员身份的材料'
-    : '请拍摄清晰的校园卡照片';
+  const currentTypeMeta = VERIFY_TYPE_OPTIONS.find(o => o.value === verifyType);
+  const verifyLabel = currentTypeMeta?.label || '认证';
+  const photoLabel = verifyType === 'STUDENT' ? '校园卡' : verifyType === 'TEACHER' ? '工作证' : '证明材料';
 
   const status = localStatus || user.verificationStatus || 'NONE';
   const isApproved = user.verified || status === 'APPROVED';
@@ -710,18 +715,20 @@ function VerificationModal({ user, onClose, onVerified, onSubmitted }: { user: a
   };
 
   const submit = async () => {
-    if (!templateId) { setMsg('请先选择学校'); return; }
-    if (!photo) { setMsg('请先拍摄校园卡照片'); return; }
+    if (!templateId) { setMsg('请先选择模板'); return; }
+    if (!photo) { setMsg(`请先拍摄${photoLabel}照片`); return; }
     setBusy(true); setMsg('');
     try {
       const res: any = await api.post('/api/users/me/verification', { photo, templateId });
       setMsg(res?.message || '认证申请已提交');
-      // 刷新弹窗内进度 + 刷新整个资料页 (父页面实名认证状态同步更新)
       await refreshStatus();
       onSubmitted?.();
       setPhoto('');
     } catch (e: any) { setMsg(e.message); } finally { setBusy(false); }
   };
+
+  // 选中的模板 (用于显示案例图)
+  const selectedTemplate = templates.find(t => t.id === templateId);
 
   return (
     <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/50 sm:items-center" onClick={onClose}>
@@ -746,9 +753,7 @@ function VerificationModal({ user, onClose, onVerified, onSubmitted }: { user: a
           </div>
         ) : inProgress ? (
           <div className="rounded-xl bg-amber-50 p-4">
-            {/* 进度条 */}
             <div className="relative flex items-center justify-between px-1 mb-3">
-              {/* 背景连接线 */}
               <div className="absolute left-4 right-4 top-3.5 h-0.5 bg-gray-200" />
               <div className={`absolute left-4 top-3.5 h-0.5 bg-amber-400 transition-all`} style={{ width: `calc(${(progressStep / 3) * 100}% - 1rem)` }} />
               {[
@@ -798,57 +803,102 @@ function VerificationModal({ user, onClose, onVerified, onSubmitted }: { user: a
         {/* 未通过且非审核中时可提交 */}
         {!isSuperAdmin && !isApproved && !isPending && !isAiReviewing && (
           <>
-            <div className="rounded-xl bg-blue-50 p-3 mb-3">
-              <div className="text-sm font-medium text-blue-800 mb-1">拍摄要求</div>
-              <p className="text-xs text-blue-700">{photoDesc}</p>
+            {/* 第一步: 选择认证类型 */}
+            <div className="mb-3">
+              <label className="block text-sm font-medium text-gray-700 mb-2">选择认证类型</label>
+              <div className="grid grid-cols-3 gap-2">
+                {VERIFY_TYPE_OPTIONS.map(opt => (
+                  <button
+                    key={opt.value}
+                    onClick={() => { setVerifyType(opt.value); setTemplateId(''); setPhoto(''); }}
+                    className={`flex flex-col items-center justify-center rounded-xl border-2 p-3 transition ${
+                      verifyType === opt.value
+                        ? 'border-blue-500 bg-blue-50'
+                        : 'border-gray-200 bg-white hover:border-blue-300'
+                    }`}
+                  >
+                    <div className="text-2xl mb-1">{opt.icon}</div>
+                    <div className={`text-xs font-medium ${verifyType === opt.value ? 'text-blue-700' : 'text-gray-700'}`}>{opt.label}</div>
+                  </button>
+                ))}
+              </div>
             </div>
 
-            {/* 学校选择 */}
-            {!isQualification && (
-              <div className="mb-3">
-                <label className="block text-sm font-medium text-gray-700 mb-1">选择学校</label>
-                <select
-                  value={templateId}
-                  onChange={e => setTemplateId(e.target.value)}
-                  className="w-full rounded-xl border border-gray-300 px-3 py-2.5 text-sm focus:border-blue-500 focus:outline-none"
-                >
-                  <option value="">请选择学校</option>
-                  {schools.map(s => (
-                    <option key={s.id} value={s.id}>{s.name}</option>
-                  ))}
-                </select>
-              </div>
+            {/* 第二步: 选择模板 + 显示案例图 + 注意事项 */}
+            {verifyType && (
+              <>
+                <div className="mb-3">
+                  <label className="block text-sm font-medium text-gray-700 mb-1">选择模板</label>
+                  {templates.length === 0 ? (
+                    <div className="rounded-xl bg-gray-50 p-4 text-center text-xs text-gray-400">
+                      暂无{currentTypeMeta?.label}模板, 请联系管理员添加
+                    </div>
+                  ) : (
+                    <select
+                      value={templateId}
+                      onChange={e => setTemplateId(e.target.value)}
+                      className="w-full rounded-xl border border-gray-300 px-3 py-2.5 text-sm focus:border-blue-500 focus:outline-none"
+                    >
+                      <option value="">请选择模板</option>
+                      {templates.map(t => (
+                        <option key={t.id} value={t.id}>{t.name}</option>
+                      ))}
+                    </select>
+                  )}
+                </div>
+
+                {/* 选中模板后显示案例图 + 注意事项 */}
+                {selectedTemplate && selectedTemplate.image && (
+                  <div className="mb-3">
+                    <div className="text-xs font-medium text-gray-600 mb-1.5">模板示例 (请参照此样式拍摄)</div>
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src={selectedTemplate.image} alt="模板示例" className="w-full rounded-xl border border-gray-200" />
+                  </div>
+                )}
+
+                {/* 拍摄注意事项 */}
+                <div className="rounded-xl bg-amber-50 p-3 mb-3">
+                  <div className="text-sm font-medium text-amber-800 mb-1.5">📸 拍摄注意事项</div>
+                  <ul className="text-xs text-amber-700 space-y-1 list-disc list-inside">
+                    <li>请将{photoLabel}平放, 保持画面端正, 不要倾斜</li>
+                    <li>确保照片清晰, 文字和头像可辨认, 避免模糊</li>
+                    <li>光线充足, 避免反光、阴影遮挡关键信息</li>
+                    <li>只拍摄{photoLabel}本身, 不要包含其他杂物</li>
+                    <li>照片需完整显示{photoLabel}的全部内容</li>
+                  </ul>
+                </div>
+
+                {photo ? (
+                  <div className="relative mb-3">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src={photo} alt={photoLabel} className="w-full rounded-xl border border-gray-200" />
+                    <button onClick={() => setPhoto('')} className="absolute top-2 right-2 h-7 w-7 rounded-full bg-black/60 text-white text-sm">✕</button>
+                  </div>
+                ) : (
+                  <label className="flex flex-col items-center justify-center w-full rounded-xl border-2 border-dashed border-gray-300 py-8 mb-3 cursor-pointer hover:border-blue-400 hover:bg-blue-50/50 transition">
+                    <svg className="h-10 w-10 text-gray-400 mb-2" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+                      <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z" strokeLinecap="round" strokeLinejoin="round"/>
+                      <circle cx="12" cy="13" r="4"/>
+                    </svg>
+                    <span className="text-sm text-blue-600 font-medium">点击拍摄{photoLabel}</span>
+                    <input
+                      ref={inputRef}
+                      type="file"
+                      accept="image/*"
+                      capture="environment"
+                      className="hidden"
+                      onChange={onCapture}
+                    />
+                  </label>
+                )}
+
+                {msg && <p className={`mb-3 text-sm ${msg.includes('已提交') ? 'text-green-600' : 'text-red-500'}`}>{msg}</p>}
+
+                <button onClick={submit} disabled={busy || !photo || !templateId} className="w-full rounded-full bg-blue-600 py-3 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50">
+                  {busy ? '提交中…' : `提交${verifyLabel}申请`}
+                </button>
+              </>
             )}
-
-            {photo ? (
-              <div className="relative mb-3">
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={photo} alt={photoLabel} className="w-full rounded-xl border border-gray-200" />
-                <button onClick={() => setPhoto('')} className="absolute top-2 right-2 h-7 w-7 rounded-full bg-black/60 text-white text-sm">✕</button>
-              </div>
-            ) : (
-              <label className="flex flex-col items-center justify-center w-full rounded-xl border-2 border-dashed border-gray-300 py-8 mb-3 cursor-pointer hover:border-blue-400 hover:bg-blue-50/50 transition">
-                <svg className="h-10 w-10 text-gray-400 mb-2" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
-                  <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z" strokeLinecap="round" strokeLinejoin="round"/>
-                  <circle cx="12" cy="13" r="4"/>
-                </svg>
-                <span className="text-sm text-blue-600 font-medium">点击拍摄{photoLabel}</span>
-                <input
-                  ref={inputRef}
-                  type="file"
-                  accept="image/*"
-                  capture="environment"
-                  className="hidden"
-                  onChange={onCapture}
-                />
-              </label>
-            )}
-
-            {msg && <p className={`mb-3 text-sm ${msg.includes('已提交') ? 'text-green-600' : 'text-red-500'}`}>{msg}</p>}
-
-            <button onClick={submit} disabled={busy || !photo || (!isQualification && !templateId)} className="w-full rounded-full bg-blue-600 py-3 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50">
-              {busy ? '提交中…' : '提交认证申请'}
-            </button>
           </>
         )}
 

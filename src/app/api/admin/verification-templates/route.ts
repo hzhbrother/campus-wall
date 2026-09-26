@@ -2,7 +2,7 @@
 // POST /api/admin/verification-templates        创建模板
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
-import { UserRole } from '@prisma/client';
+import { UserRole, VerificationTemplateType } from '@prisma/client';
 import { requireRole } from '@/lib/server-auth';
 import { prisma } from '@/lib/prisma';
 import { errorResponse } from '@/lib/api-response';
@@ -19,6 +19,7 @@ const FieldSchema = z.object({
 
 const CreateSchema = z.object({
   name: z.string().min(1).max(30),
+  type: z.nativeEnum(VerificationTemplateType).default(VerificationTemplateType.STUDENT),
   image: z.string().min(1),
   fields: z.array(FieldSchema).max(20),
 });
@@ -41,7 +42,7 @@ export async function POST(req: NextRequest) {
     const dto = CreateSchema.parse(await req.json());
     // 新建模板默认非激活
     const tpl = await prisma.verificationTemplate.create({
-      data: { name: dto.name, image: dto.image, fields: dto.fields as any },
+      data: { name: dto.name, type: dto.type, image: dto.image, fields: dto.fields as any },
     });
     return NextResponse.json({ message: '模板创建成功', template: tpl }, { status: 201 });
   } catch (e: any) {

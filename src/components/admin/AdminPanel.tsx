@@ -2200,7 +2200,14 @@ function VerificationReviewTab() {
                       {u.avatar ? <img src={u.avatar} alt="" className="h-full w-full object-cover" /> : (u.nickname || 'U')[0]}
                     </div>
                     <div>
-                      <div className="text-sm font-medium text-gray-900">{u.nickname} <span className="text-gray-400 font-normal">· {u.role}</span></div>
+                      <div className="text-sm font-medium text-gray-900 flex items-center gap-1.5">
+                        {u.nickname} <span className="text-gray-400 font-normal">· {u.role}</span>
+                        {u.verificationTemplate?.type && (
+                          <span className="text-[10px] bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded">
+                            {u.verificationTemplate.type === 'STUDENT' ? '学生认证' : u.verificationTemplate.type === 'TEACHER' ? '老师认证' : '资质认证'}
+                          </span>
+                        )}
+                      </div>
                       <div className="text-xs text-gray-400">{u.realName || '未填写真名'} {u.studentId ? `· 学号 ${u.studentId}` : ''} {u.grade ? `· ${u.grade}${u.className || ''}` : ''}</div>
                     </div>
                   </div>
