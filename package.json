@@ -2,7 +2,7 @@
   "name": "campus-wall",
   "version": "1.1.0.3",
   "private": true,
-  "description": "校园墙全栈应用 (Next.js App Router + Prisma + Neon)",
+  "description": "校园墙全栈应用 (Next.js App Router + Prisma + Supabase)",
   "scripts": {
     "dev": "next dev -p 3000",
     "build": "prisma generate && prisma db push --accept-data-loss && next build",

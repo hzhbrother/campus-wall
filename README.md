@@ -6,7 +6,7 @@
 
 ![首页预览](docs/homepage.png)
 
-**技术栈**: Next.js 14 (App Router) + Prisma ORM + PostgreSQL (Neon) + TailwindCSS。前后端同源，一键部署到 Vercel。
+**技术栈**: Next.js 14 (App Router) + Prisma ORM + PostgreSQL (Supabase) + TailwindCSS。前后端同源，一键部署到 Vercel。
 
 ## 📌 版本说明
 
@@ -103,7 +103,7 @@ npm install
 
 # 2. 配置环境变量
 cp .env.example .env.local
-# 在 .env.local 填入 DATABASE_URL (Neon 连接串) 和 JWT_SECRET
+# 在 .env.local 填入 DATABASE_URL / DIRECT_URL (Supabase 连接串) 和 JWT_SECRET
 
 # 3. 生成 Prisma Client + 推送表结构 + 初始化数据
 npm run prisma:generate
@@ -117,15 +117,18 @@ npm run dev
 # → http://localhost:3000 (前后端同源, API 在 /api/*)
 ```
 
-## 部署到 Vercel + Neon (推荐路径)
+## 部署到 Vercel + Supabase (推荐路径)
 
-### 1. 准备 Neon 数据库
+### 1. 准备 Supabase 数据库
 
-1. 访问 https://neon.tech 注册并登录
-2. 新建一个 Project, 区域选离 Vercel 近的 (如 `AWS Asia Pacific (Singapore)`)
-3. 在 Connection Details 拿到连接串 (勾选 "Pooled connection" 更适合 serverless)
-   - 形如 `postgresql://user:pass@ep-xxx.aws.neon.tech/neondb?sslmode=require`
-4. 复制保存
+1. 访问 https://supabase.com 注册并登录
+2. 新建一个 Project, 区域选离 Vercel 近的 (如 `Southeast Asia (Singapore)`), 记住设置的数据库密码
+3. 打开顶部 "Connect" 按钮, 获取两条连接串:
+   - **DATABASE_URL** (应用运行时): 选 **Transaction pooler** (端口 6543), 末尾加 `?pgbouncer=true&connection_limit=1`
+     - 形如 `postgresql://postgres.<项目ref>:<密码>@aws-0-<区域>.pooler.supabase.com:6543/postgres?pgbouncer=true&connection_limit=1`
+   - **DIRECT_URL** (建表/seed 直连): 选 **Session pooler** (端口 5432)
+     - 形如 `postgresql://postgres.<项目ref>:<密码>@aws-0-<区域>.pooler.supabase.com:5432/postgres`
+4. 复制保存两条连接串
 
 ### 2. 推送代码到 GitHub
 
@@ -149,11 +152,11 @@ gh repo create campus-wall --public --source=. --push
 
 ### 3. 初始化数据库表结构
 
-Prisma 表结构需要在 Neon 上初始化。两种方式二选一:
+Prisma 表结构需要在 Supabase 上初始化。两种方式二选一:
 
-**方式 A (本地连库)**: 把 Neon 连接串填到 `.env.local`, 运行 `npm run prisma:db:push && npm run prisma:db:seed`。
+**方式 A (本地连库)**: 把 Supabase 两条连接串填到 `.env.local`, 运行 `npm run prisma:db:push && npm run prisma:db:seed`。
 
-**方式 B (用 Prisma 数据浏览器)**: Neon 控制台自带 SQL Editor, 也可手动跑 schema.prisma 转换出的 SQL (但 seed 推荐用方式 A 跑)。
+**方式 B (用 SQL Editor)**: Supabase 控制台自带 SQL Editor, 也可手动跑 schema.prisma 转换出的 SQL (但 seed 推荐用方式 A 跑)。
 
 ### 4. 在 Vercel 导入项目
 
@@ -167,7 +170,8 @@ Prisma 表结构需要在 Neon 上初始化。两种方式二选一:
 
 | Key | Value | 说明 |
 |---|---|---|
-| `DATABASE_URL` | Neon 连接串 | 必填 |
+| `DATABASE_URL` | Supabase Transaction pooler 连接串 (6543) | 必填 |
+| `DIRECT_URL` | Supabase Session pooler 连接串 (5432) | 必填 |
 | `JWT_SECRET` | 32+ 字符随机串 | 必填, 可用 `openssl rand -hex 32` 生成 |
 | `JWT_EXPIRES_IN` | `7d` | |
 | `SEED_SUPER_ADMIN_EMAIL` | `admin@campus.edu` | |
@@ -197,7 +201,7 @@ Prisma 表结构需要在 Neon 上初始化。两种方式二选一:
 
 如果第 3 步用的是方式 A (本地 seed), 超级管理员已经创建好了, 直接用 `admin@campus.edu / Admin@12345` 登录。
 
-如果没 seed, Vercel 上没法直接跑 `tsx prisma/seed.ts` (serverless 没常驻命令), 推荐做法: **本地用 Neon 连接串跑一次 `npm run prisma:db:seed`** (Neon 是公网可达的, 本地连过去 seed 即可), 完成后生产环境就有这个管理员了。
+如果没 seed, Vercel 上没法直接跑 `tsx prisma/seed.ts` (serverless 没常驻命令), 推荐做法: **本地用 Supabase 连接串跑一次 `npm run prisma:db:seed`** (Supabase 是公网可达的, 本地连过去 seed 即可), 完成后生产环境就有这个管理员了。
 
 ## 主要 API 速览 (同源 /api/*)
 
@@ -318,7 +322,7 @@ Prisma 表结构需要在 Neon 上初始化。两种方式二选一:
 #### 📦 技术栈
 
 - Next.js 14 (App Router)
-- Prisma ORM + PostgreSQL (Neon)
+- Prisma ORM + PostgreSQL (Supabase)
 - TailwindCSS
 - JWT 认证 + bcryptjs 密码哈希
 - Nodemailer 邮件服务

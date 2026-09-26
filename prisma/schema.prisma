@@ -1,5 +1,5 @@
 // 校园墙 Prisma schema
-// 数据库: PostgreSQL (Neon / 自建均可)
+// 数据库: PostgreSQL (Supabase / Neon / 自建均可)
 
 generator client {
   provider = "prisma-client-js"
@@ -8,7 +8,8 @@ generator client {
 datasource db {
   provider  = "postgresql"
   url       = env("DATABASE_URL")
-  directUrl = env("DATABASE_URL")
+  // db push / migrate 需要直连; Supabase 填 Session pooler (5432) 连接串
+  directUrl = env("DIRECT_URL")
 }
 
 // ---- 枚举 ----
