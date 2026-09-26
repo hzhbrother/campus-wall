@@ -347,10 +347,11 @@ function ProfilePageInner() {
   }
 
   // ---- 首页视图 ----
+  const verifyMenuLabel = user?.role === 'ADMIN' ? '资质认证' : user?.role === 'SUPER_ADMIN' ? '资质认证' : '实名认证';
   const menuItems = [
     { key: 'homepage', label: '我的主页', icon: '🏠' },
     { key: 'favorites', label: '我的收藏', icon: '⭐' },
-    { key: 'verification', label: '实名认证', icon: '✅' },
+    { key: 'verification', label: verifyMenuLabel, icon: '✅' },
     { key: 'password', label: '修改密码', icon: '🔑' },
     { key: 'notif-settings', label: '通知设置', icon: '🔔' },
     { key: 'violations', label: '违规记录', icon: '📋' },
@@ -582,12 +583,22 @@ function NotificationSettingsModal({ onClose }: { onClose: () => void }) {
   );
 }
 
-// ---------- 实名认证弹窗 ----------
+// ---------- 实名认证 / 资质认证弹窗 ----------
 function VerificationModal({ user, onClose, onVerified }: { user: any; onClose: () => void; onVerified: () => void }) {
   const [photo, setPhoto] = useState<string>('');
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState('');
   const inputRef = useRef<HTMLInputElement>(null);
+
+  const role = user.role || 'STUDENT';
+  // 认证类型: 学生/教师走实名认证(校园卡), 管理员走资质认证(证明材料), 超级管理员自动已认证
+  const isQualification = role === 'ADMIN';
+  const isSuperAdmin = role === 'SUPER_ADMIN';
+  const verifyLabel = isQualification ? '资质认证' : '实名认证';
+  const photoLabel = isQualification ? '证明材料' : '校园卡';
+  const photoDesc = isQualification
+    ? '请拍摄能证明您管理员身份的材料 (如工作证、聘书、在职证明等)'
+    : '请拍摄校园卡带人像的一面 (头像、姓名、卡号、班级清晰)';
 
   const status = user.verificationStatus || 'NONE';
   const isApproved = user.verified || status === 'APPROVED';
@@ -647,47 +658,50 @@ function VerificationModal({ user, onClose, onVerified }: { user: any; onClose: 
     <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/50 sm:items-center" onClick={onClose}>
       <div className="w-full max-w-md rounded-t-3xl bg-white p-5 pb-8 sm:rounded-2xl" onClick={e => e.stopPropagation()}>
         <div className="flex items-center justify-between mb-4">
-          <h3 className="text-lg font-bold text-gray-900">实名认证</h3>
+          <h3 className="text-lg font-bold text-gray-900">{verifyLabel}</h3>
           <button onClick={onClose} className="text-gray-400 hover:text-gray-600 text-xl">✕</button>
         </div>
 
-        {/* 状态展示 */}
-        {isApproved ? (
+        {/* 超级管理员: 自动已认证 */}
+        {isSuperAdmin ? (
           <div className="rounded-xl bg-green-50 p-4 text-center">
             <div className="text-3xl mb-1">✅</div>
             <div className="text-sm font-medium text-green-700">已认证</div>
+            <div className="text-xs text-green-600 mt-1">超级管理员身份自动通过认证</div>
+          </div>
+        ) : isApproved ? (
+          <div className="rounded-xl bg-green-50 p-4 text-center">
+            <div className="text-3xl mb-1">✅</div>
+            <div className="text-sm font-medium text-green-700">已{verifyLabel}</div>
             {user.verifiedAt && <div className="text-xs text-green-600 mt-1">认证时间: {new Date(user.verifiedAt).toLocaleDateString('zh-CN')}</div>}
           </div>
         ) : isPending ? (
           <div className="rounded-xl bg-amber-50 p-4 text-center">
             <div className="text-3xl mb-1">⏳</div>
             <div className="text-sm font-medium text-amber-700">审核中</div>
-            <div className="text-xs text-amber-600 mt-1">管理员正在审核您的认证申请, 请耐心等待</div>
+            <div className="text-xs text-amber-600 mt-1">管理员正在审核您的{verifyLabel}申请, 请耐心等待</div>
           </div>
         ) : isRejected ? (
           <div className="rounded-xl bg-red-50 p-4 mb-3">
             <div className="text-sm font-medium text-red-700">❌ 认证被驳回</div>
             {user.verificationRejectReason && <div className="text-xs text-red-600 mt-1">原因: {user.verificationRejectReason}</div>}
-            <div className="text-xs text-red-500 mt-1">请重新拍摄清晰的校园卡照片后再次提交</div>
+            <div className="text-xs text-red-500 mt-1">请重新拍摄清晰的{photoLabel}照片后再次提交</div>
           </div>
         ) : null}
 
-        {/* 未通过时可重新提交 */}
-        {!isApproved && !isPending && (
+        {/* 未通过且非超管时可提交 */}
+        {!isSuperAdmin && !isApproved && !isPending && (
           <>
             <div className="rounded-xl bg-blue-50 p-3 mb-3">
               <div className="text-sm font-medium text-blue-800 mb-1">拍摄要求</div>
-              <ul className="text-xs text-blue-700 space-y-0.5 list-disc pl-4">
-                <li>请拍摄校园卡<span className="font-semibold">带人像的一面</span></li>
-                <li>照片中需清晰可见: <span className="font-semibold">头像、姓名、卡号、班级</span></li>
-                <li>仅支持手机现场拍照, 不支持从相册选择</li>
-              </ul>
+              <p className="text-xs text-blue-700">{photoDesc}</p>
+              <p className="text-xs text-blue-500 mt-1">仅支持手机现场拍照, 不支持从相册选择</p>
             </div>
 
             {photo ? (
               <div className="relative mb-3">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={photo} alt="校园卡" className="w-full rounded-xl border border-gray-200" />
+                <img src={photo} alt={photoLabel} className="w-full rounded-xl border border-gray-200" />
                 <button onClick={() => setPhoto('')} className="absolute top-2 right-2 h-7 w-7 rounded-full bg-black/60 text-white text-sm">✕</button>
               </div>
             ) : (
@@ -696,7 +710,7 @@ function VerificationModal({ user, onClose, onVerified }: { user: any; onClose: 
                   <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z" strokeLinecap="round" strokeLinejoin="round"/>
                   <circle cx="12" cy="13" r="4"/>
                 </svg>
-                <span className="text-sm text-blue-600 font-medium">点击拍摄校园卡</span>
+                <span className="text-sm text-blue-600 font-medium">点击拍摄{photoLabel}</span>
                 <span className="text-xs text-gray-400 mt-1">仅支持拍照, 不支持相册</span>
                 <input
                   ref={inputRef}

@@ -53,7 +53,7 @@ export default function NewPostPage() {
     if (!loading && !user) router.push('/login');
   }, [loading, user, router]);
 
-  // 发帖需实名认证 (管理员/超级管理员绕过)
+  // 发帖需实名认证 (管理员/超级管理员默认已认证)
   const isAdmin = user?.role === 'ADMIN' || user?.role === 'SUPER_ADMIN';
   const canPost = !!user?.verified || isAdmin;
 

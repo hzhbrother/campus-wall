@@ -18,6 +18,10 @@ export async function GET(req: NextRequest) {
       where: { post: { authorId: me.id } },
     });
     const data = sanitize(user) as any;
+    // 管理员/超级管理员默认已认证
+    if (data.role === 'ADMIN' || data.role === 'SUPER_ADMIN') {
+      data.verified = true;
+    }
     data._count = { ...data._count, likesReceived };
     return Response.json(data);
   } catch (e) {

@@ -15,11 +15,13 @@ export async function GET(_req: NextRequest, { params }: { params: { id: string 
       },
     });
     if (!user) return NextResponse.json({ message: '用户不存在' }, { status: 404 });
+    // 管理员/超级管理员默认已认证
+    const verified = user.verified || user.role === 'ADMIN' || user.role === 'SUPER_ADMIN';
     // 获赞数: 用户所有帖子收到的点赞总数
     const likesReceived = await prisma.like.count({
       where: { post: { authorId: params.id } },
     });
-    return NextResponse.json({ ...user, _count: { ...user._count, likesReceived } });
+    return NextResponse.json({ ...user, verified, _count: { ...user._count, likesReceived } });
   } catch (e) {
     return errorResponse(e);
   }

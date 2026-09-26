@@ -56,11 +56,13 @@ export async function POST(req: NextRequest) {
     if (!me) return NextResponse.json({ message: '未登录' }, { status: 401 });
     if (isUserBanned(me)) return NextResponse.json({ message: '账号已被封禁, 暂不能发帖' }, { status: 403 });
 
-    // 发帖需实名认证 (管理员/超级管理员绕过)
-    const isAdmin = me.role === UserRole.ADMIN || me.role === UserRole.SUPER_ADMIN;
-    if (!isAdmin && !me.verified) {
+    // 发帖需实名认证 (所有用户均需认证, 含管理员)
+    if (!me.verified) {
       return NextResponse.json({ message: '请先完成实名认证后再发帖', status: 'UNVERIFIED' }, { status: 403 });
     }
+
+    // 管理员/超级管理员发帖直通审核
+    const isAdmin = me.role === UserRole.ADMIN || me.role === UserRole.SUPER_ADMIN;
 
     // 读取站点配置
     const [categories, allowAnonymous, requiresApproval, dailyLimit, sensitiveWords] = await Promise.all([

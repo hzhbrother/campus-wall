@@ -2,8 +2,7 @@
 import jwt from 'jsonwebtoken';
 import { NextRequest } from 'next/server';
 import { prisma } from './prisma';
-import type { UserRole } from '@prisma/client';
-import { UserStatus } from '@prisma/client';
+import { UserRole, UserStatus } from '@prisma/client';
 
 export interface JwtPayload {
   sub: string;
@@ -43,7 +42,9 @@ export async function getUserFromRequest(req: Request | NextRequest): Promise<Re
   if (!payload) return null;
   const user = await prisma.user.findUnique({ where: { id: payload.sub } });
   if (!user || user.status === UserStatus.BANNED) return null;
-  return { id: user.id, email: user.email, role: user.role, nickname: user.nickname, bannedUntil: user.bannedUntil, verified: user.verified };
+  // 管理员/超级管理员默认已认证 (无需走认证流程)
+  const autoVerified = user.role === UserRole.ADMIN || user.role === UserRole.SUPER_ADMIN;
+  return { id: user.id, email: user.email, role: user.role, nickname: user.nickname, bannedUntil: user.bannedUntil, verified: autoVerified || user.verified };
 }
 
 class HttpError extends Error {
