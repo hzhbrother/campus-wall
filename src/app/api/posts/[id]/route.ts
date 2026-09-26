@@ -13,7 +13,7 @@ const UpdateSchema = z.object({
   title: z.string().max(100).optional(),
   content: z.string().max(5000).optional(),
   category: z.string().optional(),
-  images: z.array(z.string()).optional(),
+  images: z.array(z.string().max(3 * 1024 * 1024)).max(3).optional(),
   isAnonymous: z.boolean().optional(),
 });
 

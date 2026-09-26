@@ -8,13 +8,21 @@ import { usePageRefresh } from '@/lib/use-page-refresh';
 
 const DEFAULT_CATEGORIES = ['校园', '失物招领', '二手交易', '表白墙', '寻物启事', '招聘兼职', '求助问答'];
 const MAX_LEN = 1000;
+const MAX_IMAGES = 3;          // 最多 3 张图
+const COMPRESS_THRESHOLD = 2 * 1024 * 1024; // 超过 2MB 才压缩, 否则保留原图
 
-// 客户端图片压缩: 缩放至最大边 1280px, JPEG 质量 0.7, 返回 base64
-function compressImage(file: File): Promise<string> {
+// 图片处理: 超过阈值才压缩 (缩放至最大边 1280px, JPEG 0.7), 否则直接读 base64
+function processImage(file: File): Promise<string> {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
     reader.onerror = () => reject(new Error('读取失败'));
     reader.onload = () => {
+      // 小于阈值: 不压缩, 直接返回原图 base64
+      if (file.size <= COMPRESS_THRESHOLD) {
+        resolve(reader.result as string);
+        return;
+      }
+      // 超过阈值: 用 canvas 压缩
       const img = new Image();
       img.onerror = () => reject(new Error('图片加载失败'));
       img.onload = () => {
@@ -70,13 +78,18 @@ export default function NewPostPage() {
   const handleImage = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (!files) return;
-    Array.from(files).forEach(file => {
-      // 单文件最大 10MB
+    const fileArr = Array.from(files);
+    // 超出最大张数提示
+    if (images.length + fileArr.length > MAX_IMAGES) {
+      setErr(`最多只能上传 ${MAX_IMAGES} 张图片`);
+    }
+    fileArr.slice(0, MAX_IMAGES - images.length).forEach(file => {
+      // 单文件最大 10MB (超过会自动压缩, 但过大的文件直接拒绝避免浏览器卡死)
       if (file.size > 10 * 1024 * 1024) {
         setErr(`图片 ${file.name} 超过 10MB, 请压缩后上传`);
         return;
       }
-      compressImage(file).then(dataUrl => {
+      processImage(file).then(dataUrl => {
         setImages(prev => [...prev, dataUrl]);
       }).catch(() => setErr(`图片 ${file.name} 处理失败`));
     });
@@ -169,7 +182,7 @@ export default function NewPostPage() {
               <button onClick={() => removeImage(i)} className="absolute top-0 right-0 h-5 w-5 rounded-bl-lg bg-black/50 text-white text-xs">×</button>
             </div>
           ))}
-          {images.length < 9 && (
+          {images.length < MAX_IMAGES && (
             <button onClick={() => fileRef.current?.click()} className="flex h-20 w-20 flex-col items-center justify-center rounded-lg bg-slate-50 text-slate-300 hover:bg-slate-100">
               <svg className="h-7 w-7" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
                 <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z" strokeLinecap="round" strokeLinejoin="round"/>
