@@ -2,10 +2,11 @@
 // DELETE /api/admin/users/:id 删除用户 (ADMIN+)
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
-import { UserRole, UserStatus, VerificationStatus } from '@prisma/client';
+import { UserRole, UserStatus, VerificationStatus, NotificationType } from '@prisma/client';
 import { requireRole, requirePermission } from '@/lib/server-auth';
 import { updateUser, deleteUser } from '@/lib/admin-service';
 import { errorResponse } from '@/lib/api-response';
+import { createNotification } from '@/lib/notification-service';
 
 const Schema = z.object({
   realName: z.string().max(32).optional().or(z.literal('')),
@@ -27,6 +28,8 @@ const Schema = z.object({
   // 资质认证 (学生会/广播站等)
   qualificationType: z.string().max(50).optional().or(z.literal('')),
   qualificationVerified: z.boolean().optional(),
+  qualificationStatus: z.enum(['APPROVED', 'REJECTED', 'NONE']).optional(),
+  qualificationRejectReason: z.string().max(200).optional().or(z.literal('')),
 });
 
 export async function PATCH(req: NextRequest, { params }: { params: { id: string } }) {
@@ -48,6 +51,24 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
     if (dto.qualificationVerified !== undefined) {
       data.qualificationVerified = dto.qualificationVerified;
       data.qualificationVerifiedAt = dto.qualificationVerified ? new Date() : null;
+    }
+    // 资质认证审核流转
+    if (dto.qualificationStatus === 'APPROVED') {
+      data.qualificationVerified = true;
+      data.qualificationVerifiedAt = new Date();
+      data.qualificationStatus = VerificationStatus.APPROVED;
+      data.qualificationRejectReason = null;
+    } else if (dto.qualificationStatus === 'REJECTED') {
+      data.qualificationVerified = false;
+      data.qualificationVerifiedAt = null;
+      data.qualificationStatus = VerificationStatus.REJECTED;
+      data.qualificationRejectReason = dto.qualificationRejectReason || null;
+    } else if (dto.qualificationStatus === 'NONE') {
+      data.qualificationVerified = false;
+      data.qualificationVerifiedAt = null;
+      data.qualificationStatus = VerificationStatus.NONE;
+      data.qualificationRejectReason = null;
+      data.qualificationPhoto = null;
     }
     if (dto.status) data.status = dto.status as UserStatus;
     if (dto.role) data.role = dto.role as UserRole;
@@ -73,7 +94,41 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
     data.verificationRejectReason = null;
     data.verificationPhoto = null;
   }
-    return NextResponse.json(await updateUser(params.id, data, me.id));
+    const updated = await updateUser(params.id, data, me.id);
+
+    // 认证通过/驳回后给用户发通知
+    if (dto.verificationStatus === 'APPROVED') {
+      await createNotification({
+        userId: params.id,
+        type: NotificationType.SYSTEM,
+        title: '✅ 身份认证已通过',
+        content: '恭喜您, 您的身份认证已通过审核!',
+      });
+    } else if (dto.verificationStatus === 'REJECTED') {
+      await createNotification({
+        userId: params.id,
+        type: NotificationType.SYSTEM,
+        title: '❌ 身份认证被驳回',
+        content: `您的身份认证未通过, 原因: ${dto.verificationRejectReason || '请重新提交'}`,
+      });
+    }
+    if (dto.qualificationStatus === 'APPROVED') {
+      await createNotification({
+        userId: params.id,
+        type: NotificationType.SYSTEM,
+        title: '✅ 资质认证已通过',
+        content: `恭喜您, 您的「${dto.qualificationType || updated.qualificationType || '资质'}」认证已通过!`,
+      });
+    } else if (dto.qualificationStatus === 'REJECTED') {
+      await createNotification({
+        userId: params.id,
+        type: NotificationType.SYSTEM,
+        title: '❌ 资质认证被驳回',
+        content: `您的资质认证未通过, 原因: ${dto.qualificationRejectReason || '请重新提交'}`,
+      });
+    }
+
+    return NextResponse.json(updated);
   } catch (e: any) {
     if (e?.name === 'ZodError') return NextResponse.json({ message: e.errors?.[0]?.message || '参数错误' }, { status: 400 });
     return errorResponse(e);

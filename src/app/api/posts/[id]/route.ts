@@ -22,10 +22,10 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
     const post = await prisma.post.findUnique({
       where: { id: params.id },
       include: {
-        author: { select: { id: true, nickname: true, avatar: true, role: true } },
+        author: { select: { id: true, nickname: true, avatar: true, role: true, verified: true } },
         comments: {
           orderBy: { createdAt: 'asc' },
-          include: { author: { select: { id: true, nickname: true, avatar: true } } },
+          include: { author: { select: { id: true, nickname: true, avatar: true, role: true, verified: true } } },
         },
       },
     });
@@ -36,6 +36,13 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
         return NextResponse.json({ message: '帖子不存在' }, { status: 404 });
       }
     }
+    // 管理员/超级管理员默认已认证
+    const isAdmin = (r: string) => r === 'ADMIN' || r === 'SUPER_ADMIN';
+    const author = { ...post.author, verified: post.author.verified || isAdmin(post.author.role) };
+    const comments = post.comments.map(c => ({
+      ...c,
+      author: { ...c.author, verified: c.author.verified || isAdmin(c.author.role) },
+    }));
     // 异步累加浏览量 (不阻塞返回)
     prisma.post.update({ where: { id: params.id }, data: { viewCount: { increment: 1 } } }).catch(() => {});
     // 检查当前用户是否已收藏
@@ -44,7 +51,7 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
     if (viewer) {
       favorited = (await prisma.favorite.count({ where: { userId: viewer.id, postId: params.id } })) > 0;
     }
-    return NextResponse.json({ ...post, favorited });
+    return NextResponse.json({ ...post, author, comments, favorited });
   } catch (e) {
     return errorResponse(e);
   }

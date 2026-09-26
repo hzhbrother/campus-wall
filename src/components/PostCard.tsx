@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import { VerifiedBadge } from './VerifiedBadge';
 
 export interface PostListItem {
   id: string;
@@ -12,7 +13,7 @@ export interface PostListItem {
   likeCount: number;
   commentCount: number;
   createdAt: string;
-  author: { id: string; nickname: string; avatar?: string | null };
+  author: { id: string; nickname: string; avatar?: string | null; verified?: boolean };
 }
 
 const CATEGORY_COLOR: Record<string, string> = {
@@ -43,16 +44,21 @@ export function PostCard({ post }: { post: PostListItem }) {
         {/* 顶部: 头像 + 昵称/日期 + 分类标签 */}
         <div className="flex items-start justify-between gap-3">
           <div className="flex items-center gap-2.5">
-            <div className="h-10 w-10 shrink-0 overflow-hidden rounded-full bg-gradient-to-br from-indigo-400 to-purple-500 flex items-center justify-center text-white font-medium">
-              {post.author.avatar ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img src={post.author.avatar} alt="" className="h-full w-full object-cover" />
-              ) : (
-                (post.author.nickname || 'U')[0].toUpperCase()
-              )}
-            </div>
+            <Link href={`/users/${post.author.id}`} className="shrink-0 no-underline">
+              <div className="h-10 w-10 overflow-hidden rounded-full bg-gradient-to-br from-indigo-400 to-purple-500 flex items-center justify-center text-white font-medium">
+                {post.author.avatar ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={post.author.avatar} alt="" className="h-full w-full object-cover" />
+                ) : (
+                  (post.author.nickname || 'U')[0].toUpperCase()
+                )}
+              </div>
+            </Link>
             <div>
-              <div className="text-sm font-semibold text-slate-900">{post.author.nickname}</div>
+              <div className="flex items-center gap-1.5">
+                <span className="text-sm font-semibold text-slate-900">{post.author.nickname}</span>
+                <VerifiedBadge verified={!!post.author.verified} />
+              </div>
               <div className="text-xs text-slate-400">{fmtDate(post.createdAt)}</div>
             </div>
           </div>

@@ -7,6 +7,7 @@ import { requireUser } from '@/lib/server-auth';
 import { errorResponse } from '@/lib/api-response';
 import { getSiteConfigBool } from '@/lib/site-config';
 import { isUserBanned } from '@/lib/server-auth';
+import { checkAndAwardBadges } from '@/lib/badge-service';
 
 const CreateSchema = z.object({
   postId: z.string(),
@@ -26,7 +27,7 @@ export async function GET(req: NextRequest) {
         where: { authorId },
         orderBy: { createdAt: 'desc' },
         include: {
-          author: { select: { id: true, nickname: true, avatar: true } },
+          author: { select: { id: true, nickname: true, avatar: true, verified: true, role: true } },
           post: { select: { id: true, title: true } },
         },
         take: 50,
@@ -40,7 +41,7 @@ export async function GET(req: NextRequest) {
     const items = await prisma.comment.findMany({
       where: { postId },
       orderBy: { createdAt: 'asc' },
-      include: { author: { select: { id: true, nickname: true, avatar: true } } },
+      include: { author: { select: { id: true, nickname: true, avatar: true, verified: true, role: true } } },
     });
     return NextResponse.json(items);
   } catch (e) {
@@ -66,6 +67,8 @@ export async function POST(req: NextRequest) {
       where: { id: dto.postId },
       data: { commentCount: { increment: 1 } },
     });
+    // 异步检查勋章
+    checkAndAwardBadges(me.id).catch(() => {});
     return NextResponse.json(comment);
   } catch (e: any) {
     if (e?.name === 'ZodError') return NextResponse.json({ message: e.errors?.[0]?.message || '参数错误' }, { status: 400 });

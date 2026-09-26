@@ -10,6 +10,7 @@ import { errorResponse } from '@/lib/api-response';
 import { getSiteConfigBool, getSiteConfigValue, getPostCategories } from '@/lib/site-config';
 import { isUserBanned } from '@/lib/server-auth';
 import { createNotification } from '@/lib/notification-service';
+import { checkAndAwardBadges } from '@/lib/badge-service';
 
 export async function GET(req: NextRequest) {
   try {
@@ -41,7 +42,7 @@ export async function GET(req: NextRequest) {
         orderBy,
         skip: (page - 1) * pageSize,
         take: pageSize,
-        include: { author: { select: { id: true, nickname: true, avatar: true, role: true } } },
+        include: { author: { select: { id: true, nickname: true, avatar: true, role: true, verified: true } } },
       }),
       prisma.post.count({ where }),
     ]);
@@ -52,6 +53,8 @@ export async function GET(req: NextRequest) {
       content: p.content.length > 200 ? p.content.slice(0, 200) + '…' : p.content,
       images: [],  // 列表不返回 base64 图片, 只返回数量
       imageCount: p.images?.length || 0,
+      // 管理员/超级管理员默认已认证
+      author: { ...p.author, verified: p.author.verified || p.author.role === 'ADMIN' || p.author.role === 'SUPER_ADMIN' },
     }));
     return NextResponse.json({ items, total, page, pageSize });
   } catch (e) {
@@ -148,6 +151,9 @@ export async function POST(req: NextRequest) {
         link: '/profile?tab=moderation',
       });
     }
+
+    // 异步检查勋章 (不阻塞返回)
+    checkAndAwardBadges(me.id).catch(() => {});
 
     return NextResponse.json(post);
   } catch (e: any) {

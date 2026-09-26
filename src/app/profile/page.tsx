@@ -7,6 +7,9 @@ import { useAuth } from '@/lib/auth-context';
 import { api } from '@/lib/api';
 import { COUNTRY_CODES, getCountryByCode, validatePhone } from '@/lib/country-codes';
 import { usePageRefresh } from '@/lib/use-page-refresh';
+import { VerifiedBadge } from '@/components/VerifiedBadge';
+import { BadgesView } from '@/components/BadgesView';
+import { CheckInView } from '@/components/CheckInView';
 import type { AdminTab } from '@/components/admin/AdminPanel';
 
 // 管理后台懒加载 (大幅减少首屏体积)
@@ -15,7 +18,7 @@ const AdminPanel = dynamic(() => import('@/components/admin/AdminPanel').then(m 
   loading: () => <div className="py-12 text-center text-gray-400">加载中…</div>,
 });
 
-type View = 'home' | 'admin' | 'edit' | AdminTab;
+type View = 'home' | 'admin' | 'edit' | 'security' | 'violations' | 'my-badges' | 'checkin' | 'contact' | AdminTab;
 
 // ---------- 通用行组件 (定义在组件外, 避免每次渲染重建导致 input 失焦) ----------
 const Row = ({ label, children, onClick, border = true }: { label: React.ReactNode; children: React.ReactNode; onClick?: () => void; border?: boolean }) => (
@@ -34,7 +37,6 @@ const GRADES = ['高一', '高二', '高三', '初一', '初二', '初三'];
 const CLASS_LIST = ['1班', '2班', '3班', '4班', '5班', '6班', '7班', '8班', '9班', '10班'];
 
 function EditProfile({ user, onSaved, forcePhone = false }: { user: any; onSaved: () => void; forcePhone?: boolean }) {
-  const { logout } = useAuth();
   const router = useRouter();
   const [nickname, setNickname] = useState(user?.nickname || '');
   const [realName, setRealName] = useState(user?.realName || '');
@@ -227,15 +229,14 @@ function EditProfile({ user, onSaved, forcePhone = false }: { user: any; onSaved
 
       {msg && <p className={`text-sm ${msg.includes('成功') || msg.includes('已保存') ? 'text-green-600' : 'text-red-500'}`}>{msg}</p>}
 
-      <button onClick={save} disabled={saving} className="mt-2 w-full rounded-full bg-blue-500 py-3.5 text-[15px] font-medium text-white hover:bg-blue-600 disabled:opacity-50">
-        {saving ? '保存中…' : '保存'}
-      </button>
-
-      {!forcePhone && (
-        <button onClick={() => { if (confirm('确定退出登录吗？')) { logout(); router.push('/'); } }} className="mt-3 w-full rounded-full border border-red-400 py-3.5 text-[15px] font-medium text-red-500 hover:bg-red-50">
-          退出登录
+      <div className="flex gap-3 mt-2">
+        <button onClick={() => onSaved()} className="flex-1 rounded-full border border-gray-300 py-3.5 text-[15px] font-medium text-gray-600 hover:bg-gray-50">
+          取消
         </button>
-      )}
+        <button onClick={save} disabled={saving} className="flex-1 rounded-full bg-blue-500 py-3.5 text-[15px] font-medium text-white hover:bg-blue-600 disabled:opacity-50">
+          {saving ? '保存中…' : '保存'}
+        </button>
+      </div>
 
       {showCountryPicker && (
         <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/50" onClick={() => setShowCountryPicker(false)}>
@@ -268,6 +269,7 @@ function ProfilePageInner() {
   const [showPwdModal, setShowPwdModal] = useState(false);
   const [showNotifModal, setShowNotifModal] = useState(false);
   const [showVerifyModal, setShowVerifyModal] = useState(false);
+  const [showAvatarLightbox, setShowAvatarLightbox] = useState(false);
   const [profileBg, setProfileBg] = useState('');
 
   // 系统管理员/超级管理员, 或拥有自定义角色的用户均可进入管理后台
@@ -303,10 +305,14 @@ function ProfilePageInner() {
 
   if (loading) return <div className="min-h-screen flex items-center justify-center text-gray-400">加载中…</div>;
 
-  const counts = (user as any)?._count || { posts: 0, comments: 0, likes: 0 };
+  const counts = (user as any)?._count || { posts: 0, comments: 0, likes: 0, favorites: 0 };
+
+  // 判断是否为管理后台标签
+  const ADMIN_TABS: AdminTab[] = ['overview', 'posts', 'moderation', 'comments', 'users', 'verification', 'template', 'appeals', 'notifications', 'settings', 'email', 'agreement', 'roles', 'badges'];
+  const isAdminView = (v: View): v is AdminTab => ADMIN_TABS.includes(v as AdminTab);
 
   // ---- 管理后台视图 ----
-  if (view !== 'home' && view !== 'edit') {
+  if (isAdminView(view)) {
     const adminTabs: { key: AdminTab; label: string }[] = [
       { key: 'overview', label: '数据概览' },
       { key: 'posts', label: '帖子管理' },
@@ -319,13 +325,14 @@ function ProfilePageInner() {
       // 站点配置类 (SMTP/站点信息/协议) + 角色管理 + 识别模板 仅超级管理员可见
       ...(isSuper ? [
         { key: 'roles' as AdminTab, label: '角色管理' },
+        { key: 'badges' as AdminTab, label: '勋章管理' },
         { key: 'template' as AdminTab, label: '识别模板' },
         { key: 'email' as AdminTab, label: '邮件配置' },
         { key: 'settings' as AdminTab, label: '站点设置' },
         { key: 'agreement' as AdminTab, label: '协议管理' },
       ] : []),
     ];
-    const tab = view === 'admin' ? adminTab : (view as AdminTab);
+    const tab = view as AdminTab;
     return (
       <div className="space-y-4">
         <button onClick={() => setView('home')} className="flex items-center gap-1 text-sm text-gray-500">
@@ -371,33 +378,116 @@ function ProfilePageInner() {
 
   // ---- 首页视图 ----
   const menuItems = [
-    { key: 'homepage', label: '我的主页', icon: '🏠' },
-    { key: 'favorites', label: '我的收藏', icon: '⭐' },
     { key: 'verification', label: '认证', icon: '✅' },
-    { key: 'password', label: '修改密码', icon: '🔑' },
-    { key: 'notif-settings', label: '通知设置', icon: '🔔' },
-    { key: 'violations', label: '违规记录', icon: '📋' },
-    { key: 'ban-appeal', label: '封禁申诉', icon: '✊' },
+    { key: 'violations', label: '违规与信用', icon: '📋' },
+    { key: 'badges', label: '我的勋章', icon: '🏅' },
+    { key: 'checkin', label: '签到积分', icon: '🪙' },
+    { key: 'security', label: '账户与安全', icon: '🔒' },
     ...(isAdmin ? [{ key: 'admin', label: '管理后台', icon: '⚙️' }] : []),
     { key: 'about', label: '关于校园墙', icon: 'ℹ️' },
-    { key: 'agreement', label: '用户协议', icon: '📄' },
-    { key: 'privacy', label: '隐私政策', icon: '🔒' },
+    { key: 'contact', label: '联系我们', icon: '💬' },
   ];
 
   const handleMenu = (key: string) => {
-    if (key === 'admin') { setView('admin'); return; }
-    if (key === 'homepage') { router.push(`/users/${user?.id}`); return; }
-    if (key === 'favorites') { router.push('/profile/favorites'); return; }
-    if (key === 'violations') { router.push('/profile/violations'); return; }
-    if (key === 'ban-appeal') { router.push('/profile/ban-appeal'); return; }
-    if (key === 'password') { setShowPwdModal(true); return; }
-    if (key === 'notif-settings') { setShowNotifModal(true); return; }
+    if (key === 'admin') { setView('overview'); return; }
     if (key === 'verification') { setShowVerifyModal(true); return; }
-    if (key === 'agreement') { router.push('/agreement'); return; }
-    if (key === 'privacy') { router.push('/privacy'); return; }
+    if (key === 'violations') { setView('violations'); return; }
+    if (key === 'badges') { setView('my-badges'); return; }
+    if (key === 'checkin') { setView('checkin'); return; }
+    if (key === 'security') { setView('security'); return; }
     if (key === 'about') { router.push('/about'); return; }
+    if (key === 'contact') { setView('contact'); return; }
     alert(`「${menuItems.find(m => m.key === key)?.label}」功能开发中…`);
   };
+
+  // ---- 违规与信用视图 ----
+  if (view === 'violations' && user) {
+    return (
+      <div className="space-y-4">
+        <button onClick={() => setView('home')} className="flex items-center gap-1 text-sm text-gray-500">
+          <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="m15 18-6-6 6-6" strokeLinecap="round" strokeLinejoin="round"/></svg>
+          返回
+        </button>
+        <div className="rounded-2xl bg-white p-5 shadow-sm">
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-lg font-bold text-gray-900">违规与信用</h3>
+            <span className="text-sm text-gray-500">诚信分: <span className="font-bold text-green-600">{user.credibilityScore}</span></span>
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <button onClick={() => router.push('/profile/violations')} className="rounded-xl border border-gray-200 p-4 text-left hover:bg-gray-50">
+              <div className="text-2xl mb-1">📋</div>
+              <div className="text-sm font-medium text-gray-800">违规记录</div>
+              <div className="text-xs text-gray-400 mt-0.5">查看历史违规</div>
+            </button>
+            <button onClick={() => router.push('/profile/ban-appeal')} className="rounded-xl border border-gray-200 p-4 text-left hover:bg-gray-50">
+              <div className="text-2xl mb-1">✊</div>
+              <div className="text-sm font-medium text-gray-800">违规申诉</div>
+              <div className="text-xs text-gray-400 mt-0.5">对封禁提出申诉</div>
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // ---- 账户与安全视图 ----
+  if (view === 'security' && user) {
+    const securityItems = [
+      { key: 'password', label: '修改密码', icon: '🔑', onClick: () => setShowPwdModal(true) },
+      { key: 'notif', label: '通知设置', icon: '🔔', onClick: () => setShowNotifModal(true) },
+      { key: 'agreement', label: '用户协议', icon: '📄', onClick: () => router.push('/agreement') },
+      { key: 'privacy', label: '隐私政策', icon: '🛡️', onClick: () => router.push('/privacy') },
+    ];
+    return (
+      <div className="space-y-4">
+        <button onClick={() => setView('home')} className="flex items-center gap-1 text-sm text-gray-500">
+          <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="m15 18-6-6 6-6" strokeLinecap="round" strokeLinejoin="round"/></svg>
+          返回
+        </button>
+        <div className="rounded-2xl bg-white shadow-sm overflow-hidden">
+          {securityItems.map((item, idx) => (
+            <div key={item.key} onClick={item.onClick} className={`flex items-center gap-3 px-4 py-4 cursor-pointer hover:bg-gray-50 ${idx > 0 ? 'border-t border-gray-100' : ''}`}>
+              <span className="text-xl">{item.icon}</span>
+              <span className="flex-1 text-[15px] text-gray-800">{item.label}</span>
+              <Arrow />
+            </div>
+          ))}
+        </div>
+      </div>
+    );
+  }
+
+  // ---- 我的勋章视图 ----
+  if (view === 'my-badges') {
+    return <BadgesView onBack={() => setView('home')} />;
+  }
+
+  // ---- 签到积分视图 ----
+  if (view === 'checkin') {
+    return <CheckInView onBack={() => setView('home')} />;
+  }
+
+  // ---- 联系我们视图 ----
+  if (view === 'contact') {
+    return (
+      <div className="space-y-4">
+        <button onClick={() => setView('home')} className="flex items-center gap-1 text-sm text-gray-500">
+          <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="m15 18-6-6 6-6" strokeLinecap="round" strokeLinejoin="round"/></svg>
+          返回
+        </button>
+        <div className="rounded-2xl bg-white p-6 shadow-sm text-center space-y-4">
+          <div className="text-5xl">💬</div>
+          <h3 className="text-lg font-bold text-gray-900">联系我们</h3>
+          <div className="text-sm text-gray-600 space-y-2">
+            <p>🕐 服务时间: <span className="font-medium">每天 8:00 - 23:00</span></p>
+            <p>📅 节假日正常服务</p>
+            <p className="pt-2">联系方式: <span className="font-medium text-green-600">企业微信</span></p>
+            <p className="text-xs text-gray-400">请在服务时间内通过企业微信联系客服</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-4">
@@ -406,35 +496,31 @@ function ProfilePageInner() {
         style={profileBg ? { backgroundImage: `url(${profileBg})`, backgroundSize: 'cover', backgroundPosition: 'center' } : undefined}
       >
         {/* 无背景图时用渐变兜底 */}
-        {!profileBg && <div className="absolute inset-0 bg-gradient-to-br from-indigo-500 via-blue-500 to-cyan-400" />}
+        {!profileBg && <div className="absolute inset-0 bg-gradient-to-br from-indigo-500 via-purple-500 to-pink-400" />}
         {/* 半透明遮罩, 保证文字可读 */}
         {profileBg && <div className="absolute inset-0 bg-black/30" />}
         <div className="relative flex items-center gap-4">
-          <div className="h-16 w-16 overflow-hidden rounded-full bg-white/30 flex items-center justify-center text-white text-2xl font-bold ring-4 ring-white/40">
+          <button onClick={() => setShowAvatarLightbox(true)} className="h-16 w-16 overflow-hidden rounded-full bg-white/30 flex items-center justify-center text-white text-2xl font-bold ring-4 ring-white/40 shrink-0">
             {user?.avatar ? (
               <img src={user.avatar} alt="" className="h-full w-full object-cover" />
             ) : (
               (user?.nickname || 'U')[0].toUpperCase()
             )}
-          </div>
-          <div className="flex-1">
+          </button>
+          <div className="flex-1 min-w-0">
             {user ? (
               <>
-                <div className="flex items-center gap-1.5">
+                <div className="flex items-center gap-1.5 flex-wrap">
                   <span className="text-lg font-bold text-white">{user.nickname}</span>
-                  {user.verified ? (
-                    <span className="inline-flex items-center gap-0.5 rounded-full bg-white/25 px-1.5 py-0.5 text-xs text-white">
-                      <svg className="h-3 w-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="m5 12 5 5L20 7" strokeLinecap="round" strokeLinejoin="round"/></svg>
-                      已认证
-                    </span>
-                  ) : user.verificationStatus === 'PENDING' ? (
-                    <span className="rounded-full bg-amber-400/90 px-1.5 py-0.5 text-xs text-white">审核中</span>
-                  ) : null}
+                  <VerifiedBadge verified={!!user.verified} className="!bg-white/20 !text-white" />
                   {user.qualificationVerified && user.qualificationType && (
                     <span className="rounded-full bg-purple-400/80 px-1.5 py-0.5 text-xs text-white">🏅 {user.qualificationType}</span>
                   )}
                 </div>
-                <div className="text-sm text-white/80">{user.email || '未绑定邮箱'}</div>
+                <div className="text-sm text-white/80 mt-0.5">{user.email || '未绑定邮箱'}</div>
+                <div className="mt-1.5 flex items-center gap-2">
+                  <span className="inline-flex items-center gap-1 rounded-full bg-yellow-400/90 px-2 py-0.5 text-xs font-medium text-yellow-900">🪙 {user.points || 0} 积分</span>
+                </div>
               </>
             ) : (
               <>
@@ -444,21 +530,21 @@ function ProfilePageInner() {
             )}
           </div>
           {user ? (
-            <button onClick={() => setView('edit')} className="rounded-full bg-white/20 px-3 py-1.5 text-sm text-white">编辑</button>
+            <button onClick={() => setView('edit')} className="rounded-full bg-white/20 px-3 py-1.5 text-sm text-white shrink-0">编辑</button>
           ) : (
-            <button onClick={() => router.push('/login')} className="rounded-full bg-white px-5 py-2 text-sm font-medium text-blue-600">立即登录 / 注册</button>
+            <button onClick={() => router.push('/login')} className="rounded-full bg-white px-5 py-2 text-sm font-medium text-blue-600 shrink-0">立即登录 / 注册</button>
           )}
         </div>
       </div>
 
-      {/* 统计卡片 */}
+      {/* 统计卡片: 帖子 / 获赞 / 收藏 / 评论 (实时计数) */}
       <div className="-mt-8 rounded-2xl bg-white p-4 shadow-sm">
         <div className="grid grid-cols-4 gap-2">
           {[
             { label: '帖子', value: counts.posts, color: 'text-purple-500' },
-            { label: '评论', value: counts.comments, color: 'text-pink-500' },
             { label: '获赞', value: counts.likesReceived || 0, color: 'text-red-500' },
-            { label: '赞过', value: counts.likes, color: 'text-blue-500' },
+            { label: '收藏', value: counts.favorites || 0, color: 'text-amber-500' },
+            { label: '评论', value: counts.comments, color: 'text-blue-500' },
           ].map(s => (
             <div key={s.label} className="flex flex-col items-center py-2">
               <div className={`text-xl font-bold ${s.color}`}>{s.value}</div>
@@ -489,6 +575,13 @@ function ProfilePageInner() {
         <button onClick={() => { logout(); router.push('/'); }} className="w-full rounded-2xl bg-white py-3.5 text-sm text-red-500 shadow-sm hover:bg-gray-50">
           退出登录
         </button>
+      )}
+
+      {/* 头像放大灯箱 */}
+      {showAvatarLightbox && user?.avatar && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80" onClick={() => setShowAvatarLightbox(false)}>
+          <img src={user.avatar} alt="" className="max-h-[80vh] max-w-[90vw] rounded-xl" />
+        </div>
       )}
 
       {/* 修改密码弹窗 */}
@@ -614,13 +707,12 @@ function NotificationSettingsModal({ onClose }: { onClose: () => void }) {
   );
 }
 
-// ---------- 认证弹窗 (学生认证 / 老师认证 / 资质认证) ----------
-type VerifyType = 'STUDENT' | 'TEACHER' | 'QUALIFICATION';
+// ---------- 认证弹窗 (身份认证 / 资质荣誉认证) ----------
+type VerifyType = 'IDENTITY' | 'QUALIFICATION';
 
 const VERIFY_TYPE_OPTIONS: { value: VerifyType; label: string; icon: string; desc: string }[] = [
-  { value: 'STUDENT', label: '学生认证', icon: '🎓', desc: '上传校园卡 / 学生证' },
-  { value: 'TEACHER', label: '老师认证', icon: '👨‍🏫', desc: '上传教师工作证 / 工牌' },
-  { value: 'QUALIFICATION', label: '资质认证', icon: '🏅', desc: '学生会 / 广播站等岗位证明' },
+  { value: 'IDENTITY', label: '身份认证', icon: '🎓', desc: '学生/老师身份认证 (校园卡或工牌)' },
+  { value: 'QUALIFICATION', label: '资质/荣誉认证', icon: '🏅', desc: '学生会/广播站/证书等, 可重复认证' },
 ];
 
 function VerificationModal({ user, onClose, onVerified, onSubmitted }: { user: any; onClose: () => void; onVerified: () => void; onSubmitted?: () => void }) {
@@ -630,6 +722,7 @@ function VerificationModal({ user, onClose, onVerified, onSubmitted }: { user: a
   const [photoType, setPhotoType] = useState<'CARD' | 'FACE'>('CARD');
   const [faceName, setFaceName] = useState('');
   const [faceId, setFaceId] = useState('');
+  const [qualName, setQualName] = useState(''); // 资质/荣誉名称
   const [templates, setTemplates] = useState<{ id: string; name: string; type: string; image: string; isActive: boolean }[]>([]);
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState('');
@@ -659,9 +752,10 @@ function VerificationModal({ user, onClose, onVerified, onSubmitted }: { user: a
   const isSuperAdmin = role === 'SUPER_ADMIN';
   const currentTypeMeta = VERIFY_TYPE_OPTIONS.find(o => o.value === verifyType);
   const verifyLabel = currentTypeMeta?.label || '认证';
+  const isQual = verifyType === 'QUALIFICATION';
   const photoLabel = photoType === 'FACE'
     ? '人脸照片'
-    : verifyType === 'STUDENT' ? '校园卡' : verifyType === 'TEACHER' ? '工作证' : '证明材料';
+    : isQual ? '证明材料' : '校园卡/工牌';
   const isFace = photoType === 'FACE';
 
   const status = localStatus || user.verificationStatus || 'NONE';
@@ -721,6 +815,19 @@ function VerificationModal({ user, onClose, onVerified, onSubmitted }: { user: a
   };
 
   const submit = async () => {
+    if (isQual) {
+      if (!qualName.trim()) { setMsg('请填写资质/荣誉名称'); return; }
+      if (!photo) { setMsg('请先上传证明材料'); return; }
+      setBusy(true); setMsg('');
+      try {
+        const res: any = await api.post('/api/users/me/qualification', { photo, type: qualName.trim() });
+        setMsg(res?.message || '资质认证申请已提交');
+        await refreshStatus();
+        onSubmitted?.();
+        setPhoto('');
+      } catch (e: any) { setMsg(e.message); } finally { setBusy(false); }
+      return;
+    }
     if (!isFace && !templateId) { setMsg('请先选择模板'); return; }
     if (isFace && !faceName.trim()) { setMsg('请填写姓名'); return; }
     if (isFace && !faceId.trim()) { setMsg('请填写工号/学号'); return; }
@@ -814,13 +921,13 @@ function VerificationModal({ user, onClose, onVerified, onSubmitted }: { user: a
           </div>
         ) : null}
 
-        {/* 未通过且非审核中时可提交 */}
-        {!isSuperAdmin && !isApproved && !isPending && !isAiReviewing && (
+        {/* 未通过且非审核中时可提交 (资质/荣誉认证可重复提交) */}
+        {!isSuperAdmin && (isQual || (!isApproved && !isPending && !isAiReviewing)) && (
           <>
             {/* 第一步: 选择认证类型 */}
             <div className="mb-3">
               <label className="block text-sm font-medium text-gray-700 mb-2">选择认证类型</label>
-              <div className="grid grid-cols-3 gap-2">
+              <div className="grid grid-cols-2 gap-2">
                 {VERIFY_TYPE_OPTIONS.map(opt => (
                   <button
                     key={opt.value}
@@ -838,8 +945,23 @@ function VerificationModal({ user, onClose, onVerified, onSubmitted }: { user: a
               </div>
             </div>
 
-            {/* 第二步: 选择照片类型 (卡面 / 人脸) */}
-            {verifyType && (
+            {/* 资质/荣誉认证: 填写名称 */}
+            {isQual && (
+              <div className="mb-3">
+                <label className="block text-sm font-medium text-gray-700 mb-2">资质/荣誉名称</label>
+                <input
+                  type="text"
+                  value={qualName}
+                  onChange={e => setQualName(e.target.value)}
+                  placeholder="如: 学生会主席 / 优秀志愿者 / 数学竞赛一等奖"
+                  maxLength={50}
+                  className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm focus:border-blue-400 focus:outline-none"
+                />
+              </div>
+            )}
+
+            {/* 第二步: 选择照片类型 (卡面 / 人脸) — 仅身份认证 */}
+            {verifyType && !isQual && (
               <div className="mb-3">
                 <label className="block text-sm font-medium text-gray-700 mb-2">上传方式</label>
                 <div className="grid grid-cols-2 gap-2">

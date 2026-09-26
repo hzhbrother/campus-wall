@@ -2,11 +2,13 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 import { useAuth } from '@/lib/auth-context';
 import { api } from '@/lib/api';
 import { usePageRefresh } from '@/lib/use-page-refresh';
+import { VerifiedBadge } from '@/components/VerifiedBadge';
 
-interface Author { id: string; nickname: string; avatar?: string | null; role?: string }
+interface Author { id: string; nickname: string; avatar?: string | null; role?: string; verified?: boolean }
 interface Comment { id: string; content: string; createdAt: string; author: Author; parentId?: string | null }
 interface PostDetail {
   id: string; title: string; content: string; category: string; images: string[];
@@ -99,7 +101,10 @@ export default function PostDetailPage({ params }: { params: { id: string } }) {
           </div>
         )}
         <div className="flex items-center justify-between border-t border-slate-100 pt-3 text-sm">
-          <span className="text-slate-500">发布人: {post.author.nickname}</span>
+          <div className="flex items-center gap-1.5">
+            <Link href={`/users/${post.author.id}`} className="text-slate-500 hover:text-slate-700 no-underline">发布人: {post.author.nickname}</Link>
+            <VerifiedBadge verified={!!post.author.verified} />
+          </div>
           <div className="flex gap-4 text-slate-500">
             <button onClick={like} className="hover:text-red-500">❤ {post.likeCount}</button>
             <span>💬 {post.commentCount}</span>
@@ -133,8 +138,9 @@ export default function PostDetailPage({ params }: { params: { id: string } }) {
         <div className="space-y-3">
           {post.comments.map((c) => (
             <div key={c.id} className="text-sm">
-              <div className="flex items-center gap-2 mb-0.5">
-                <span className="font-medium text-slate-700">{c.author.nickname}</span>
+              <div className="flex items-center gap-1.5 mb-0.5">
+                <Link href={`/users/${c.author.id}`} className="font-medium text-slate-700 hover:text-blue-500 no-underline">{c.author.nickname}</Link>
+                <VerifiedBadge verified={!!c.author.verified} />
                 <span className="text-xs text-slate-400">{new Date(c.createdAt).toLocaleString('zh-CN')}</span>
               </div>
               <p className="text-slate-600 pl-1">{c.content}</p>

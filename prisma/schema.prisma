@@ -142,6 +142,11 @@ model User {
   qualificationType String?    // 组织类型: 学生会/广播站/团委/社团等
   qualificationVerified Boolean @default(false) // 资质认证是否已通过
   qualificationVerifiedAt DateTime? // 资质认证通过时间
+  qualificationPhoto String? // 资质认证证明材料照片
+  qualificationStatus VerificationStatus @default(NONE) // 资质认证审核状态
+  qualificationRejectReason String? // 资质认证驳回原因
+  lastReadNotificationsAt DateTime? // 上次标记全部已读的时间 (用于广播通知未读计算)
+  points Int @default(0) // 积分 (签到等获得)
   createdAt    DateTime         @default(now())
   updatedAt    DateTime         @updatedAt
 
@@ -158,6 +163,8 @@ model User {
   notifications Notification[]
   notificationSettings NotificationSetting?
   customRole   Role?            @relation(fields: [roleId], references: [id])
+  userBadges   UserBadge[]
+  checkIns     CheckInRecord[]
 
   @@index([email])
   @@index([role])
@@ -435,4 +442,49 @@ model SiteConfig {
   key       String   @id
   value     String
   updatedAt DateTime @updatedAt
+}
+
+// ---- 勋章系统 ----
+
+model Badge {
+  id          String   @id @default(cuid())
+  name        String            // 勋章名称, 如 "发帖达人"
+  description String?           // 勋章描述
+  icon        String?           // 勋章图标 (emoji 或 base64)
+  // 获得条件: type=POST_COUNT 发帖数达到 threshold; type=LIKE_COUNT 获赞数; type=COMMENT_COUNT 评论数; type=CHECKIN_DAYS 连续签到天数; type=POINTS 积分达到
+  conditionType String         // POST_COUNT | LIKE_COUNT | COMMENT_COUNT | CHECKIN_DAYS | POINTS | MANUAL
+  threshold   Int      @default(1) // 条件阈值
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  userBadges  UserBadge[]
+}
+
+model UserBadge {
+  id        String   @id @default(cuid())
+  userId    String
+  badgeId   String
+  earnedAt  DateTime @default(now()) // 获得时间 (用于显示年份)
+
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  badge     Badge    @relation(fields: [badgeId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, badgeId])
+  @@index([userId])
+}
+
+// ---- 签到记录 (积分) ----
+
+model CheckInRecord {
+  id        String   @id @default(cuid())
+  userId    String
+  date      String            // 日期 YYYY-MM-DD (便于去重查询)
+  points    Int      @default(1) // 本次获得积分
+  createdAt DateTime @default(now())
+
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, date])
+  @@index([userId])
 }

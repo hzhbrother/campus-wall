@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { requireUser } from '@/lib/server-auth';
 import { errorResponse } from '@/lib/api-response';
+import { checkAndAwardBadges } from '@/lib/badge-service';
 
 export async function POST(req: NextRequest, { params }: { params: { id: string } }) {
   try {
@@ -25,6 +26,8 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
       prisma.like.create({ data: { postId: params.id, userId: me.id } }),
       prisma.post.update({ where: { id: params.id }, data: { likeCount: { increment: 1 } } }),
     ]);
+    // 帖子作者可能获得勋章 (获赞数)
+    checkAndAwardBadges(post.authorId).catch(() => {});
     return NextResponse.json({ liked: true, likeCount: post.likeCount + 1 });
   } catch (e) {
     return errorResponse(e);

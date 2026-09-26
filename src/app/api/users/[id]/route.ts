@@ -10,8 +10,10 @@ export async function GET(_req: NextRequest, { params }: { params: { id: string 
       select: {
         id: true, nickname: true, avatar: true, coverImage: true,
         role: true, grade: true, className: true, verified: true, verificationStatus: true,
+        qualificationType: true, qualificationVerified: true,
+        points: true,
         createdAt: true,
-        _count: { select: { posts: true, comments: true } },
+        _count: { select: { posts: true, comments: true, favorites: true } },
       },
     });
     if (!user) return NextResponse.json({ message: '用户不存在' }, { status: 404 });

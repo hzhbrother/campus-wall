@@ -6,6 +6,7 @@ import { api } from '@/lib/api';
 import { useAuth } from '@/lib/auth-context';
 import Link from 'next/link';
 import { usePageRefresh } from '@/lib/use-page-refresh';
+import { VerifiedBadge } from '@/components/VerifiedBadge';
 
 interface UserProfile {
   id: string;
@@ -16,8 +17,11 @@ interface UserProfile {
   grade: string | null;
   className: string | null;
   verified: boolean;
+  qualificationType: string | null;
+  qualificationVerified: boolean;
+  points: number;
   createdAt: string;
-  _count: { posts: number; comments: number; likesReceived: number };
+  _count: { posts: number; comments: number; favorites: number; likesReceived: number };
 }
 
 interface Post {
@@ -49,6 +53,8 @@ export default function UserProfilePage() {
   const [err, setErr] = useState('');
   const [tab, setTab] = useState<'posts' | 'comments'>('posts');
   const [savingCover, setSavingCover] = useState(false);
+  const [showAvatarLightbox, setShowAvatarLightbox] = useState(false);
+  const [badges, setBadges] = useState<{ badge: { id: string; name: string; icon: string | null; description: string | null }; earnedAt: string }[]>([]);
   // 墙龄自动刷新: 每天 0 点更新一次 now, 触发重新计算天数
   const [now, setNow] = useState(Date.now());
   useEffect(() => {
@@ -79,6 +85,10 @@ export default function UserProfilePage() {
       setProfile(u);
       setPosts(p);
       setComments(c);
+      // 加载勋章
+      api.get<{ items: any[] }>(`/api/users/${userId}/badges`)
+        .then(d => setBadges(d.items || []))
+        .catch(() => setBadges([]));
     }).finally(() => setLoading(false));
   }, [userId]);
 
@@ -150,14 +160,21 @@ export default function UserProfilePage() {
       {/* 用户信息卡片 (上移覆盖封面) */}
       <div className="relative -mt-10 rounded-t-3xl bg-white px-4 pt-4 pb-5 shadow-sm">
         <div className="flex items-end gap-3">
-          {/* 头像 */}
-          <div className="h-16 w-16 shrink-0 overflow-hidden rounded-full bg-gradient-to-br from-indigo-400 to-purple-500 ring-4 ring-white flex items-center justify-center text-white text-xl font-bold">
+          {/* 头像 (点击放大) */}
+          <button onClick={() => profile.avatar && setShowAvatarLightbox(true)} className="h-16 w-16 shrink-0 overflow-hidden rounded-full bg-gradient-to-br from-indigo-400 to-purple-500 ring-4 ring-white flex items-center justify-center text-white text-xl font-bold">
             {profile.avatar ? <img src={profile.avatar} alt="" className="h-full w-full object-cover" /> : (profile.nickname || 'U')[0].toUpperCase()}
-          </div>
+          </button>
           {/* 昵称 + 编辑按钮 */}
           <div className="flex-1 pb-1">
-            <div className="flex items-center gap-1.5">
+            <div className="flex items-center gap-1.5 flex-wrap">
               <span className="text-lg font-bold text-gray-900">{profile.nickname}</span>
+              <VerifiedBadge verified={profile.verified} />
+              {profile.qualificationVerified && profile.qualificationType && (
+                <span className="rounded-full bg-purple-100 px-2 py-0.5 text-xs text-purple-600">🏅 {profile.qualificationType}</span>
+              )}
+            </div>
+            <div className="mt-1 flex items-center gap-2">
+              <span className="inline-flex items-center gap-1 rounded-full bg-yellow-50 px-2 py-0.5 text-xs font-medium text-yellow-700">🪙 {profile.points || 0} 积分</span>
             </div>
           </div>
           {isOwn ? (
@@ -177,7 +194,7 @@ export default function UserProfilePage() {
           )}
         </div>
 
-        {/* 标签行: 年级 / 班级 / 认证 / 墙龄 */}
+        {/* 标签行: 年级 / 班级 / 墙龄 */}
         <div className="mt-3 flex flex-wrap items-center gap-2">
           {profile.grade && (
             <span className="rounded-full bg-gray-100 px-2.5 py-0.5 text-xs text-gray-500">{profile.grade}</span>
@@ -185,33 +202,65 @@ export default function UserProfilePage() {
           {profile.className && (
             <span className="rounded-full bg-gray-100 px-2.5 py-0.5 text-xs text-gray-500">{profile.className}</span>
           )}
-          {profile.verified ? (
-            <span className="inline-flex items-center gap-1 rounded-full bg-green-50 px-2.5 py-0.5 text-xs text-green-600">
-              <svg className="h-3 w-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="m5 12 5 5L20 7" strokeLinecap="round" strokeLinejoin="round"/></svg>
-              已认证
-            </span>
-          ) : (
-            <span className="rounded-full bg-red-50 px-2.5 py-0.5 text-xs text-red-400">未认证</span>
-          )}
           <span className="rounded-full bg-blue-50 px-2.5 py-0.5 text-xs text-blue-500">墙龄 {wallDays} 天</span>
         </div>
 
-        {/* 统计: 帖子 / 评论 / 获赞 */}
-        <div className="mt-4 grid grid-cols-3 border-t border-gray-100 pt-3">
+        {/* 统计: 帖子 / 获赞 / 收藏 / 评论 */}
+        <div className="mt-4 grid grid-cols-4 border-t border-gray-100 pt-3">
           <div className="flex flex-col items-center">
             <span className="text-lg font-bold text-gray-900">{counts.posts}</span>
             <span className="text-xs text-gray-400">帖子</span>
           </div>
           <div className="flex flex-col items-center">
-            <span className="text-lg font-bold text-gray-900">{counts.comments}</span>
-            <span className="text-xs text-gray-400">评论</span>
-          </div>
-          <div className="flex flex-col items-center">
             <span className="text-lg font-bold text-gray-900">{counts.likesReceived}</span>
             <span className="text-xs text-gray-400">获赞</span>
           </div>
+          <div className="flex flex-col items-center">
+            <span className="text-lg font-bold text-gray-900">{counts.favorites || 0}</span>
+            <span className="text-xs text-gray-400">收藏</span>
+          </div>
+          <div className="flex flex-col items-center">
+            <span className="text-lg font-bold text-gray-900">{counts.comments}</span>
+            <span className="text-xs text-gray-400">评论</span>
+          </div>
         </div>
       </div>
+
+      {/* 头像放大灯箱 */}
+      {showAvatarLightbox && profile.avatar && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80" onClick={() => setShowAvatarLightbox(false)}>
+          <img src={profile.avatar} alt="" className="max-h-[80vh] max-w-[90vw] rounded-xl" />
+        </div>
+      )}
+
+      {/* 认证资质 / 荣誉勋章 */}
+      {(profile.qualificationVerified || badges.length > 0) && (
+        <div className="mx-3 mt-3 rounded-2xl bg-white p-4 shadow-sm">
+          {profile.qualificationVerified && profile.qualificationType && (
+            <div className="mb-3">
+              <h3 className="text-sm font-bold text-gray-900 mb-2">📜 认证资质</h3>
+              <span className="inline-flex items-center gap-1 rounded-full bg-green-50 px-3 py-1 text-sm text-green-700">
+                ✓ {profile.qualificationType}
+              </span>
+            </div>
+          )}
+          {badges.length > 0 && (
+            <div>
+              <h3 className="text-sm font-bold text-gray-900 mb-2">🏅 荣誉勋章</h3>
+              <div className="grid grid-cols-4 gap-3">
+                {badges.slice(0, 8).map(ub => (
+                  <div key={ub.badge.id} className="flex flex-col items-center text-center">
+                    <div className="h-12 w-12 rounded-full bg-gradient-to-br from-yellow-400 to-amber-500 flex items-center justify-center text-2xl shadow-sm">
+                      {ub.badge.icon || '🏅'}
+                    </div>
+                    <div className="mt-1 text-[11px] text-gray-600 line-clamp-1">{ub.badge.name}</div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* 帖子 / 评论 Tab */}
       <div className="sticky top-14 z-10 bg-white/95 backdrop-blur border-b border-gray-100">

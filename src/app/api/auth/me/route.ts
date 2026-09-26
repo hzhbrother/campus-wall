@@ -11,7 +11,7 @@ export async function GET(req: NextRequest) {
     const user = await prisma.user.findUnique({
       where: { id: me.id },
       include: {
-        _count: { select: { posts: true, comments: true, likes: true } },
+        _count: { select: { posts: true, comments: true, likes: true, favorites: true } },
         customRole: { select: { id: true, name: true, permissions: true } },
       },
     });

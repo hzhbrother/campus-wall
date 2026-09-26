@@ -28,6 +28,8 @@ export interface AuthUser {
   qualificationVerified?: boolean;
   createdAt?: string;
   bannedUntil?: string | null;
+  points?: number;
+  credibilityScore?: number;
   banReason?: string | null;
   _count?: { posts: number; comments: number; likes: number; likesReceived: number };
 }

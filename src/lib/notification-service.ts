@@ -105,18 +105,36 @@ async function broadcastEmail(
 
 // 获取用户未读数量
 export async function getUnreadCount(userId: string): Promise<number> {
-  const [personal, broadcast] = await Promise.all([
+  const [personal, user] = await Promise.all([
     prisma.notification.count({ where: { userId, isRead: false } }),
-    prisma.notification.count({ where: { userId: null } }),
+    prisma.user.findUnique({ where: { id: userId }, select: { lastReadNotificationsAt: true } }),
   ]);
-  // 广播通知的已读状态简化处理: 假设都算未读 (实际可加 NotificationRead 表)
+  // 广播通知: 仅统计用户上次"全部已读"时间之后创建的
+  const since = user?.lastReadNotificationsAt || new Date(0);
+  const broadcast = await prisma.notification.count({
+    where: { userId: null, createdAt: { gt: since } },
+  });
   return personal + broadcast;
 }
 
 // 获取用户通知列表 (个人 + 广播)
 export async function listUserNotifications(userId: string, page = 1, pageSize = 20, onlyUnread = false) {
+  const user = await prisma.user.findUnique({ where: { id: userId }, select: { lastReadNotificationsAt: true } });
+  const lastRead = user?.lastReadNotificationsAt || new Date(0);
+
   const where: any = { OR: [{ userId }, { userId: null }] };
-  if (onlyUnread) where.isRead = false;
+  if (onlyUnread) {
+    // 未读 = (个人未读) OR (广播且创建时间 > 上次已读时间)
+    where.AND = [
+      { OR: [{ userId: { not: null } }, { userId: null }] },
+      {
+        OR: [
+          { userId, isRead: false },
+          { userId: null, createdAt: { gt: lastRead } },
+        ],
+      },
+    ];
+  }
   const [items, total] = await Promise.all([
     prisma.notification.findMany({
       where,
@@ -126,21 +144,41 @@ export async function listUserNotifications(userId: string, page = 1, pageSize =
     }),
     prisma.notification.count({ where }),
   ]);
-  return { items, total, page, pageSize };
+  // 广播通知的已读状态按 lastReadNotificationsAt 计算
+  const enriched = items.map(n => ({
+    ...n,
+    isRead: n.userId === null ? n.createdAt <= lastRead : n.isRead,
+  }));
+  return { items: enriched, total, page, pageSize };
 }
 
 // 标记为已读
 export async function markAsRead(userId: string, id: string) {
-  return prisma.notification.updateMany({
-    where: { id, OR: [{ userId }, { userId: null }] },
+  // 先标记个人通知
+  await prisma.notification.updateMany({
+    where: { id, userId },
     data: { isRead: true },
   });
+  // 广播通知: 更新 lastReadNotificationsAt 为 max(当前, 该通知创建时间)
+  const notif = await prisma.notification.findUnique({ where: { id }, select: { userId: true, createdAt: true } });
+  if (notif?.userId === null) {
+    const user = await prisma.user.findUnique({ where: { id: userId }, select: { lastReadNotificationsAt: true } });
+    const current = user?.lastReadNotificationsAt || new Date(0);
+    if (notif.createdAt > current) {
+      await prisma.user.update({ where: { id: userId }, data: { lastReadNotificationsAt: notif.createdAt } });
+    }
+  }
 }
 
 // 全部标记已读
 export async function markAllAsRead(userId: string) {
-  return prisma.notification.updateMany({
+  await prisma.notification.updateMany({
     where: { userId, isRead: false },
     data: { isRead: true },
+  });
+  // 广播通知: 记录"全部已读"时间戳, 之后的广播才算未读
+  await prisma.user.update({
+    where: { id: userId },
+    data: { lastReadNotificationsAt: new Date() },
   });
 }

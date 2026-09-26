@@ -4,8 +4,9 @@ import { useEffect, useState, useCallback } from 'react';
 import { api } from '@/lib/api';
 import { PERMISSIONS, PERMISSIONS_BY_GROUP, SUPER_ADMIN_ONLY_PERMISSIONS } from '@/lib/permissions';
 import TemplateManager from './TemplateManager';
+import { BadgesManager } from './BadgesManager';
 
-export type AdminTab = 'overview' | 'posts' | 'moderation' | 'comments' | 'users' | 'verification' | 'template' | 'appeals' | 'notifications' | 'settings' | 'email' | 'agreement' | 'roles';
+export type AdminTab = 'overview' | 'posts' | 'moderation' | 'comments' | 'users' | 'verification' | 'template' | 'appeals' | 'notifications' | 'settings' | 'email' | 'agreement' | 'roles' | 'badges';
 
 // ---------- 通用 UI ----------
 function SectionTitle({ title, desc }: { title: string; desc?: string }) {
@@ -2807,6 +2808,7 @@ export function AdminPanel({ tab, isSuper }: { tab: AdminTab; isSuper: boolean }
     case 'email': return <EmailSettings />;
     case 'agreement': return <AgreementManager />;
     case 'roles': return <RolesManager />;
+    case 'badges': return <BadgesManager />;
     default: return <OverviewTab />;
   }
 }
