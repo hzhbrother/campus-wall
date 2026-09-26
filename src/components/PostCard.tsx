@@ -6,6 +6,7 @@ export interface PostListItem {
   content: string;
   category: string;
   images: string[];
+  imageCount?: number;   // 列表视图: 图片数量 (不返回完整 base64)
   pinned: boolean;
   viewCount: number;
   likeCount: number;
@@ -69,20 +70,11 @@ export function PostCard({ post }: { post: PostListItem }) {
           <p className="text-sm leading-relaxed text-slate-700 line-clamp-4 whitespace-pre-wrap">{post.content}</p>
         </div>
 
-        {/* 图片 */}
-        {post.images?.length > 0 && (
-          <div className="mt-3 overflow-hidden rounded-xl">
-            {post.images.length === 1 ? (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img src={post.images[0]} alt="" className="w-full max-h-80 object-cover" />
-            ) : (
-              <div className="grid grid-cols-3 gap-1">
-                {post.images.slice(0, 3).map((url, i) => (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img key={i} src={url} alt="" className="aspect-square w-full object-cover rounded-lg" />
-                ))}
-              </div>
-            )}
+        {/* 图片: 列表视图只显示数量提示, 不渲染完整 base64 (点击进入详情查看) */}
+        {(post.images?.length > 0 || (post.imageCount && post.imageCount > 0)) && (
+          <div className="mt-3 flex items-center gap-2 rounded-xl bg-slate-50 px-3 py-2 text-sm text-slate-500">
+            <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"><rect x="3" y="3" width="18" height="18" rx="2" /><circle cx="8.5" cy="8.5" r="1.5" /><path d="m21 15-5-5L5 21" strokeLinecap="round" strokeLinejoin="round" /></svg>
+            附图 {post.imageCount || post.images?.length || 0} 张 (点击查看)
           </div>
         )}
 
