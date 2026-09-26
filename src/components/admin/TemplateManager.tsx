@@ -67,14 +67,17 @@ export default function TemplateManager() {
     };
   };
 
-  const onMouseDown = (e: React.MouseEvent) => {
+  // ---- 框选: 使用 Pointer Events 统一鼠标/触摸/手写笔 ----
+  const onPointerDown = (e: React.PointerEvent) => {
     if (!image) return;
+    e.preventDefault();
+    (e.target as Element).setPointerCapture?.(e.pointerId);
     const { x, y } = toNorm(e.clientX, e.clientY);
     setDrawing({ sx: x, sy: y });
     setCurBox({ x, y, w: 0, h: 0 });
   };
 
-  const onMouseMove = (e: React.MouseEvent) => {
+  const onPointerMove = (e: React.PointerEvent) => {
     if (!drawing) return;
     const { x, y } = toNorm(e.clientX, e.clientY);
     const nx = Math.min(drawing.sx, x), ny = Math.min(drawing.sy, y);
@@ -82,7 +85,8 @@ export default function TemplateManager() {
     setCurBox({ x: nx, y: ny, w: nw, h: nh });
   };
 
-  const onMouseUp = () => {
+  const onPointerUp = (e: React.PointerEvent) => {
+    (e.target as Element).releasePointerCapture?.(e.pointerId);
     if (!drawing || !curBox) { setDrawing(null); setCurBox(null); return; }
     // 太小忽略
     if (curBox.w < 0.02 || curBox.h < 0.02) {
@@ -216,7 +220,7 @@ export default function TemplateManager() {
 
           {image && (
             <div>
-              <div className="text-xs text-gray-500 mb-1">在图片上按住鼠标拖动来框选字段, 松开后输入字段名称</div>
+              <div className="text-xs text-gray-500 mb-1">在图片上按住拖动来框选字段 (支持鼠标/触摸), 松开后输入字段名称</div>
               <div
                 ref={containerRef}
                 className="relative inline-block select-none border border-gray-200 rounded-lg overflow-hidden"
@@ -233,7 +237,7 @@ export default function TemplateManager() {
                 {fields.map((f, i) => (
                   <div
                     key={i}
-                    className="absolute border-2 flex items-start"
+                    className="absolute border-2 flex items-start pointer-events-none"
                     style={{
                       left: `${f.bbox.x * 100}%`,
                       top: `${f.bbox.y * 100}%`,
@@ -248,7 +252,7 @@ export default function TemplateManager() {
                     >{f.name}</span>
                     <button
                       onClick={() => removeField(i)}
-                      className="absolute -top-2 -right-2 w-4 h-4 bg-red-500 text-white text-[10px] rounded-full flex items-center justify-center"
+                      className="absolute -top-2 -right-2 w-4 h-4 bg-red-500 text-white text-[10px] rounded-full flex items-center justify-center pointer-events-auto"
                       title="删除"
                     >×</button>
                   </div>
@@ -265,13 +269,14 @@ export default function TemplateManager() {
                     }}
                   />
                 )}
-                {/* 透明覆盖层用于捕获鼠标 */}
+                {/* 覆盖层: 捕获指针事件用于框选 (统一鼠标/触摸) */}
                 <div
                   className="absolute inset-0 cursor-crosshair"
-                  onMouseDown={onMouseDown}
-                  onMouseMove={onMouseMove}
-                  onMouseUp={onMouseUp}
-                  onMouseLeave={() => { if (drawing) { setDrawing(null); setCurBox(null); } }}
+                  style={{ touchAction: 'none' }}
+                  onPointerDown={onPointerDown}
+                  onPointerMove={onPointerMove}
+                  onPointerUp={onPointerUp}
+                  onPointerCancel={() => { setDrawing(null); setCurBox(null); }}
                 />
               </div>
 
