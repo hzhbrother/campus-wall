@@ -283,16 +283,20 @@ function ProfilePageInner() {
   }, []);
 
   useEffect(() => {
-    if (searchParams.get('edit') === '1' && view === 'home') {
+    if (searchParams.get('edit') === '1') {
       setView('edit');
+      // 消费后清除 URL 参数, 避免返回时 useEffect 重新触发导致死循环
+      router.replace('/profile', { scroll: false });
+      return;
     }
     // 通过通知链接直接打开管理后台的申诉审核
     const tab = searchParams.get('tab');
-    if (tab === 'appeals' && view !== 'appeals') {
+    if (tab === 'appeals') {
       setAdminTab('appeals');
       setView('appeals');
+      router.replace('/profile', { scroll: false });
     }
-  }, [searchParams, view]);
+  }, [searchParams]);
 
   // 标签页激活时刷新用户信息 (跳过挂载时首次刷新, 由 auth context 负责)
   usePageRefresh(() => { refreshUser(); }, [refreshUser], true);
