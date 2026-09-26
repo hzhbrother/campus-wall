@@ -70,10 +70,6 @@ export default function AboutPage() {
           </div>
         )}
       </div>
-
-      <div className="text-center text-xs text-gray-400 py-2">
-        © {new Date().getFullYear()} {siteName}
-      </div>
     </div>
   );
 }
