@@ -44,6 +44,21 @@ export async function approve(postId: string, actorId: string) {
   if (!post) throw new Error('帖子不存在');
   const updated = await prisma.post.update({ where: { id: postId }, data: { status: PostStatus.APPROVED } });
   await audit(actorId, 'APPROVE_POST', postId);
+
+  // 发送审核通过通知 (邮件 + 站内)
+  if (post.authorId) {
+    const { createNotification } = await import('@/lib/notification-service');
+    const { NotificationType } = await import('@prisma/client');
+    await createNotification({
+      userId: post.authorId,
+      type: NotificationType.POST,
+      title: '帖子审核通过',
+      content: `您发布的帖子「${post.title}」已通过审核，现已公开发布。`,
+      link: `/post/${postId}`,
+      sendEmail: true,
+      templateData: { _templateKey: 'post.approved', postTitle: post.title, postUrl: `/post/${postId}` },
+    });
+  }
   return updated;
 }
 
@@ -59,15 +74,17 @@ export async function reject(postId: string, actorId: string, reason?: string, v
     const vLabel = violationTypeLabel(violationType);
     const points = VIOLATION_POINTS[violationType] || 10;
     const { newScore } = await recordViolation(post.author.id, violationType, `帖子「${post.title}」因「${reason || vLabel}」被驳回`, postId);
-    // 发送违规扣分通知
+    // 发送驳回通知 (使用 post.rejected 模板)
     const { createNotification } = await import('@/lib/notification-service');
     const { NotificationType } = await import('@prisma/client');
     await createNotification({
       userId: post.author.id,
-      type: NotificationType.SYSTEM,
-      title: '账号违规通知',
+      type: NotificationType.POST,
+      title: '帖子审核驳回',
       content: `您发布的帖子「${post.title}」因「${reason || vLabel}」被驳回, 已扣除诚信分 ${points} 分, 当前诚信分 ${newScore} 分。`,
       link: `/post/${postId}`,
+      sendEmail: true,
+      templateData: { _templateKey: 'post.rejected', postTitle: post.title, reason: reason || vLabel },
     });
   }
   return updated;
@@ -241,6 +258,10 @@ export async function banUser(
     title: '账号违规通知',
     content: `您的账号已违规: 因「${vLabel}」${reason ? '（' + reason + '）' : ''}, 扣除诚信分 ${deducted} 分, 当前诚信分 ${newScore} 分。\n处罚措施: ${banDurationText}。\n如有异议, 可点击下方进行申诉。`,
     link: '/profile/ban-appeal',
+    templateData: {
+      reason: `${vLabel}${reason ? '（' + reason + '）' : ''}`,
+      expiresAt: isPermanent ? '' : (user.bannedUntil ? new Date(user.bannedUntil).toLocaleString('zh-CN') : ''),
+    },
   });
 
   await audit(actorId, 'BAN_USER', userId, isPermanent ? '永久封禁' : `封禁${durationDays}天${durationHours}小时`);

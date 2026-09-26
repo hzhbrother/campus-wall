@@ -1061,6 +1061,7 @@ function EmailSettings() {
   const [testMsg, setTestMsg] = useState('');
   const [connecting, setConnecting] = useState(false);
   const [connectMsg, setConnectMsg] = useState('');
+  const [connectDetail, setConnectDetail] = useState<{ alternatives?: { label: string; ok: boolean; hint: string }[]; suggestion?: string } | null>(null);
 
   // 模板相关
   const [templates, setTemplates] = useState<any[]>([]);
@@ -1068,11 +1069,20 @@ function EmailSettings() {
   const [tplName, setTplName] = useState('');
   const [tplSubject, setTplSubject] = useState('');
   const [tplHtml, setTplHtml] = useState('');
+  const [tplVariables, setTplVariables] = useState<{ name: string; desc: string }[]>([]);
   const [tplSaving, setTplSaving] = useState(false);
   const [tplMsg, setTplMsg] = useState('');
 
   useEffect(() => {
-    api.get('/api/admin/site-config').then(setCfg).catch(console.error).finally(() => setLoading(false));
+    api.get<Record<string, string>>('/api/admin/site-config').then(data => {
+      // 确保关键开关有默认值, 避免 "显示了但未保存" 的问题
+      const withDefaults: Record<string, string> = {
+        smtp_enabled: data.smtp_enabled ?? 'true',
+        smtp_secure: data.smtp_secure ?? 'true',
+        ...data,
+      };
+      setCfg(withDefaults);
+    }).catch(console.error).finally(() => setLoading(false));
     api.get<{ templates: any[] }>('/api/admin/email-templates').then(r => {
       setTemplates(r.templates || []);
       if (r.templates?.length) {
@@ -1081,6 +1091,7 @@ function EmailSettings() {
         setTplName(first.name);
         setTplSubject(first.subject);
         setTplHtml(first.html);
+        setTplVariables(first.variables || []);
       }
     }).catch(console.error);
   }, []);
@@ -1095,11 +1106,17 @@ function EmailSettings() {
   };
 
   const testConnection = async () => {
-    setConnecting(true); setConnectMsg('');
+    setConnecting(true); setConnectMsg(''); setConnectDetail(null);
     try {
       const r = await api.post<{ message?: string }>('/api/admin/site-config/test-connection', {});
       setConnectMsg(r.message || '连接成功');
-    } catch (e: any) { setConnectMsg(e.message); } finally { setConnecting(false); }
+    } catch (e: any) {
+      setConnectMsg(e.message);
+      // 后端返回的多策略诊断
+      if (e?.data) {
+        setConnectDetail({ alternatives: e.data.alternatives, suggestion: e.data.suggestion });
+      }
+    } finally { setConnecting(false); }
   };
 
   const sendTest = async () => {
@@ -1117,6 +1134,7 @@ function EmailSettings() {
     setTplName(t.name);
     setTplSubject(t.subject);
     setTplHtml(t.html);
+    setTplVariables(t.variables || []);
     setTplMsg('');
   };
 
@@ -1169,6 +1187,10 @@ function EmailSettings() {
                 </select>
               </div>
             </div>
+            <label className="flex items-center gap-2 cursor-pointer">
+              <input type="checkbox" checked={cfg.smtp_tls_reject_unauthorized === 'false'} onChange={e => set('smtp_tls_reject_unauthorized', String(!e.target.checked))} className="h-4 w-4" />
+              <span className="text-xs text-gray-500">跳过 TLS 证书校验 (仅在证书异常时临时启用, 有安全风险)</span>
+            </label>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">发件人账号</label>
               <input value={cfg.smtp_user || ''} onChange={e => set('smtp_user', e.target.value)} className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm" placeholder="your-email@163.com" />
@@ -1202,6 +1224,24 @@ function EmailSettings() {
               <button onClick={sendTest} disabled={testing || !enabled} className="rounded-lg bg-green-600 px-4 py-2 text-sm font-medium text-white disabled:opacity-50 hover:bg-green-700">{testing ? '发送中…' : '发送测试'}</button>
             </div>
             {connectMsg && <p className={`text-xs ${connectMsg.includes('成功') ? 'text-green-600' : 'text-red-500'}`}>连接: {connectMsg}</p>}
+            {connectDetail && (
+              <div className="mt-2 space-y-1 rounded-lg bg-gray-50 p-3 text-xs">
+                {connectDetail.alternatives && connectDetail.alternatives.length > 0 && (
+                  <div>
+                    <p className="font-medium text-gray-700 mb-1">🔍 自动尝试的备选组合:</p>
+                    {connectDetail.alternatives.map((a, i) => (
+                      <div key={i} className="flex items-start gap-1.5">
+                        <span className={a.ok ? 'text-green-600' : 'text-gray-400'}>{a.ok ? '✅' : '❌'}</span>
+                        <span className="text-gray-600"><b>{a.label}</b>: {a.hint}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+                {connectDetail.suggestion && (
+                  <p className="mt-2 text-amber-700 bg-amber-50 rounded px-2 py-1.5">💡 {connectDetail.suggestion}</p>
+                )}
+              </div>
+            )}
             {testMsg && <p className={`text-xs ${testMsg.includes('成功') || testMsg.includes('已') ? 'text-green-600' : 'text-red-500'}`}>邮件: {testMsg}</p>}
           </div>
         </div>
@@ -1211,7 +1251,19 @@ function EmailSettings() {
           <h3 className="font-semibold text-gray-900 mb-3 flex items-center gap-2">
             <span>📝</span> 邮件模板
           </h3>
-          <p className="text-xs text-gray-400 mb-3">支持变量 <code className="bg-gray-100 px-1 rounded">{'{{purpose}}'}</code> <code className="bg-gray-100 px-1 rounded">{'{{code}}'}</code> <code className="bg-gray-100 px-1 rounded">{'{{expiresInMinutes}}'}</code> <code className="bg-gray-100 px-1 rounded">{'{{email}}'}</code></p>
+          <div className="text-xs text-gray-400 mb-3">
+            支持变量:
+            {tplVariables.length > 0 ? (
+              <span className="ml-1">
+                {tplVariables.map(v => (
+                  <code key={v.name} className="bg-gray-100 px-1.5 py-0.5 rounded mr-1.5" title={v.desc}>{`{{${v.name}}}`}</code>
+                ))}
+              </span>
+            ) : (
+              <span className="ml-1 text-gray-300">（当前模板未声明变量）</span>
+            )}
+            <span className="ml-1 text-gray-400">· 语法: <code className="bg-gray-100 px-1 rounded">{'{{var}}'}</code> 自动转义, <code className="bg-gray-100 px-1 rounded">{'{{!var}}'}</code> 不转义, <code className="bg-gray-100 px-1 rounded">{'{{#if var}}…{{/if}}'}</code> 条件块</span>
+          </div>
 
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
             {/* 模板列表 */}

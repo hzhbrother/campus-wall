@@ -2,6 +2,7 @@
 import { NotificationType, UserRole } from '@prisma/client';
 import { prisma } from './prisma';
 import { sendEmail } from './email-service';
+import { getTemplate, renderTemplate } from './email-templates';
 
 export interface CreateNotificationOptions {
   userId?: string | null;       // null = 广播给所有人
@@ -12,11 +13,23 @@ export interface CreateNotificationOptions {
   sendEmail?: boolean;          // 是否同时发邮件
   targetRole?: UserRole;       // 按角色发送
   pinned?: boolean;            // 强调/置顶
+  /** 邮件模板专用数据 (如 postTitle, reason 等) */
+  templateData?: Record<string, any>;
 }
+
+// 通知类型 -> 邮件模板 key 映射
+const TYPE_TEMPLATE_MAP: Partial<Record<NotificationType, string>> = {
+  [NotificationType.SYSTEM]: 'notification.generic',
+  [NotificationType.ANNOUNCE]: 'notification.generic',
+  [NotificationType.POST]: 'post.approved',   // 默认走审核通过, 调用方可通过 templateData 切换
+  [NotificationType.COMMENT]: 'comment.reply',
+  [NotificationType.LIKE]: 'post.liked',
+  [NotificationType.BAN]: 'user.banned',
+};
 
 // 创建通知 (单条或批量)
 export async function createNotification(opts: CreateNotificationOptions) {
-  const { userId, type = NotificationType.SYSTEM, title, content, link, sendEmail: doEmail = false, targetRole, pinned = false } = opts;
+  const { userId, type = NotificationType.SYSTEM, title, content, link, sendEmail: doEmail = false, targetRole, pinned = false, templateData } = opts;
 
   // 目标用户列表
   let userIds: string[] = [];
@@ -28,7 +41,7 @@ export async function createNotification(opts: CreateNotificationOptions) {
   } else {
     // 全体广播: 创建一条 userId=null 的广播通知
     await prisma.notification.create({ data: { type, title, content, link, userId: null, pinned } });
-    if (doEmail) await broadcastEmail(title, content, null);
+    if (doEmail) await broadcastEmail(type, title, content, link, null, templateData);
     return;
   }
 
@@ -42,23 +55,51 @@ export async function createNotification(opts: CreateNotificationOptions) {
 
   // 邮件推送
   if (doEmail && userIds.length > 0) {
-    await broadcastEmail(title, content, userIds);
+    await broadcastEmail(type, title, content, link, userIds, templateData);
   }
 }
 
-// 批量发送邮件
-async function broadcastEmail(title: string, content: string, userIds: string[] | null) {
+// 获取站点名称
+async function getSiteName(): Promise<string> {
+  const row = await prisma.siteConfig.findUnique({ where: { key: 'site_name' } });
+  return row?.value || '校园墙';
+}
+
+// 批量发送邮件 (按通知类型选择模板)
+async function broadcastEmail(
+  type: NotificationType,
+  title: string,
+  content: string,
+  link: string | undefined,
+  userIds: string[] | null,
+  templateData?: Record<string, any>
+) {
   const where = userIds ? { id: { in: userIds }, email: { not: null } } : { email: { not: null } };
   const users = await prisma.user.findMany({ where, select: { email: true, nickname: true } });
-  const html = `
-    <div style="max-width:600px;margin:0 auto;font-family:sans-serif;">
-      <h2 style="color:#3b82f6;">${title}</h2>
-      <p style="color:#374151;line-height:1.6;">${content.replace(/\n/g, '<br>')}</p>
-      <hr style="border:none;border-top:1px solid #e5e7eb;margin:20px 0;"/>
-      <p style="color:#9ca3af;font-size:12px;">此邮件由校园墙系统自动发送，请勿直接回复。</p>
-    </div>`;
+  if (users.length === 0) return;
+
+  const siteName = await getSiteName();
+  // 优先使用调用方指定的模板, 否则按通知类型映射, 最后回退通用模板
+  const tplKey = templateData?._templateKey || TYPE_TEMPLATE_MAP[type] || 'notification.generic';
+  const template = await getTemplate(tplKey);
+
+  // 模板变量: 合并通用变量 + 业务数据
+  const vars: Record<string, any> = {
+    siteName,
+    title,
+    message: content.replace(/\n/g, '<br>'),
+    actionUrl: link,
+    actionText: '查看详情',
+    nickname: '', // 单条发送时会覆盖
+    ...(templateData || {}),
+  };
+
   for (const u of users) {
-    if (u.email) await sendEmail(u.email, `[校园墙] ${title}`, html);
+    if (!u.email) continue;
+    const userVars = { ...vars, nickname: u.nickname || '同学' };
+    const subject = template ? renderTemplate(template.subject, userVars) : `【${siteName}】${title}`;
+    const html = template ? renderTemplate(template.html, userVars) : content;
+    await sendEmail(u.email, subject, html);
   }
 }
 

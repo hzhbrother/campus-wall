@@ -52,7 +52,11 @@ export async function sendEmailCode(email: string, purpose: string): Promise<{ s
   // 4. 获取邮件模板并渲染
   const template = await getTemplate('verification-code');
   const purposeLabel = PURPOSE_LABEL[purpose] || '邮箱验证';
+  // 获取站点名称
+  const siteRow = await prisma.siteConfig.findUnique({ where: { key: 'site_name' } }).catch(() => null);
+  const siteName = siteRow?.value || '校园墙';
   const vars = {
+    siteName,
     purpose: purposeLabel,
     code,
     expiresInMinutes: String(CODE_EXPIRE_MINUTES),

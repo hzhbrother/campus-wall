@@ -4,9 +4,11 @@ const BASE = process.env.NEXT_PUBLIC_API_BASE || '';
 
 export class ApiError extends Error {
   status: number;
-  constructor(message: string, status: number) {
+  data: any;
+  constructor(message: string, status: number, data?: any) {
     super(message);
     this.status = status;
+    this.data = data;
   }
 }
 
@@ -36,7 +38,7 @@ async function request<T>(path: string, opts: RequestInit = {}): Promise<T> {
       }
     }
     const message = data?.message || (Array.isArray(data?.message) ? data.message[0] : `请求失败 (${res.status})`);
-    throw new ApiError(message, res.status);
+    throw new ApiError(message, res.status, data);
   }
   return data as T;
 }
