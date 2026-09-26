@@ -452,6 +452,8 @@ const CLASS_LIST = ['1班', '2班', '3班', '4班', '5班', '6班', '7班', '8�
 
 function EditUserModal({ user, onClose, onSaved, isSuper }: { user: any; onClose: () => void; onSaved: () => void; isSuper: boolean }) {
   const [realName, setRealName] = useState(user.realName || '');
+  const [email, setEmail] = useState(user.email || '');
+  const [phoneNumber, setPhoneNumber] = useState(user.phoneNumber || '');
   const [grade, setGrade] = useState(user.grade || '');
   const [className, setClassName] = useState(user.className || '');
   const [remark, setRemark] = useState(user.remark || '');
@@ -462,6 +464,8 @@ function EditUserModal({ user, onClose, onSaved, isSuper }: { user: any; onClose
   const [verified, setVerified] = useState(!!user.verified);
   const [rejectReason, setRejectReason] = useState('');
   const [avatar, setAvatar] = useState(user.avatar || '');
+  const [qualificationType, setQualificationType] = useState(user.qualificationType || '');
+  const [qualificationVerified, setQualificationVerified] = useState(!!user.qualificationVerified);
   const [saving, setSaving] = useState(false);
   const [err, setErr] = useState('');
 
@@ -499,8 +503,13 @@ function EditUserModal({ user, onClose, onSaved, isSuper }: { user: any; onClose
     setSaving(true); setErr('');
     try {
       const payload: any = { realName, grade, className, remark, status, verified };
+      if (email !== (user.email || '')) payload.email = email || '';
+      if (phoneNumber !== (user.phoneNumber || '')) payload.phoneNumber = phoneNumber || '';
       // 仅头像有变更时才上传, 避免无谓的大体积请求
       if (avatar !== (user.avatar || '')) payload.avatar = avatar;
+      // 资质认证
+      if (qualificationType !== (user.qualificationType || '')) payload.qualificationType = qualificationType || '';
+      if (qualificationVerified !== !!user.qualificationVerified) payload.qualificationVerified = qualificationVerified;
       // 角色: 系统角色 or 自定义角色
       if (roleVal.startsWith('custom:')) {
         payload.roleId = roleVal.slice(7);
@@ -578,6 +587,17 @@ function EditUserModal({ user, onClose, onSaved, isSuper }: { user: any; onClose
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">真实姓名</label>
             <input value={realName} onChange={e => setRealName(e.target.value)} className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/40" placeholder="请输入真实姓名" />
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">邮箱</label>
+              <input type="email" value={email} onChange={e => setEmail(e.target.value)} className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/40" placeholder="user@example.com" />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">手机号</label>
+              <input type="tel" value={phoneNumber} onChange={e => setPhoneNumber(e.target.value.replace(/\D/g, ''))} className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/40" placeholder="选填" />
+            </div>
           </div>
 
           <div className="grid grid-cols-2 gap-3">
@@ -687,6 +707,28 @@ function EditUserModal({ user, onClose, onSaved, isSuper }: { user: any; onClose
               上次驳回原因: {user.verificationRejectReason}
             </div>
           )}
+
+          {/* 资质认证 (学生会/广播站等组织认证) */}
+          <div className="rounded-lg border border-purple-200 px-3 py-2.5">
+            <div className="text-sm font-medium text-purple-700 mb-2">🏅 资质认证 (组织身份)</div>
+            <div className="grid grid-cols-2 gap-2">
+              <select value={qualificationType} onChange={e => setQualificationType(e.target.value)} className="rounded-lg border border-gray-300 px-3 py-2 text-sm">
+                <option value="">无</option>
+                <option value="学生会">学生会</option>
+                <option value="广播站">广播站</option>
+                <option value="团委">团委</option>
+                <option value="社团联合会">社团联合会</option>
+                <option value="校报编辑部">校报编辑部</option>
+                <option value="志愿者协会">志愿者协会</option>
+                <option value="其他">其他</option>
+              </select>
+              <label className="flex items-center gap-2 text-sm text-gray-600">
+                <input type="checkbox" checked={qualificationVerified} onChange={e => setQualificationVerified(e.target.checked)} className="h-4 w-4" />
+                已验证
+              </label>
+            </div>
+            <p className="mt-1 text-xs text-gray-400">管理员可手动设置用户的组织身份和验证状态</p>
+          </div>
 
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">备注</label>
@@ -1758,6 +1800,18 @@ function SiteSettings() {
         </div>
 
         <div className="rounded-xl border border-gray-100 p-4">
+          <h3 className="font-semibold text-gray-900 mb-3">🎨 个人中心</h3>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">个人中心背景图 URL</label>
+            <input value={cfg.profile_bg || ''} onChange={e => set('profile_bg', e.target.value)} className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm" placeholder="https://...  (留空使用默认渐变)" />
+            {cfg.profile_bg && (
+              <div className="mt-2 h-20 rounded-lg overflow-hidden border border-gray-200" style={{ backgroundImage: `url(${cfg.profile_bg})`, backgroundSize: 'cover', backgroundPosition: 'center' }} />
+            )}
+            <p className="mt-1 text-xs text-gray-400">建议上传 750x300 的图片, 管理员可在用户管理中单独修改用户头像</p>
+          </div>
+        </div>
+
+        <div className="rounded-xl border border-gray-100 p-4">
           <h3 className="font-semibold text-gray-900 mb-3">⚙️ 功能开关</h3>
           <div className="space-y-3">
             {[
@@ -1935,6 +1989,18 @@ function mapFieldsToUser(fields: Record<string, string>) {
     else if (['grade', '年级'].includes(key)) out.grade = val;
     else if (['classname', 'class', '班级'].includes(key)) out.className = val;
     else if (['school', '学校', '院校'].includes(key)) out.school = val;
+    else if (['email', '邮箱', '电子邮件'].includes(key)) out.email = val;
+    else if (['phone', '手机', '手机号', '电话', 'phonenumber'].includes(key)) {
+      // 尝试分离区号和号码
+      const m = val.match(/(\+\d{1,4})?[-\s]?([\d-]+)/);
+      if (m) {
+        if (m[1]) out.countryCode = m[1];
+        out.phoneNumber = (m[2] || val).replace(/-/g, '');
+      } else {
+        out.phoneNumber = val.replace(/\D/g, '');
+      }
+    }
+    else if (['nickname', '昵称'].includes(key)) out.nickname = val;
   }
   return out;
 }
@@ -1951,6 +2017,9 @@ function VerificationReviewTab() {
   const [rejectMode, setRejectMode] = useState(false);
   const [rejectReason, setRejectReason] = useState('');
   const [customReason, setCustomReason] = useState('');
+  // 提取的头像 base64 + 是否设为用户头像
+  const [extractedAvatar, setExtractedAvatar] = useState<string>('');
+  const [setAsAvatar, setSetAsAvatar] = useState(true);
 
   const load = useCallback(() => {
     setLoading(true); setErr('');
@@ -1982,6 +2051,8 @@ function VerificationReviewTab() {
       if (['grade', '年级'].includes(norm)) continue;
       if (['classname', 'class', '班级'].includes(norm)) continue;
       if (['school', '学校', '院校'].includes(norm)) continue;
+      // 头像字段跳过 (不是文本字段)
+      if (['avatar', '头像', 'photo', '照片'].includes(norm)) continue;
       merged[k] = v;
     }
     setFields(merged);
@@ -1989,6 +2060,46 @@ function VerificationReviewTab() {
     setRejectReason('');
     setCustomReason('');
     setReviewTarget(u);
+    setExtractedAvatar('');
+    setSetAsAvatar(true);
+
+    // 如果 AI 结果中有头像 bbox, 用 canvas 从认证照片中裁剪
+    if (ai.avatarBbox && u.verificationPhoto) {
+      extractAvatar(u.verificationPhoto, ai.avatarBbox).then(dataUrl => {
+        if (dataUrl) setExtractedAvatar(dataUrl);
+      }).catch(() => {});
+    }
+  };
+
+  // 用 canvas 从认证照片中裁剪头像区域
+  const extractAvatar = (photoSrc: string, bbox: { x: number; y: number; w: number; h: number }): Promise<string | null> => {
+    return new Promise(resolve => {
+      const img = new Image();
+      img.crossOrigin = 'anonymous';
+      img.onload = () => {
+        const sx = Math.max(0, bbox.x * img.width);
+        const sy = Math.max(0, bbox.y * img.height);
+        const sw = Math.max(1, bbox.w * img.width);
+        const sh = Math.max(1, bbox.h * img.height);
+        // 限制最大尺寸 400px
+        const maxDim = 400;
+        let dw = sw, dh = sh;
+        if (Math.max(sw, sh) > maxDim) {
+          const scale = maxDim / Math.max(sw, sh);
+          dw = Math.round(sw * scale);
+          dh = Math.round(sh * scale);
+        }
+        const canvas = document.createElement('canvas');
+        canvas.width = dw;
+        canvas.height = dh;
+        const ctx = canvas.getContext('2d');
+        if (!ctx) { resolve(null); return; }
+        ctx.drawImage(img, sx, sy, sw, sh, 0, 0, dw, dh);
+        resolve(canvas.toDataURL('image/jpeg', 0.85));
+      };
+      img.onerror = () => resolve(null);
+      img.src = photoSrc;
+    });
   };
 
   const doApprove = async () => {
@@ -1997,13 +2108,23 @@ function VerificationReviewTab() {
     setBusy(true);
     try {
       const mapped = mapFieldsToUser(fields);
-      await api.patch(`/api/admin/users/${reviewTarget.id}`, {
+      const payload: any = {
         verificationStatus: 'APPROVED',
         realName: mapped.realName || undefined,
         studentId: mapped.studentId || undefined,
         grade: mapped.grade || undefined,
         className: mapped.className || undefined,
-      });
+      };
+      // 自动填充邮箱/手机号/昵称 (仅当识别到值时)
+      if (mapped.email) payload.email = mapped.email;
+      if (mapped.phoneNumber) {
+        payload.phoneNumber = mapped.phoneNumber;
+        if (mapped.countryCode) payload.countryCode = mapped.countryCode;
+      }
+      if (mapped.nickname) payload.nickname = mapped.nickname;
+      // 如果提取到了头像且勾选"设为用户头像", 一并更新
+      if (extractedAvatar && setAsAvatar) payload.avatar = extractedAvatar;
+      await api.patch(`/api/admin/users/${reviewTarget.id}`, payload);
       setReviewTarget(null);
       load();
     } catch (e: any) { alert(e.message); }
@@ -2162,6 +2283,23 @@ function VerificationReviewTab() {
                 ))}
               </div>
             </div>
+
+            {/* 提取的头像预览 */}
+            {extractedAvatar && (
+              <div className="mt-4 flex items-center gap-4 rounded-xl bg-blue-50 p-3">
+                <div className="h-20 w-20 overflow-hidden rounded-full border-2 border-blue-300 flex items-center justify-center bg-white">
+                  <img src={extractedAvatar} alt="提取的头像" className="h-full w-full object-cover" />
+                </div>
+                <div className="flex-1">
+                  <div className="text-sm font-medium text-blue-800">已从校园卡提取头像</div>
+                  <div className="text-xs text-blue-600 mt-0.5">通过认证时将自动设为用户头像</div>
+                </div>
+                <label className="flex items-center gap-1 text-sm text-gray-600 cursor-pointer">
+                  <input type="checkbox" checked={setAsAvatar} onChange={e => setSetAsAvatar(e.target.checked)} className="h-4 w-4" />
+                  设为头像
+                </label>
+              </div>
+            )}
 
             {/* 驳回原因选择 */}
             {rejectMode && (

@@ -11,6 +11,7 @@ const PUBLIC_KEYS = [
   'announcement_text',
   'agreement_content', 'privacy_content',
   'about_content',
+  'profile_bg',
 ];
 
 export async function GET() {

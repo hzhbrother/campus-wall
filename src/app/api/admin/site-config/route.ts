@@ -8,6 +8,8 @@ import { errorResponse } from '@/lib/api-response';
 const CONFIG_KEYS = [
   // 站点信息
   'site_name', 'site_desc', 'site_logo', 'site_url', 'site_icp', 'contact_email', 'site_keywords',
+  // 个人中心背景
+  'profile_bg',
   // SMTP
   'smtp_enabled', 'smtp_host', 'smtp_port', 'smtp_user', 'smtp_pass', 'smtp_from', 'smtp_from_name', 'smtp_from_email', 'smtp_secure', 'smtp_tls_reject_unauthorized',
   // 功能开关

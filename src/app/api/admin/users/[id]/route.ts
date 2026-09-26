@@ -14,12 +14,19 @@ const Schema = z.object({
   className: z.string().max(20).optional().or(z.literal('')),
   remark: z.string().max(200).optional().or(z.literal('')),
   avatar: z.string().optional(),
+  nickname: z.string().max(20).optional(),
+  email: z.string().email().optional().or(z.literal('')),
+  phoneNumber: z.string().max(20).optional().or(z.literal('')),
+  countryCode: z.string().max(10).optional().or(z.literal('')),
   status: z.enum(['NORMAL', 'GRADUATED', 'BANNED']).optional(),
   role: z.enum(['USER', 'STUDENT', 'TEACHER', 'ADMIN', 'SUPER_ADMIN']).optional(),
   verified: z.boolean().optional(),
   // 认证审核: APPROVED 通过 / REJECTED 驳回 (驳回时需传 rejectReason)
   verificationStatus: z.enum(['APPROVED', 'REJECTED', 'NONE']).optional(),
   verificationRejectReason: z.string().max(200).optional().or(z.literal('')),
+  // 资质认证 (学生会/广播站等)
+  qualificationType: z.string().max(50).optional().or(z.literal('')),
+  qualificationVerified: z.boolean().optional(),
 });
 
 export async function PATCH(req: NextRequest, { params }: { params: { id: string } }) {
@@ -33,6 +40,15 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
     if (dto.className !== undefined) data.className = dto.className || null;
     if (dto.remark !== undefined) data.remark = dto.remark || null;
     if (dto.avatar !== undefined) data.avatar = dto.avatar || null;
+    if (dto.nickname !== undefined) data.nickname = dto.nickname;
+    if (dto.email !== undefined) data.email = dto.email || null;
+    if (dto.phoneNumber !== undefined) data.phoneNumber = dto.phoneNumber || null;
+    if (dto.countryCode !== undefined) data.countryCode = dto.countryCode || null;
+    if (dto.qualificationType !== undefined) data.qualificationType = dto.qualificationType || null;
+    if (dto.qualificationVerified !== undefined) {
+      data.qualificationVerified = dto.qualificationVerified;
+      data.qualificationVerifiedAt = dto.qualificationVerified ? new Date() : null;
+    }
     if (dto.status) data.status = dto.status as UserStatus;
     if (dto.role) data.role = dto.role as UserRole;
     if (dto.verified !== undefined) {

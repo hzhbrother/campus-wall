@@ -23,6 +23,9 @@ export interface AuthUser {
   verified?: boolean;
   verificationStatus?: string;
   verificationRejectReason?: string | null;
+  // 资质认证 (组织身份)
+  qualificationType?: string | null;
+  qualificationVerified?: boolean;
   createdAt?: string;
   bannedUntil?: string | null;
   banReason?: string | null;

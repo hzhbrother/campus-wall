@@ -55,6 +55,7 @@ export interface AiReviewResult {
   rejectReason?: string;          // 初审驳回原因
   fields: Record<string, string>; // 字段名 -> 识别值 (字段名来自模板)
   bboxes: Record<string, BBox>;   // 字段名 -> 用户图中对应位置 (归一化)
+  avatarBbox?: BBox;              // 头像区域的归一化坐标 (模板中名为"头像"的字段)
   confidence: 'high' | 'medium' | 'low';
   rawText: string;                // OCR 全文 (供人工复核参考)
 }
@@ -379,8 +380,9 @@ function extractFieldsByTemplate(words: OcrWord[], imgW: number, imgH: number, f
 
   for (const field of fields) {
     // 收集与 field 框有重叠的词, 按从上到下从左到右排序
+    // 降低重叠阈值至 0.05, 避免因坐标微小偏差导致漏匹配
     const hits = normWords
-      .filter(w => bboxOverlap(field.bbox, { x: w.x, y: w.y, w: w.w, h: w.h }) > 0.15)
+      .filter(w => bboxOverlap(field.bbox, { x: w.x, y: w.y, w: w.w, h: w.h }) > 0.05)
       .sort((a, b) => a.y - b.y || a.x - b.x);
     if (hits.length > 0) {
       result[field.name] = hits.map(h => h.text).join(' ').trim();
@@ -464,11 +466,42 @@ export async function preliminaryReview(
   const fields: Record<string, string> = {};
   const bboxes: Record<string, BBox> = {};
   const rawText = ocr?.text || '';
+  let avatarBbox: BBox | undefined;
 
   if (ocr && template && template.fields.length > 0) {
+    // 按模板字段坐标提取
     const mapped = extractFieldsByTemplate(ocr.words, ocr.imgWidth, ocr.imgHeight, template.fields);
     Object.assign(fields, mapped.result);
     Object.assign(bboxes, mapped.bboxes);
+
+    // 如果模板提取到的字段太少, 用正则兜底补充缺失字段
+    if (Object.keys(fields).length < template.fields.length) {
+      const regexFields = extractFieldsByRegex(ocr.text);
+      for (const [k, v] of Object.entries(regexFields)) {
+        if (!fields[k]) fields[k] = v;
+      }
+    }
+
+    // 按字段名在原文中搜索值 (针对 OCR 坐标不匹配的情况)
+    for (const field of template.fields) {
+      if (fields[field.name]) continue; // 已有值跳过
+      const fn = field.name.trim();
+      // 在原文中查找 "字段名:值" 或 "字段名 值" 格式
+      const re = new RegExp(`${fn.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}[\\s:：]*([^\\n]{1,30})`, 'i');
+      const m = ocr.text.match(re);
+      if (m && m[1].trim()) {
+        fields[field.name] = m[1].trim();
+      }
+    }
+
+    // 检查模板中是否有"头像"字段, 记录其 bbox 用于前端裁剪
+    const avatarField = template.fields.find(f => {
+      const n = f.name.toLowerCase().replace(/\s+/g, '');
+      return ['头像', 'avatar', 'photo', '照片', '照片'].includes(n);
+    });
+    if (avatarField) {
+      avatarBbox = avatarField.bbox;
+    }
   } else if (ocr) {
     // 无模板时正则兜底
     Object.assign(fields, extractFieldsByRegex(ocr.text));
@@ -488,6 +521,7 @@ export async function preliminaryReview(
     rejectReason: judge.rejectReason,
     fields,
     bboxes,
+    avatarBbox,
     confidence,
     rawText,
   };

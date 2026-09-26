@@ -128,6 +128,10 @@ model User {
   verificationAiResult Json?  // AI 初审识别结果 (信息+边界框), 供人工复核参考
   verificationReviewedBy String? // 人工复核人 ID
   verificationReviewedAt DateTime? // 人工复核时间
+  // 资质认证 (学生会/广播站等组织认证)
+  qualificationType String?    // 组织类型: 学生会/广播站/团委/社团等
+  qualificationVerified Boolean @default(false) // 资质认证是否已通过
+  qualificationVerifiedAt DateTime? // 资质认证通过时间
   createdAt    DateTime         @default(now())
   updatedAt    DateTime         @updatedAt
 

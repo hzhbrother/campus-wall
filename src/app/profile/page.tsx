@@ -268,11 +268,19 @@ function ProfilePageInner() {
   const [showPwdModal, setShowPwdModal] = useState(false);
   const [showNotifModal, setShowNotifModal] = useState(false);
   const [showVerifyModal, setShowVerifyModal] = useState(false);
+  const [profileBg, setProfileBg] = useState('');
 
   // 系统管理员/超级管理员, 或拥有自定义角色的用户均可进入管理后台
   const isAdmin = user?.role === 'ADMIN' || user?.role === 'SUPER_ADMIN' || !!user?.roleId;
   const isSuper = user?.role === 'SUPER_ADMIN';
   const forcePhone = searchParams.get('forcePhone') === '1';
+
+  // 加载个人中心背景图 (管理员可在站点设置中配置)
+  useEffect(() => {
+    api.get<{ profile_bg?: string }>('/api/site-config')
+      .then(d => { if (d.profile_bg) setProfileBg(d.profile_bg); })
+      .catch(() => {});
+  }, []);
 
   useEffect(() => {
     if (searchParams.get('edit') === '1' && view === 'home') {
@@ -390,9 +398,15 @@ function ProfilePageInner() {
 
   return (
     <div className="space-y-4">
-      {/* 蓝色渐变头部 */}
-      <div className="-mx-4 -mt-3 px-4 pt-6 pb-12 bg-gradient-to-b from-blue-500 to-blue-400">
-        <div className="flex items-center gap-4">
+      {/* 渐变头部 (管理员可配置背景图) */}
+      <div className="-mx-4 -mt-3 px-4 pt-6 pb-12 relative overflow-hidden"
+        style={profileBg ? { backgroundImage: `url(${profileBg})`, backgroundSize: 'cover', backgroundPosition: 'center' } : undefined}
+      >
+        {/* 无背景图时用渐变兜底 */}
+        {!profileBg && <div className="absolute inset-0 bg-gradient-to-br from-indigo-500 via-blue-500 to-cyan-400" />}
+        {/* 半透明遮罩, 保证文字可读 */}
+        {profileBg && <div className="absolute inset-0 bg-black/30" />}
+        <div className="relative flex items-center gap-4">
           <div className="h-16 w-16 overflow-hidden rounded-full bg-white/30 flex items-center justify-center text-white text-2xl font-bold ring-4 ring-white/40">
             {user?.avatar ? (
               <img src={user.avatar} alt="" className="h-full w-full object-cover" />
@@ -413,6 +427,9 @@ function ProfilePageInner() {
                   ) : user.verificationStatus === 'PENDING' ? (
                     <span className="rounded-full bg-amber-400/90 px-1.5 py-0.5 text-xs text-white">审核中</span>
                   ) : null}
+                  {user.qualificationVerified && user.qualificationType && (
+                    <span className="rounded-full bg-purple-400/80 px-1.5 py-0.5 text-xs text-white">🏅 {user.qualificationType}</span>
+                  )}
                 </div>
                 <div className="text-sm text-white/80">{user.email || '未绑定邮箱'}</div>
               </>
@@ -448,21 +465,20 @@ function ProfilePageInner() {
         </div>
       </div>
 
-      {/* 菜单列表 */}
-      <div className="rounded-2xl bg-white shadow-sm overflow-hidden">
-        {menuItems.map((item, i) => (
-          <button
-            key={item.key}
-            onClick={() => handleMenu(item.key)}
-            className={`flex w-full items-center gap-3 px-4 py-3.5 text-left hover:bg-gray-50 ${i > 0 ? 'border-t border-gray-100' : ''}`}
-          >
-            <span className="text-lg">{item.icon}</span>
-            <span className="flex-1 text-sm text-gray-800">{item.label}</span>
-            <svg className="h-4 w-4 text-gray-300" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <path d="m9 18 6-6-6-6" strokeLinecap="round" strokeLinejoin="round"/>
-            </svg>
-          </button>
-        ))}
+      {/* 菜单宫格 */}
+      <div className="rounded-2xl bg-white shadow-sm p-4">
+        <div className="grid grid-cols-4 gap-1">
+          {menuItems.map((item) => (
+            <button
+              key={item.key}
+              onClick={() => handleMenu(item.key)}
+              className="flex flex-col items-center gap-1.5 py-3 rounded-xl hover:bg-gray-50 transition-colors"
+            >
+              <span className="text-2xl">{item.icon}</span>
+              <span className="text-xs text-gray-600 text-center leading-tight">{item.label}</span>
+            </button>
+          ))}
+        </div>
       </div>
 
       {/* 退出登录 */}
