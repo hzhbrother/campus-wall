@@ -15,6 +15,7 @@ const Schema = z.object({
   avatar: z.string().optional(),
   status: z.enum(['NORMAL', 'GRADUATED', 'BANNED']).optional(),
   role: z.enum(['USER', 'STUDENT', 'TEACHER', 'ADMIN', 'SUPER_ADMIN']).optional(),
+  verified: z.boolean().optional(),
 });
 
 export async function PATCH(req: NextRequest, { params }: { params: { id: string } }) {
@@ -29,6 +30,10 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
     if (dto.avatar !== undefined) data.avatar = dto.avatar || null;
     if (dto.status) data.status = dto.status as UserStatus;
     if (dto.role) data.role = dto.role as UserRole;
+    if (dto.verified !== undefined) {
+      data.verified = dto.verified;
+      data.verifiedAt = dto.verified ? new Date() : null;
+    }
     return NextResponse.json(await updateUser(params.id, data, me.id));
   } catch (e: any) {
     if (e?.name === 'ZodError') return NextResponse.json({ message: e.errors?.[0]?.message || '参数错误' }, { status: 400 });

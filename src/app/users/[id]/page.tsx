@@ -14,6 +14,7 @@ interface UserProfile {
   role: string;
   grade: string | null;
   className: string | null;
+  verified: boolean;
   createdAt: string;
   _count: { posts: number; comments: number; likesReceived: number };
 }
@@ -47,6 +48,22 @@ export default function UserProfilePage() {
   const [err, setErr] = useState('');
   const [tab, setTab] = useState<'posts' | 'comments'>('posts');
   const [savingCover, setSavingCover] = useState(false);
+  // 墙龄自动刷新: 每天 0 点更新一次 now, 触发重新计算天数
+  const [now, setNow] = useState(Date.now());
+  useEffect(() => {
+    let timer: NodeJS.Timeout;
+    const tick = () => {
+      setNow(Date.now());
+      // 计算到下一个 0 点的毫秒数
+      const next = new Date();
+      next.setHours(24, 0, 0, 0);
+      timer = setTimeout(tick, next.getTime() - Date.now());
+    };
+    const next = new Date();
+    next.setHours(24, 0, 0, 0);
+    timer = setTimeout(tick, next.getTime() - Date.now());
+    return () => clearTimeout(timer);
+  }, []);
 
   const isOwn = me?.id === userId;
 
@@ -64,9 +81,9 @@ export default function UserProfilePage() {
     }).finally(() => setLoading(false));
   }, [userId]);
 
-  // 墙龄: 从注册日到今天的天数
+  // 墙龄: 从注册日到今天的天数 (now 每日 0 点自动刷新)
   const wallDays = profile
-    ? Math.max(1, Math.floor((Date.now() - new Date(profile.createdAt).getTime()) / (24 * 60 * 60 * 1000)) + 1)
+    ? Math.max(1, Math.floor((now - new Date(profile.createdAt).getTime()) / (24 * 60 * 60 * 1000)) + 1)
     : 0;
 
   // 更换封面
@@ -163,7 +180,14 @@ export default function UserProfilePage() {
           {profile.className && (
             <span className="rounded-full bg-gray-100 px-2.5 py-0.5 text-xs text-gray-500">{profile.className}</span>
           )}
-          <span className="rounded-full bg-red-50 px-2.5 py-0.5 text-xs text-red-400">未认证</span>
+          {profile.verified ? (
+            <span className="inline-flex items-center gap-1 rounded-full bg-green-50 px-2.5 py-0.5 text-xs text-green-600">
+              <svg className="h-3 w-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="m5 12 5 5L20 7" strokeLinecap="round" strokeLinejoin="round"/></svg>
+              已认证
+            </span>
+          ) : (
+            <span className="rounded-full bg-red-50 px-2.5 py-0.5 text-xs text-red-400">未认证</span>
+          )}
           <span className="rounded-full bg-blue-50 px-2.5 py-0.5 text-xs text-blue-500">墙龄 {wallDays} 天</span>
         </div>
 

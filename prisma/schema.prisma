@@ -110,6 +110,8 @@ model User {
   bannedUntil  DateTime?        // 封禁到期时间 (null=未临时封禁)
   banReason    String?          // 封禁原因
   credibilityScore Int          @default(100) // 诚信分 (0-100)
+  verified      Boolean        @default(false) // 是否已认证 (实名/学生认证)
+  verifiedAt    DateTime?      // 认证通过时间
   createdAt    DateTime         @default(now())
   updatedAt    DateTime         @updatedAt
 

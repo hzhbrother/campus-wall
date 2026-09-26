@@ -376,6 +376,7 @@ function UsersTab({ isSuper }: { isSuper: boolean }) {
                 <div>
                   <div className="flex items-center gap-2 flex-wrap">
                     <span className="font-semibold text-gray-900">{u.nickname}</span>
+                    {u.verified && <span className="inline-flex items-center gap-0.5 rounded bg-green-100 px-1.5 py-0.5 text-xs text-green-700"><svg className="h-3 w-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="m5 12 5 5L20 7" strokeLinecap="round" strokeLinejoin="round"/></svg>已认证</span>}
                     <span className="rounded bg-blue-100 px-1.5 py-0.5 text-xs text-blue-700">{roleLabel[u.role] || u.role}</span>
                     <span className={`rounded px-1.5 py-0.5 text-xs ${userStatus(u).color}`}>{userStatus(u).label}</span>
                   </div>
@@ -424,6 +425,7 @@ function EditUserModal({ user, onClose, onSaved, isSuper }: { user: any; onClose
   const [remark, setRemark] = useState(user.remark || '');
   const [status, setStatus] = useState(user.status || 'NORMAL');
   const [role, setRole] = useState(user.role || 'STUDENT');
+  const [verified, setVerified] = useState(!!user.verified);
   const [avatar, setAvatar] = useState(user.avatar || '');
   const [saving, setSaving] = useState(false);
   const [err, setErr] = useState('');
@@ -439,7 +441,7 @@ function EditUserModal({ user, onClose, onSaved, isSuper }: { user: any; onClose
   const save = async () => {
     setSaving(true); setErr('');
     try {
-      await api.patch(`/api/admin/users/${user.id}`, { realName, grade, className, remark, status, role, avatar });
+      await api.patch(`/api/admin/users/${user.id}`, { realName, grade, className, remark, status, role, avatar, verified });
       onSaved();
       onClose();
     } catch (e: any) { setErr(e.message); } finally { setSaving(false); }
@@ -533,6 +535,20 @@ function EditUserModal({ user, onClose, onSaved, isSuper }: { user: any; onClose
               <option value="ADMIN">管理员</option>
               {isSuper && <option value="SUPER_ADMIN">超级管理员</option>}
             </select>
+          </div>
+
+          <div className="flex items-center justify-between rounded-lg border border-gray-200 px-3 py-2.5">
+            <div>
+              <div className="text-sm font-medium text-gray-700">实名认证</div>
+              <div className="text-xs text-gray-400">通过后用户主页显示「已认证」标识</div>
+            </div>
+            <button
+              type="button"
+              onClick={() => setVerified(v => !v)}
+              className={`relative h-6 w-11 rounded-full transition-colors ${verified ? 'bg-green-500' : 'bg-gray-300'}`}
+            >
+              <span className={`absolute top-0.5 h-5 w-5 rounded-full bg-white shadow transition-transform ${verified ? 'translate-x-5' : 'translate-x-0.5'}`} />
+            </button>
           </div>
 
           <div>

@@ -149,7 +149,7 @@ export async function listUsers(page: number, pageSize: number, role?: UserRole,
       orderBy: { createdAt: 'desc' },
       skip: (page - 1) * pageSize,
       take: pageSize,
-      select: { id: true, email: true, nickname: true, realName: true, avatar: true, role: true, status: true, grade: true, className: true, remark: true, bannedUntil: true, banReason: true, credibilityScore: true, createdAt: true, _count: { select: { posts: true } } },
+      select: { id: true, email: true, nickname: true, realName: true, avatar: true, role: true, status: true, grade: true, className: true, remark: true, bannedUntil: true, banReason: true, credibilityScore: true, verified: true, verifiedAt: true, createdAt: true, _count: { select: { posts: true } } },
     }),
     prisma.user.count({ where }),
   ]);
@@ -182,6 +182,8 @@ export async function updateUser(userId: string, data: {
   status?: UserStatus;
   role?: UserRole;
   bannedUntil?: Date | null;
+  verified?: boolean;
+  verifiedAt?: Date | null;
 }, actorId: string) {
   const user = await prisma.user.findUnique({ where: { id: userId } });
   if (!user) throw new Error('用户不存在');

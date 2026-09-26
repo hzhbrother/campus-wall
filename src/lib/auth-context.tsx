@@ -18,6 +18,7 @@ export interface AuthUser {
   className?: string | null;
   remark?: string | null;
   role: Role;
+  verified?: boolean;
   createdAt?: string;
   bannedUntil?: string | null;
   banReason?: string | null;
