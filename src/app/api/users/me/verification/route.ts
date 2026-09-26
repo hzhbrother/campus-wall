@@ -6,6 +6,7 @@ import { getUserFromRequest } from '@/lib/server-auth';
 import { prisma } from '@/lib/prisma';
 import { errorResponse } from '@/lib/api-response';
 import { VerificationStatus } from '@prisma/client';
+import { isVisionEnabled, preliminaryReview } from '@/lib/ai-vision';
 
 // 校园卡照片上限 5MB (base64 后约 6.7MB)
 const MAX_PHOTO_BYTES = 5 * 1024 * 1024;
@@ -26,6 +27,7 @@ export async function GET(req: NextRequest) {
         verificationStatus: true,
         verificationRejectReason: true,
         verificationPhoto: true,
+        verificationAiResult: true,
       },
     });
     if (!user) return NextResponse.json({ message: '用户不存在' }, { status: 404 });
@@ -52,28 +54,67 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ message: '照片格式不正确, 请上传 JPG/PNG 图片' }, { status: 400 });
     }
 
-    const updated = await prisma.user.update({
+    // 初始状态: 若配置了 AI 视觉则进入 AI 初审, 否则直接进入人工复审队列
+    const initStatus = isVisionEnabled() ? VerificationStatus.AI_REVIEWING : VerificationStatus.PENDING;
+
+    await prisma.user.update({
       where: { id: me.id },
       data: {
         verificationPhoto: dto.photo,
-        verificationStatus: VerificationStatus.PENDING,
+        verificationStatus: initStatus,
         verificationRejectReason: null,
-      },
-      select: {
-        verified: true,
-        verificationStatus: true,
-        verificationRejectReason: true,
+        verificationAiResult: null,
       },
     });
 
+    // 异步触发 AI 初审 (不阻塞响应)
+    if (isVisionEnabled()) {
+      runAiReview(me.id, dto.photo).catch(e => console.error('[verification] AI review failed:', e));
+    }
+
     return NextResponse.json({
-      message: '认证申请已提交, 等待管理员审核',
-      ...updated,
+      message: initStatus === VerificationStatus.AI_REVIEWING
+        ? '认证申请已提交, AI 正在初审'
+        : '认证申请已提交, 等待人工复审',
+      verificationStatus: initStatus,
     });
   } catch (e: any) {
     if (e?.name === 'ZodError') {
       return NextResponse.json({ message: e.errors?.[0]?.message || '参数错误' }, { status: 400 });
     }
     return errorResponse(e);
+  }
+}
+
+// AI 初审: 判断是否校园卡 + 清晰度, 通过则进入人工复审, 不通过则直接驳回
+async function runAiReview(userId: string, photo: string) {
+  const result = await preliminaryReview(photo);
+  if (!result) {
+    // AI 调用失败, 转入人工复审
+    await prisma.user.update({
+      where: { id: userId },
+      data: { verificationStatus: VerificationStatus.PENDING },
+    });
+    return;
+  }
+  if (result.isIdCard && result.isClear) {
+    // AI 初审通过, 等待人工复审
+    await prisma.user.update({
+      where: { id: userId },
+      data: {
+        verificationStatus: VerificationStatus.PENDING,
+        verificationAiResult: result as any,
+      },
+    });
+  } else {
+    // AI 初审驳回
+    await prisma.user.update({
+      where: { id: userId },
+      data: {
+        verificationStatus: VerificationStatus.REJECTED,
+        verificationRejectReason: result.rejectReason || '照片不符合要求 (非校园卡或不清晰)',
+        verificationAiResult: result as any,
+      },
+    });
   }
 }

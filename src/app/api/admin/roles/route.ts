@@ -21,8 +21,24 @@ export async function GET(req: NextRequest) {
 
     const roles = await prisma.role.findMany({
       orderBy: [{ isSystem: 'desc' }, { createdAt: 'asc' }],
-      include: { _count: { select: { users: true } } },
     });
+
+    // 统计每个角色的用户数:
+    // - 系统角色: 用户通过 User.role 枚举关联 (roleId 为空)
+    // - 自定义角色: 用户通过 User.roleId 外键关联
+    const groups = await prisma.user.groupBy({
+      by: ['role', 'roleId'],
+      _count: true,
+    });
+    const countByRole: Record<string, number> = {};
+    const countByRoleId: Record<string, number> = {};
+    for (const g of groups) {
+      if (g.roleId) {
+        countByRoleId[g.roleId] = (countByRoleId[g.roleId] || 0) + g._count;
+      } else if (g.role) {
+        countByRole[g.role] = (countByRole[g.role] || 0) + g._count;
+      }
+    }
 
     return NextResponse.json({
       roles: roles.map(r => ({
@@ -32,7 +48,7 @@ export async function GET(req: NextRequest) {
         permissions: Array.isArray(r.permissions) ? r.permissions : [],
         isSystem: r.isSystem,
         isDefault: r.isDefault,
-        userCount: r._count.users,
+        userCount: r.isSystem ? (countByRole[r.code] || 0) : (countByRoleId[r.id] || 0),
         createdAt: r.createdAt,
       })),
     });

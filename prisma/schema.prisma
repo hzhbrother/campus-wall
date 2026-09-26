@@ -84,10 +84,11 @@ enum ViolationType {
 }
 
 enum VerificationStatus {
-  NONE       // 未提交
-  PENDING    // 审核中
-  APPROVED   // 已通过
-  REJECTED   // 已驳回
+  NONE         // 未提交
+  AI_REVIEWING // AI 初审中 (判断是否校园卡、是否清晰)
+  PENDING      // AI 初审通过, 等待人工复审
+  APPROVED     // 已通过
+  REJECTED     // 已驳回 (AI 初审驳回 或 人工驳回)
 }
 
 enum NotificationTarget {
@@ -123,6 +124,9 @@ model User {
   verificationPhoto String?    // 校园卡照片 (base64, 待审核/已驳回时保留)
   verificationStatus VerificationStatus @default(NONE) // 认证审核状态
   verificationRejectReason String? // 驳回原因
+  verificationAiResult Json?  // AI 初审识别结果 (信息+边界框), 供人工复核参考
+  verificationReviewedBy String? // 人工复核人 ID
+  verificationReviewedAt DateTime? // 人工复核时间
   createdAt    DateTime         @default(now())
   updatedAt    DateTime         @updatedAt
 

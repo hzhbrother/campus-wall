@@ -4,7 +4,7 @@ import { useEffect, useState, useCallback } from 'react';
 import { api } from '@/lib/api';
 import { PERMISSIONS, PERMISSIONS_BY_GROUP, SUPER_ADMIN_ONLY_PERMISSIONS } from '@/lib/permissions';
 
-export type AdminTab = 'overview' | 'posts' | 'moderation' | 'comments' | 'users' | 'appeals' | 'notifications' | 'settings' | 'email' | 'agreement' | 'roles';
+export type AdminTab = 'overview' | 'posts' | 'moderation' | 'comments' | 'users' | 'verification' | 'appeals' | 'notifications' | 'settings' | 'email' | 'agreement' | 'roles';
 
 // ---------- 通用 UI ----------
 function SectionTitle({ title, desc }: { title: string; desc?: string }) {
@@ -476,15 +476,30 @@ function EditUserModal({ user, onClose, onSaved, isSuper }: { user: any; onClose
   const handleAvatarFile = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    const reader = new FileReader();
-    reader.onload = () => setAvatar(reader.result as string);
-    reader.readAsDataURL(file);
+    // 压缩/缩放头像, 避免手机拍照产生的超大 base64 拖慢保存
+    const img = new Image();
+    img.onload = () => {
+      const max = 256;
+      let { width, height } = img;
+      if (width > height && width > max) { height = Math.round(height * max / width); width = max; }
+      else if (height > max) { width = Math.round(width * max / height); height = max; }
+      const canvas = document.createElement('canvas');
+      canvas.width = width; canvas.height = height;
+      const ctx = canvas.getContext('2d');
+      if (!ctx) return;
+      ctx.drawImage(img, 0, 0, width, height);
+      setAvatar(canvas.toDataURL('image/jpeg', 0.8));
+      URL.revokeObjectURL(img.src);
+    };
+    img.src = URL.createObjectURL(file);
   };
 
   const save = async () => {
     setSaving(true); setErr('');
     try {
-      const payload: any = { realName, grade, className, remark, status, avatar, verified };
+      const payload: any = { realName, grade, className, remark, status, verified };
+      // 仅头像有变更时才上传, 避免无谓的大体积请求
+      if (avatar !== (user.avatar || '')) payload.avatar = avatar;
       // 角色: 系统角色 or 自定义角色
       if (roleVal.startsWith('custom:')) {
         payload.roleId = roleVal.slice(7);
@@ -492,7 +507,7 @@ function EditUserModal({ user, onClose, onSaved, isSuper }: { user: any; onClose
         payload.role = roleVal;
         payload.roleId = null;
       }
-      // 若处于待审核, 按当前 verified 状态决定通过/驳回
+      // 认证状态处理
       if (isPending) {
         if (verified) {
           payload.verificationStatus = 'APPROVED';
@@ -500,6 +515,9 @@ function EditUserModal({ user, onClose, onSaved, isSuper }: { user: any; onClose
           payload.verificationStatus = 'REJECTED';
           payload.verificationRejectReason = rejectReason.trim() || '照片不清晰或信息不全';
         }
+      } else if (verified !== !!user.verified) {
+        // 非待审核状态下的手动操作 (跳过照片审核)
+        payload.verificationStatus = verified ? 'APPROVED' : 'NONE';
       }
       await api.patch(`/api/admin/users/${user.id}`, payload);
       onSaved();
@@ -607,38 +625,58 @@ function EditUserModal({ user, onClose, onSaved, isSuper }: { user: any; onClose
             </select>
           </div>
 
-          <div className="flex items-center justify-between rounded-lg border border-gray-200 px-3 py-2.5">
-            <div>
-              <div className="text-sm font-medium text-gray-700">实名认证</div>
-              <div className="text-xs text-gray-400">
-                {isPending ? '该用户提交了认证申请, 开启开关=通过, 关闭=驳回' : '通过后用户主页显示「已认证」标识'}
+          <div className="rounded-lg border border-gray-200 px-3 py-2.5">
+            <div className="flex items-center justify-between">
+              <div className="pr-3">
+                <div className="text-sm font-medium text-gray-700">认证状态</div>
+                <div className="text-xs text-gray-400">
+                  {isPending
+                    ? '该用户已提交认证申请, 可直接通过或驳回'
+                    : verified
+                      ? '已认证, 用户可发帖并在主页显示「已认证」标识'
+                      : '未认证, 用户无法发帖。需用户在个人中心提交认证申请后, 在「实名认证审核」中人工审核通过。'}
+                </div>
               </div>
+              {isPending ? (
+                <button
+                  type="button"
+                  onClick={() => setVerified(v => !v)}
+                  className={`relative h-6 w-11 shrink-0 rounded-full transition-colors ${verified ? 'bg-green-500' : 'bg-gray-300'}`}
+                >
+                  <span className={`absolute left-0.5 top-0.5 h-5 w-5 rounded-full bg-white shadow transition-transform ${verified ? 'translate-x-5' : ''}`} />
+                </button>
+              ) : verified ? (
+                <button
+                  type="button"
+                  onClick={() => { if (confirm('确认取消该用户的认证? 取消后用户将无法发帖。')) setVerified(false); }}
+                  className="shrink-0 rounded-lg bg-gray-100 px-3 py-1.5 text-xs text-gray-600 hover:bg-gray-200"
+                >
+                  取消认证
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => { if (confirm('手动通过认证将跳过校园卡照片审核, 确认继续?')) setVerified(true); }}
+                  className="shrink-0 rounded-lg bg-blue-50 px-3 py-1.5 text-xs text-blue-600 hover:bg-blue-100"
+                >
+                  手动通过认证
+                </button>
+              )}
             </div>
-            <button
-              type="button"
-              onClick={() => setVerified(v => !v)}
-              className={`relative h-6 w-11 rounded-full transition-colors ${verified ? 'bg-green-500' : 'bg-gray-300'}`}
-            >
-              <span className={`absolute top-0.5 h-5 w-5 rounded-full bg-white shadow transition-transform ${verified ? 'translate-x-5' : 'translate-x-0.5'}`} />
-            </button>
+            {isPending && verified === false && (
+              <div className="mt-2">
+                <label className="block text-xs font-medium text-gray-500 mb-1">驳回原因 (将通知用户)</label>
+                <input value={rejectReason} onChange={e => setRejectReason(e.target.value)} className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm" placeholder="如: 照片不清晰或信息不全" />
+              </div>
+            )}
           </div>
 
-          {/* 待审核: 显示校园卡照片 + 驳回原因 */}
-          {isPending && (
-            <div className="space-y-2">
-              {user.verificationPhoto && (
-                <div>
-                  <div className="text-xs text-gray-500 mb-1">校园卡照片</div>
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src={user.verificationPhoto} alt="校园卡" className="w-full rounded-lg border border-gray-200" />
-                </div>
-              )}
-              {!verified && (
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">驳回原因</label>
-                  <input value={rejectReason} onChange={e => setRejectReason(e.target.value)} className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm" placeholder="请填写驳回原因 (将通知用户)" />
-                </div>
-              )}
+          {/* 待审核: 显示校园卡照片 */}
+          {isPending && user.verificationPhoto && (
+            <div>
+              <div className="text-xs text-gray-500 mb-1">认证照片</div>
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={user.verificationPhoto} alt="认证材料" className="w-full rounded-lg border border-gray-200" />
             </div>
           )}
 
@@ -1863,6 +1901,316 @@ function AgreementManager() {
   );
 }
 
+// ---------- 实名认证审核 ----------
+const REJECT_REASONS = [
+  '照片不清晰',
+  '非校园卡/学生证',
+  '信息无法辨认',
+  '照片与本人不符',
+  '照片已过期',
+];
+
+const FIELD_LABELS: Record<string, string> = {
+  name: '姓名',
+  studentId: '学号',
+  school: '学校',
+  grade: '年级',
+  className: '班级',
+};
+
+const BBOX_COLORS: Record<string, string> = {
+  name: 'border-green-400 bg-green-400/10',
+  studentId: 'border-blue-400 bg-blue-400/10',
+  school: 'border-purple-400 bg-purple-400/10',
+  grade: 'border-orange-400 bg-orange-400/10',
+  className: 'border-pink-400 bg-pink-400/10',
+};
+
+function VerificationReviewTab() {
+  const [items, setItems] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [err, setErr] = useState('');
+  const [filter, setFilter] = useState<'PENDING' | 'AI_REVIEWING' | 'ALL' | 'APPROVED' | 'REJECTED'>('PENDING');
+  const [busy, setBusy] = useState(false);
+  // 复审弹窗
+  const [reviewTarget, setReviewTarget] = useState<any>(null);
+  const [fields, setFields] = useState<Record<string, string>>({});
+  const [rejectMode, setRejectMode] = useState(false);
+  const [rejectReason, setRejectReason] = useState('');
+  const [customReason, setCustomReason] = useState('');
+
+  const load = useCallback(() => {
+    setLoading(true); setErr('');
+    api.get<{ items: any[] }>(`/api/admin/verifications?status=${filter}`)
+      .then(d => setItems(d.items))
+      .catch(e => setErr(e.message))
+      .finally(() => setLoading(false));
+  }, [filter]);
+
+  useEffect(() => { load(); }, [load]);
+
+  const openReview = (u: any) => {
+    const ai = u.verificationAiResult || {};
+    const info = ai.info || {};
+    setFields({
+      name: info.name || u.realName || '',
+      studentId: info.studentId || u.studentId || '',
+      school: info.school || '',
+      grade: info.grade || u.grade || '',
+      className: info.className || u.className || '',
+    });
+    setRejectMode(false);
+    setRejectReason('');
+    setCustomReason('');
+    setReviewTarget(u);
+  };
+
+  const doApprove = async () => {
+    if (!reviewTarget) return;
+    if (!confirm('确认通过该用户的实名认证? 将同步更新其姓名/学号等信息。')) return;
+    setBusy(true);
+    try {
+      await api.patch(`/api/admin/users/${reviewTarget.id}`, {
+        verificationStatus: 'APPROVED',
+        realName: fields.name || undefined,
+        studentId: fields.studentId || undefined,
+        grade: fields.grade || undefined,
+        className: fields.className || undefined,
+      });
+      setReviewTarget(null);
+      load();
+    } catch (e: any) { alert(e.message); }
+    finally { setBusy(false); }
+  };
+
+  const doReject = async () => {
+    if (!reviewTarget) return;
+    const reason = rejectReason || customReason.trim();
+    if (!reason) { alert('请选择或填写驳回原因'); return; }
+    setBusy(true);
+    try {
+      await api.patch(`/api/admin/users/${reviewTarget.id}`, {
+        verificationStatus: 'REJECTED',
+        verificationRejectReason: reason,
+      });
+      setReviewTarget(null);
+      load();
+    } catch (e: any) { alert(e.message); }
+    finally { setBusy(false); }
+  };
+
+  const statusBadge = (s: string) => {
+    const map: Record<string, string> = {
+      APPROVED: 'bg-green-100 text-green-700',
+      PENDING: 'bg-amber-100 text-amber-700',
+      AI_REVIEWING: 'bg-sky-100 text-sky-700',
+      REJECTED: 'bg-red-100 text-red-700',
+    };
+    const label: Record<string, string> = { APPROVED: '已通过', PENDING: '待人工复审', AI_REVIEWING: 'AI 初审中', REJECTED: '已驳回' };
+    return <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${map[s] || 'bg-gray-100 text-gray-600'}`}>{label[s] || s}</span>;
+  };
+
+  const ai = reviewTarget?.verificationAiResult || {};
+  const bboxes = ai.bboxes || {};
+
+  return (
+    <div>
+      <SectionTitle title="实名认证审核" desc="AI 初审通过后进入人工复审。点击「复审」查看大图与 AI 框选信息, 核对后通过或驳回。" />
+
+      <div className="mb-4 flex flex-wrap gap-2">
+        {(['PENDING', 'AI_REVIEWING', 'ALL', 'APPROVED', 'REJECTED'] as const).map(f => (
+          <button
+            key={f}
+            onClick={() => setFilter(f)}
+            className={`rounded-full px-3 py-1.5 text-sm ${filter === f ? 'bg-slate-900 text-white' : 'bg-white text-gray-500 border border-gray-200'}`}
+          >
+            {f === 'PENDING' ? '待人工复审' : f === 'AI_REVIEWING' ? 'AI 初审中' : f === 'ALL' ? '全部' : f === 'APPROVED' ? '已通过' : '已驳回'}
+          </button>
+        ))}
+      </div>
+
+      {loading ? (
+        <div className="py-8 text-center text-gray-400">加载中…</div>
+      ) : err ? (
+        <div className="py-8 text-center text-red-500">{err}</div>
+      ) : items.length === 0 ? (
+        <div className="py-16 flex flex-col items-center gap-2 text-gray-400">
+          <svg className="h-12 w-12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+            <path d="M9 12l2 2 4-4m6 2a9 9 0 1 1-18 0 9 9 0 0 1 18 0z" strokeLinecap="round" strokeLinejoin="round"/>
+          </svg>
+          <span className="text-sm">暂无认证申请</span>
+        </div>
+      ) : (
+        <div className="space-y-3">
+          {items.map(u => {
+            const isReviewable = u.verificationStatus === 'PENDING';
+            return (
+              <div key={u.id} className="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <div className="h-9 w-9 overflow-hidden rounded-full bg-gradient-to-br from-indigo-400 to-purple-500 flex items-center justify-center text-white text-sm font-bold">
+                      {u.avatar ? <img src={u.avatar} alt="" className="h-full w-full object-cover" /> : (u.nickname || 'U')[0]}
+                    </div>
+                    <div>
+                      <div className="text-sm font-medium text-gray-900">{u.nickname} <span className="text-gray-400 font-normal">· {u.role}</span></div>
+                      <div className="text-xs text-gray-400">{u.realName || '未填写真名'} {u.studentId ? `· 学号 ${u.studentId}` : ''} {u.grade ? `· ${u.grade}${u.className || ''}` : ''}</div>
+                    </div>
+                  </div>
+                  {statusBadge(u.verificationStatus)}
+                </div>
+
+                {u.verificationStatus === 'REJECTED' && u.verificationRejectReason && (
+                  <div className="mt-2 text-xs text-red-500">驳回原因: {u.verificationRejectReason}</div>
+                )}
+
+                {isReviewable && (
+                  <button
+                    onClick={() => openReview(u)}
+                    className="mt-3 w-full rounded-lg bg-blue-50 py-2 text-sm text-blue-600 hover:bg-blue-100"
+                  >
+                    进入人工复审
+                  </button>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {/* 人工复审浮窗 */}
+      {reviewTarget && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4" onClick={() => !busy && setReviewTarget(null)}>
+          <div className="w-full max-w-3xl max-h-[92vh] overflow-y-auto rounded-2xl bg-white p-5" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-bold text-gray-900">人工复审 · {reviewTarget.nickname}</h3>
+              <button onClick={() => !busy && setReviewTarget(null)} className="text-gray-400 hover:text-gray-600 text-xl">✕</button>
+            </div>
+
+            {/* 上方: 大图 + AI 框选 */}
+            <div className="rounded-xl border border-gray-200 p-3">
+              <div className="mb-2 flex items-center justify-between">
+                <span className="text-xs font-medium text-gray-500">认证照片 (AI 已框选关键信息)</span>
+                {ai.confidence && (
+                  <span className="text-xs text-gray-400">AI 置信度: {ai.confidence === 'high' ? '高' : ai.confidence === 'medium' ? '中' : '低'}</span>
+                )}
+              </div>
+              <div className="relative inline-block w-full">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={reviewTarget.verificationPhoto} alt="认证材料" className="w-full rounded-lg" />
+                {/* AI 边界框 */}
+                {Object.entries(bboxes).map(([key, box]: [string, any]) => {
+                  if (!box) return null;
+                  return (
+                    <div
+                      key={key}
+                      className={`absolute border-2 rounded ${BBOX_COLORS[key] || 'border-yellow-400 bg-yellow-400/10'}`}
+                      style={{
+                        left: `${box.x * 100}%`,
+                        top: `${box.y * 100}%`,
+                        width: `${box.w * 100}%`,
+                        height: `${box.h * 100}%`,
+                      }}
+                    >
+                      <span className="absolute -top-4 left-0 text-[10px] font-medium text-gray-700 bg-white/80 px-1 rounded">{FIELD_LABELS[key] || key}</span>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* 下方: 可编辑信息 */}
+            <div className="mt-4">
+              <div className="mb-2 text-xs font-medium text-gray-500">核对并修正以下信息 (通过后将同步到用户资料)</div>
+              <div className="grid grid-cols-2 gap-3">
+                {Object.keys(FIELD_LABELS).map(key => (
+                  <div key={key}>
+                    <label className="block text-xs text-gray-500 mb-1">{FIELD_LABELS[key]}</label>
+                    <input
+                      value={fields[key] || ''}
+                      onChange={e => setFields(prev => ({ ...prev, [key]: e.target.value }))}
+                      className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/40"
+                      placeholder={`请输入${FIELD_LABELS[key]}`}
+                    />
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* 驳回原因选择 */}
+            {rejectMode && (
+              <div className="mt-4 rounded-xl bg-red-50 p-3">
+                <div className="mb-2 text-xs font-medium text-red-700">选择驳回原因</div>
+                <div className="flex flex-wrap gap-2 mb-2">
+                  {REJECT_REASONS.map(r => (
+                    <button
+                      key={r}
+                      onClick={() => { setRejectReason(r); setCustomReason(''); }}
+                      className={`rounded-full px-3 py-1 text-xs ${rejectReason === r ? 'bg-red-500 text-white' : 'bg-white text-red-600 border border-red-200'}`}
+                    >
+                      {r}
+                    </button>
+                  ))}
+                  <button
+                    onClick={() => { setRejectReason(''); }}
+                    className={`rounded-full px-3 py-1 text-xs ${!rejectReason && customReason ? 'bg-red-500 text-white' : 'bg-white text-red-600 border border-red-200'}`}
+                  >
+                    自定义
+                  </button>
+                </div>
+                <input
+                  value={customReason}
+                  onChange={e => { setCustomReason(e.target.value); setRejectReason(''); }}
+                  className="w-full rounded-lg border border-red-200 px-3 py-2 text-sm"
+                  placeholder="输入自定义驳回原因…"
+                />
+              </div>
+            )}
+
+            {/* 底部操作 */}
+            <div className="mt-5 flex gap-2">
+              {!rejectMode ? (
+                <>
+                  <button
+                    onClick={doApprove}
+                    disabled={busy}
+                    className="flex-1 rounded-lg bg-green-500 py-2.5 text-sm font-medium text-white hover:bg-green-600 disabled:opacity-50"
+                  >
+                    {busy ? '处理中…' : '通过认证'}
+                  </button>
+                  <button
+                    onClick={() => setRejectMode(true)}
+                    disabled={busy}
+                    className="flex-1 rounded-lg bg-red-500 py-2.5 text-sm font-medium text-white hover:bg-red-600 disabled:opacity-50"
+                  >
+                    驳回
+                  </button>
+                </>
+              ) : (
+                <>
+                  <button
+                    onClick={doReject}
+                    disabled={busy}
+                    className="flex-1 rounded-lg bg-red-500 py-2.5 text-sm font-medium text-white hover:bg-red-600 disabled:opacity-50"
+                  >
+                    {busy ? '处理中…' : '确认驳回'}
+                  </button>
+                  <button
+                    onClick={() => setRejectMode(false)}
+                    disabled={busy}
+                    className="rounded-lg bg-gray-100 px-4 py-2.5 text-sm text-gray-600"
+                  >
+                    取消
+                  </button>
+                </>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ---------- 封禁申诉审核 ----------
 function BanAppealsTab() {
   const [items, setItems] = useState<any[]>([]);
@@ -2198,6 +2546,7 @@ export function AdminPanel({ tab, isSuper }: { tab: AdminTab; isSuper: boolean }
     case 'moderation': return <ModerationTab />;
     case 'comments': return <CommentsTab />;
     case 'users': return <UsersTab isSuper={isSuper} />;
+    case 'verification': return <VerificationReviewTab />;
     case 'appeals': return <BanAppealsTab />;
     case 'notifications': return <NotificationSender />;
     case 'settings': return <SiteSettings />;

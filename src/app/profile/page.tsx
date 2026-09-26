@@ -1,6 +1,6 @@
 'use client';
 
-import { Suspense, useEffect, useState, useRef } from 'react';
+import { Suspense, useCallback, useEffect, useState, useRef } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import dynamic from 'next/dynamic';
 import { useAuth } from '@/lib/auth-context';
@@ -297,6 +297,7 @@ function ProfilePageInner() {
       { key: 'moderation', label: '内容审核' },
       { key: 'comments', label: '评论管理' },
       { key: 'users', label: '用户管理' },
+      { key: 'verification', label: '实名认证审核' },
       { key: 'appeals', label: '申诉审核' },
       { key: 'notifications', label: '通知发布' },
       // 站点配置类 (SMTP/站点信息/协议) + 角色管理 仅超级管理员可见
@@ -594,6 +595,18 @@ function VerificationModal({ user, onClose, onVerified }: { user: any; onClose: 
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState('');
   const inputRef = useRef<HTMLInputElement>(null);
+  // 本地认证状态 (提交后用于实时展示进度, 轮询刷新)
+  const [localStatus, setLocalStatus] = useState<string>(user.verificationStatus || 'NONE');
+  const [localRejectReason, setLocalRejectReason] = useState<string>(user.verificationRejectReason || '');
+
+  const refreshStatus = useCallback(async () => {
+    try {
+      const d = await api.get<{ verificationStatus: string; verificationRejectReason?: string; verified?: boolean }>('/api/users/me/verification');
+      setLocalStatus(d.verificationStatus || 'NONE');
+      setLocalRejectReason(d.verificationRejectReason || '');
+      if (d.verified || d.verificationStatus === 'APPROVED') onVerified();
+    } catch { /* ignore */ }
+  }, [onVerified]);
 
   const role = user.role || 'STUDENT';
   // 认证类型: 学生/教师走实名认证(校园卡), 管理员走资质认证(证明材料), 超级管理员自动已认证
@@ -605,10 +618,22 @@ function VerificationModal({ user, onClose, onVerified }: { user: any; onClose: 
     ? '请拍摄能证明您管理员身份的材料 (如工作证、聘书、在职证明等)'
     : '请拍摄校园卡带人像的一面 (头像、姓名、卡号、班级清晰)';
 
-  const status = user.verificationStatus || 'NONE';
+  const status = localStatus || user.verificationStatus || 'NONE';
   const isApproved = user.verified || status === 'APPROVED';
+  const isAiReviewing = status === 'AI_REVIEWING';
   const isPending = status === 'PENDING';
   const isRejected = status === 'REJECTED';
+  const inProgress = isAiReviewing || isPending;
+
+  // AI 初审 / 人工复核期间轮询刷新状态 (每 3 秒)
+  useEffect(() => {
+    if (!isAiReviewing && !isPending) return;
+    const t = setInterval(refreshStatus, 3000);
+    return () => clearInterval(t);
+  }, [isAiReviewing, isPending, refreshStatus]);
+
+  // 认证进度阶段: 0=提交, 1=AI初审, 2=人工复核, 3=完成
+  const progressStep = isApproved ? 3 : isPending ? 2 : isAiReviewing ? 1 : (status !== 'NONE' ? 0 : -1);
 
   // 压缩图片至最大边 1280px
   const compress = (file: File): Promise<string> => new Promise((resolve, reject) => {
@@ -653,9 +678,11 @@ function VerificationModal({ user, onClose, onVerified }: { user: any; onClose: 
     if (!photo) { setMsg('请先拍摄校园卡照片'); return; }
     setBusy(true); setMsg('');
     try {
-      await api.post('/api/users/me/verification', { photo });
-      setMsg('认证申请已提交, 等待管理员审核');
-      onVerified();
+      const res: any = await api.post('/api/users/me/verification', { photo });
+      setMsg(res?.message || '认证申请已提交');
+      // 刷新本地状态以展示进度条, 不关闭弹窗
+      await refreshStatus();
+      setPhoto('');
     } catch (e: any) { setMsg(e.message); } finally { setBusy(false); }
   };
 
@@ -680,22 +707,59 @@ function VerificationModal({ user, onClose, onVerified }: { user: any; onClose: 
             <div className="text-sm font-medium text-green-700">已{verifyLabel}</div>
             {user.verifiedAt && <div className="text-xs text-green-600 mt-1">认证时间: {new Date(user.verifiedAt).toLocaleDateString('zh-CN')}</div>}
           </div>
-        ) : isPending ? (
-          <div className="rounded-xl bg-amber-50 p-4 text-center">
-            <div className="text-3xl mb-1">⏳</div>
-            <div className="text-sm font-medium text-amber-700">审核中</div>
-            <div className="text-xs text-amber-600 mt-1">管理员正在审核您的{verifyLabel}申请, 请耐心等待</div>
+        ) : inProgress ? (
+          <div className="rounded-xl bg-amber-50 p-4">
+            {/* 进度条 */}
+            <div className="relative flex items-center justify-between px-1 mb-3">
+              {/* 背景连接线 */}
+              <div className="absolute left-4 right-4 top-3.5 h-0.5 bg-gray-200" />
+              <div className={`absolute left-4 top-3.5 h-0.5 bg-amber-400 transition-all`} style={{ width: `calc(${(progressStep / 3) * 100}% - 1rem)` }} />
+              {[
+                { step: 0, label: '提交申请' },
+                { step: 1, label: 'AI 初审' },
+                { step: 2, label: '人工复核' },
+                { step: 3, label: '认证完成' },
+              ].map(s => {
+                const reached = progressStep >= s.step;
+                const current = progressStep === s.step;
+                return (
+                  <div key={s.step} className="relative z-10 flex flex-col items-center">
+                    <div className={`h-7 w-7 rounded-full flex items-center justify-center text-xs font-bold transition-colors ${
+                      reached ? 'bg-amber-500 text-white' : 'bg-gray-200 text-gray-400'
+                    } ${current ? 'ring-2 ring-amber-300 ring-offset-1' : ''}`}>
+                      {reached && s.step === 3 ? '✓' : s.step + 1}
+                    </div>
+                    <div className={`mt-1 text-[10px] whitespace-nowrap ${reached ? 'text-amber-700 font-medium' : 'text-gray-400'}`}>{s.label}</div>
+                  </div>
+                );
+              })}
+            </div>
+            <div className="text-center mt-2">
+              {isAiReviewing ? (
+                <>
+                  <div className="text-sm font-medium text-amber-700">🤖 AI 初审中</div>
+                  <div className="text-xs text-amber-600 mt-1">正在识别您的{photoLabel}, 请稍候…</div>
+                </>
+              ) : (
+                <>
+                  <div className="text-sm font-medium text-amber-700">⏳ 等待人工复核</div>
+                  <div className="text-xs text-amber-600 mt-1">AI 初审已通过, 管理员正在复核您的{verifyLabel}申请</div>
+                </>
+              )}
+            </div>
           </div>
         ) : isRejected ? (
           <div className="rounded-xl bg-red-50 p-4 mb-3">
             <div className="text-sm font-medium text-red-700">❌ 认证被驳回</div>
-            {user.verificationRejectReason && <div className="text-xs text-red-600 mt-1">原因: {user.verificationRejectReason}</div>}
+            {user.verificationRejectReason || localRejectReason ? (
+              <div className="text-xs text-red-600 mt-1">原因: {user.verificationRejectReason || localRejectReason}</div>
+            ) : null}
             <div className="text-xs text-red-500 mt-1">请重新拍摄清晰的{photoLabel}照片后再次提交</div>
           </div>
         ) : null}
 
-        {/* 未通过且非超管时可提交 */}
-        {!isSuperAdmin && !isApproved && !isPending && (
+        {/* 未通过且非审核中时可提交 */}
+        {!isSuperAdmin && !isApproved && !isPending && !isAiReviewing && (
           <>
             <div className="rounded-xl bg-blue-50 p-3 mb-3">
               <div className="text-sm font-medium text-blue-800 mb-1">拍摄要求</div>
@@ -736,7 +800,7 @@ function VerificationModal({ user, onClose, onVerified }: { user: any; onClose: 
           </>
         )}
 
-        {isPending && (
+        {(isPending || isAiReviewing) && (
           <p className="mt-3 text-center text-xs text-gray-400">审核期间无法重复提交, 请等待结果</p>
         )}
       </div>

@@ -9,6 +9,7 @@ import { errorResponse } from '@/lib/api-response';
 
 const Schema = z.object({
   realName: z.string().max(32).optional().or(z.literal('')),
+  studentId: z.string().max(32).optional().or(z.literal('')),
   grade: z.string().max(20).optional().or(z.literal('')),
   className: z.string().max(20).optional().or(z.literal('')),
   remark: z.string().max(200).optional().or(z.literal('')),
@@ -17,7 +18,7 @@ const Schema = z.object({
   role: z.enum(['USER', 'STUDENT', 'TEACHER', 'ADMIN', 'SUPER_ADMIN']).optional(),
   verified: z.boolean().optional(),
   // 认证审核: APPROVED 通过 / REJECTED 驳回 (驳回时需传 rejectReason)
-  verificationStatus: z.enum(['APPROVED', 'REJECTED']).optional(),
+  verificationStatus: z.enum(['APPROVED', 'REJECTED', 'NONE']).optional(),
   verificationRejectReason: z.string().max(200).optional().or(z.literal('')),
 });
 
@@ -27,6 +28,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
     const dto = Schema.parse(await req.json());
     const data: any = {};
     if (dto.realName !== undefined) data.realName = dto.realName || null;
+    if (dto.studentId !== undefined) data.studentId = dto.studentId || null;
     if (dto.grade !== undefined) data.grade = dto.grade || null;
     if (dto.className !== undefined) data.className = dto.className || null;
     if (dto.remark !== undefined) data.remark = dto.remark || null;
@@ -38,17 +40,23 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
       data.verifiedAt = dto.verified ? new Date() : null;
     }
     // 认证审核流转
-    if (dto.verificationStatus === 'APPROVED') {
-      data.verified = true;
-      data.verifiedAt = new Date();
-      data.verificationStatus = VerificationStatus.APPROVED;
-      data.verificationRejectReason = null;
-    } else if (dto.verificationStatus === 'REJECTED') {
-      data.verified = false;
-      data.verifiedAt = null;
-      data.verificationStatus = VerificationStatus.REJECTED;
-      data.verificationRejectReason = dto.verificationRejectReason || null;
-    }
+  if (dto.verificationStatus === 'APPROVED') {
+    data.verified = true;
+    data.verifiedAt = new Date();
+    data.verificationStatus = VerificationStatus.APPROVED;
+    data.verificationRejectReason = null;
+  } else if (dto.verificationStatus === 'REJECTED') {
+    data.verified = false;
+    data.verifiedAt = null;
+    data.verificationStatus = VerificationStatus.REJECTED;
+    data.verificationRejectReason = dto.verificationRejectReason || null;
+  } else if (dto.verificationStatus === 'NONE') {
+    data.verified = false;
+    data.verifiedAt = null;
+    data.verificationStatus = VerificationStatus.NONE;
+    data.verificationRejectReason = null;
+    data.verificationPhoto = null;
+  }
     return NextResponse.json(await updateUser(params.id, data, me.id));
   } catch (e: any) {
     if (e?.name === 'ZodError') return NextResponse.json({ message: e.errors?.[0]?.message || '参数错误' }, { status: 400 });
