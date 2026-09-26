@@ -1,10 +1,11 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { api } from '@/lib/api';
 import { useAuth } from '@/lib/auth-context';
 import Link from 'next/link';
+import { usePageRefresh } from '@/lib/use-page-refresh';
 
 interface UserProfile {
   id: string;
@@ -67,7 +68,7 @@ export default function UserProfilePage() {
 
   const isOwn = me?.id === userId;
 
-  useEffect(() => {
+  const loadAll = useCallback(() => {
     if (!userId) return;
     setLoading(true); setErr('');
     Promise.all([
@@ -80,6 +81,10 @@ export default function UserProfilePage() {
       setComments(c);
     }).finally(() => setLoading(false));
   }, [userId]);
+
+  // 挂载 + 标签页激活时刷新
+  usePageRefresh(loadAll, [loadAll]);
+  useEffect(() => { loadAll(); }, [loadAll]);
 
   // 墙龄: 从注册日到今天的天数 (now 每日 0 点自动刷新)
   const wallDays = profile

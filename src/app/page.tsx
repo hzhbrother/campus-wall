@@ -4,6 +4,7 @@ import { useEffect, useState, useCallback } from 'react';
 import Link from 'next/link';
 import { api } from '@/lib/api';
 import { PostCard, PostListItem } from '@/components/PostCard';
+import { usePageRefresh } from '@/lib/use-page-refresh';
 
 const DEFAULT_CATEGORIES = ['校园', '失物招领', '二手交易', '表白墙', '寻物启事', '招聘兼职', '求助问答'];
 
@@ -32,26 +33,22 @@ export default function HomePage() {
     }
   }, [category, q]);
 
-  // 加载热榜
-  useEffect(() => {
+  // 全量刷新: 帖子 + 热榜 + 分类 + 公告
+  const refreshAll = useCallback(() => {
+    load();
     api.get<{ items: PostListItem[] }>('/api/posts?sort=hot&pageSize=5')
       .then(d => setHotItems(d.items))
       .catch(() => {});
-  }, []);
-
-  // 加载分类 (从站点配置读取)
-  useEffect(() => {
     api.get<string[]>('/api/posts/categories')
       .then(cats => setCategories(cats.length ? cats : DEFAULT_CATEGORIES))
       .catch(() => {});
-  }, []);
-
-  // 加载滚动公告 (从站点配置读取)
-  useEffect(() => {
     api.get<Record<string, string>>('/api/site-config')
       .then(d => { if (d.announcement_text) setAnnouncement(d.announcement_text); })
       .catch(() => {});
-  }, []);
+  }, [load]);
+
+  // 挂载 + 标签页激活时全量刷新
+  usePageRefresh(refreshAll, [refreshAll]);
 
   useEffect(() => { load(); }, [load]);
 

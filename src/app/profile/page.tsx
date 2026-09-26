@@ -6,6 +6,7 @@ import dynamic from 'next/dynamic';
 import { useAuth } from '@/lib/auth-context';
 import { api } from '@/lib/api';
 import { COUNTRY_CODES, getCountryByCode, validatePhone } from '@/lib/country-codes';
+import { usePageRefresh } from '@/lib/use-page-refresh';
 import type { AdminTab } from '@/components/admin/AdminPanel';
 
 // 管理后台懒加载 (大幅减少首屏体积)
@@ -284,6 +285,9 @@ function ProfilePageInner() {
       setView('appeals');
     }
   }, [searchParams, view]);
+
+  // 标签页激活时刷新用户信息
+  usePageRefresh(() => { refreshUser(); }, [refreshUser]);
 
   if (loading) return <div className="min-h-screen flex items-center justify-center text-gray-400">加载中…</div>;
 

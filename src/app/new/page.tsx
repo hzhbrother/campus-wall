@@ -4,6 +4,7 @@ import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/auth-context';
 import { api } from '@/lib/api';
+import { usePageRefresh } from '@/lib/use-page-refresh';
 
 const DEFAULT_CATEGORIES = ['校园', '失物招领', '二手交易', '表白墙', '寻物启事', '招聘兼职', '求助问答'];
 const MAX_LEN = 1000;
@@ -58,11 +59,13 @@ export default function NewPostPage() {
   const canPost = !!user?.verified || isAdmin;
 
   // 加载分类 (从站点配置读取)
-  useEffect(() => {
+  const loadCats = () => {
     api.get<string[]>('/api/posts/categories')
       .then(cats => setCategories(cats.length ? cats : DEFAULT_CATEGORIES))
       .catch(() => {});
-  }, []);
+  };
+  usePageRefresh(loadCats, []);
+  useEffect(() => { loadCats(); }, []);
 
   const handleImage = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;

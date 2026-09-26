@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { api } from '@/lib/api';
+import { usePageRefresh } from '@/lib/use-page-refresh';
 
 interface AgreementContentProps {
   type: 'agreement' | 'privacy';
@@ -13,7 +14,8 @@ export default function AgreementContent({ type, title, defaultContent }: Agreem
   const [content, setContent] = useState('');
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
+  const load = () => {
+    setLoading(true);
     api.get<Record<string, string>>('/api/site-config')
       .then(d => {
         const key = type === 'agreement' ? 'agreement_content' : 'privacy_content';
@@ -21,7 +23,9 @@ export default function AgreementContent({ type, title, defaultContent }: Agreem
       })
       .catch(() => setContent(defaultContent))
       .finally(() => setLoading(false));
-  }, [type, defaultContent]);
+  };
+  usePageRefresh(load, [type, defaultContent]);
+  useEffect(() => { load(); }, [type, defaultContent]);
 
   return (
     <div className="space-y-4">

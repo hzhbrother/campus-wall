@@ -26,7 +26,14 @@ async function request<T>(path: string, opts: RequestInit = {}): Promise<T> {
   const t = token();
   if (t) headers['Authorization'] = `Bearer ${t}`;
 
-  const res = await fetch(`${BASE}${path}`, { ...opts, headers });
+  // GET 请求加时间戳参数, 强制绕过浏览器/CDN 缓存
+  let finalPath = path;
+  if (!opts.method || opts.method === 'GET') {
+    const sep = path.includes('?') ? '&' : '?';
+    finalPath = `${path}${sep}_t=${Date.now()}`;
+  }
+
+  const res = await fetch(`${BASE}${finalPath}`, { ...opts, headers, cache: 'no-store' });
   const text = await res.text();
   const data = text ? JSON.parse(text) : null;
 

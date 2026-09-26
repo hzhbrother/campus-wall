@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { api } from '@/lib/api';
 import { compressImage } from '@/lib/image-compress';
+import { usePageRefresh } from '@/lib/use-page-refresh';
 
 interface BanRecord {
   id: string;
@@ -31,11 +32,13 @@ export default function BanAppealPage() {
   const [msg, setMsg] = useState('');
 
   const load = () => {
+    setLoading(true);
     api.get<{ items: BanRecord[] }>('/api/ban-records')
       .then(d => setRecords(d.items))
       .catch(e => setErr(e.message))
       .finally(() => setLoading(false));
   };
+  usePageRefresh(load, []);
   useEffect(() => { load(); }, []);
 
   const handleImages = async (e: React.ChangeEvent<HTMLInputElement>) => {

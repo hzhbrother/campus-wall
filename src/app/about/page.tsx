@@ -2,17 +2,21 @@
 
 import { useEffect, useState } from 'react';
 import { api } from '@/lib/api';
+import { usePageRefresh } from '@/lib/use-page-refresh';
 
 export default function AboutPage() {
   const [cfg, setCfg] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
+  const load = () => {
+    setLoading(true);
     api.get<Record<string, string>>('/api/site-config')
       .then(setCfg)
       .catch(() => {})
       .finally(() => setLoading(false));
-  }, []);
+  };
+  usePageRefresh(load, []);
+  useEffect(() => { load(); }, []);
 
   const siteName = cfg.site_name || '校园墙';
   const siteDesc = cfg.site_desc || '校园信息交流平台';

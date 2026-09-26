@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/auth-context';
 import { api } from '@/lib/api';
+import { usePageRefresh } from '@/lib/use-page-refresh';
 
 interface Author { id: string; nickname: string; avatar?: string | null; role?: string }
 interface Comment { id: string; content: string; createdAt: string; author: Author; parentId?: string | null }
@@ -34,6 +35,8 @@ export default function PostDetailPage({ params }: { params: { id: string } }) {
       setErr(e.message);
     }
   };
+  // 挂载 + 标签页激活时刷新
+  usePageRefresh(load, [id]);
   useEffect(() => { load(); /* eslint-disable-next-line */ }, [id]);
 
   const like = async () => {

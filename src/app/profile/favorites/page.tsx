@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { api } from '@/lib/api';
+import { usePageRefresh } from '@/lib/use-page-refresh';
 
 interface FavPost {
   id: string;
@@ -27,12 +28,15 @@ export default function FavoritesPage() {
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState('');
 
-  useEffect(() => {
+  const load = () => {
+    setLoading(true);
     api.get<{ items: Favorite[] }>('/api/favorites')
       .then(d => setItems(d.items))
       .catch(e => setErr(e.message))
       .finally(() => setLoading(false));
-  }, []);
+  };
+  usePageRefresh(load, []);
+  useEffect(() => { load(); }, []);
 
   return (
     <div className="space-y-4">

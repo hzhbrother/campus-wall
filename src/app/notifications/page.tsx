@@ -3,6 +3,7 @@
 import { useEffect, useState, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { api } from '@/lib/api';
+import { usePageRefresh } from '@/lib/use-page-refresh';
 
 interface Notification {
   id: string;
@@ -59,8 +60,6 @@ export default function NotificationsPage() {
       .finally(() => setLoading(false));
   }, [page, tab]);
 
-  useEffect(() => { load(); }, [load]);
-
   // 获取未读总数
   const refreshUnread = useCallback(() => {
     api.get<{ count: number }>('/api/notifications/unread-count')
@@ -68,6 +67,15 @@ export default function NotificationsPage() {
       .catch(() => {});
   }, []);
 
+  // 全量刷新: 通知列表 + 未读数
+  const refreshAll = useCallback(() => {
+    load();
+    refreshUnread();
+  }, [load, refreshUnread]);
+
+  // 挂载 + 标签页激活时刷新
+  usePageRefresh(refreshAll, [refreshAll]);
+  useEffect(() => { load(); }, [load]);
   useEffect(() => { refreshUnread(); }, [refreshUnread]);
 
   // 切换标签时重置页码

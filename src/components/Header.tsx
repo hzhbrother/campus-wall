@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import { useAuth } from '@/lib/auth-context';
 import { api } from '@/lib/api';
+import { usePageRefresh } from '@/lib/use-page-refresh';
 
 export function Header() {
   const { user, loading } = useAuth();
@@ -31,22 +32,28 @@ export function Header() {
     return () => clearInterval(t);
   }, [user?.bannedUntil]);
 
-  useEffect(() => {
+  // 加载站点配置
+  const loadSite = () => {
     api.get<{ site_name?: string; site_logo?: string }>('/api/site-config')
       .then(d => {
         if (d.site_name) setSiteName(d.site_name);
         if (d.site_logo) setSiteLogo(d.site_logo);
       })
       .catch(() => {});
-  }, []);
+  };
 
   // 未读消息数
-  useEffect(() => {
+  const loadUnread = () => {
     if (!user) { setUnread(0); return; }
     api.get<{ count: number }>('/api/notifications/unread-count')
       .then(d => setUnread(d.count))
       .catch(() => {});
-  }, [user]);
+  };
+
+  // 标签页激活时刷新站点信息 + 未读数
+  usePageRefresh(() => { loadSite(); loadUnread(); }, [user]);
+  useEffect(() => { loadSite(); }, []);
+  useEffect(() => { loadUnread(); }, [user]);
 
   return (
     <header className="sticky top-0 z-20 bg-white border-b border-slate-100">

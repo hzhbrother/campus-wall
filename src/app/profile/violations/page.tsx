@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { api } from '@/lib/api';
+import { usePageRefresh } from '@/lib/use-page-refresh';
 
 interface ViolationRecord {
   id: string;
@@ -75,12 +76,15 @@ export default function ViolationsPage() {
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState('');
 
-  useEffect(() => {
+  const load = () => {
+    setLoading(true);
     api.get<{ items: ViolationRecord[]; score: number; chart: ChartPoint[] }>('/api/violations')
       .then(d => { setRecords(d.items); setScore(d.score); setChart(d.chart); })
       .catch(e => setErr(e.message))
       .finally(() => setLoading(false));
-  }, []);
+  };
+  usePageRefresh(load, []);
+  useEffect(() => { load(); }, []);
 
   const scoreColor = score >= 80 ? 'text-green-500' : score >= 60 ? 'text-amber-500' : score >= 40 ? 'text-orange-500' : 'text-red-500';
 
