@@ -36,3 +36,5 @@ prisma/migrations/
 # misc
 coverage/
 .turbo/
+.ssh-backup/
+restore-ssh.sh
