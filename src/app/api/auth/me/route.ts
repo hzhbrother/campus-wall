@@ -13,7 +13,7 @@ export async function GET(req: NextRequest) {
       include: {
         _count: { select: { posts: true, comments: true, likes: true, favorites: true } },
         customRole: { select: { id: true, name: true, permissions: true } },
-        school: { select: { id: true, name: true, gradeCount: true } },
+        school: { select: { id: true, name: true, stage: true } },
         organization: { select: { id: true, name: true } },
       },
     });

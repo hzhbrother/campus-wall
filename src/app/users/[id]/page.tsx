@@ -15,14 +15,12 @@ interface UserProfile {
   avatar: string | null;
   coverImage: string | null;
   role: string;
-  grade: string | null;
-  className: string | null;
   verified: boolean;
   qualificationType: string | null;
   qualificationVerified: boolean;
   points: number;
   userNumber: number | null;
-  school: { id: string; name: string; gradeCount: number } | null;
+  school: { id: string; name: string } | null;
   organization: { id: string; name: string } | null;
   createdAt: string;
   qualifications: { id: string; type: string; category: string; verifiedAt: string | null; photo: string | null; photo2: string | null; displayPhoto: string | null }[];
@@ -217,12 +215,6 @@ export default function UserProfilePage() {
           )}
           {profile.organization && (
             <span className="rounded-full bg-green-50 px-2.5 py-0.5 text-xs text-green-600">👥 {profile.organization.name}</span>
-          )}
-          {profile.grade && (
-            <span className="rounded-full bg-gray-100 px-2.5 py-0.5 text-xs text-gray-500">{profile.grade}</span>
-          )}
-          {profile.className && (
-            <span className="rounded-full bg-gray-100 px-2.5 py-0.5 text-xs text-gray-500">{profile.className}</span>
           )}
           <span className="rounded-full bg-blue-50 px-2.5 py-0.5 text-xs text-blue-500">墙龄 {wallDays} 天</span>
           {/* 已通过的资质认证标签 (实时动态) */}

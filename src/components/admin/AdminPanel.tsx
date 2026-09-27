@@ -431,7 +431,7 @@ function UsersTab({ isSuper }: { isSuper: boolean }) {
                     <span className={`rounded px-1.5 py-0.5 text-xs ${userStatus(u).color}`}>{userStatus(u).label}</span>
                   </div>
                   <p className="mt-0.5 text-xs text-gray-400">
-                    {u.realName ? u.realName + ' · ' : ''}{u.grade || ''}{u.className || ''}{u.email ? ' · ' + u.email : ''} · 帖子 {u._count?.posts}
+                    {u.realName ? u.realName + ' · ' : ''}{u.email ? u.email + ' · ' : ''}帖子 {u._count?.posts}
                     {typeof u.credibilityScore === 'number' && <span className={`ml-2 font-medium ${scoreColor(u.credibilityScore)}`}>诚信分 {u.credibilityScore}</span>}
                   </p>
                   {banInfo(u) && <p className="mt-0.5 text-xs text-red-500 font-medium">{banInfo(u)}{u.banReason ? ' · ' + u.banReason : ''}</p>}
@@ -468,15 +468,12 @@ function UsersTab({ isSuper }: { isSuper: boolean }) {
 }
 
 // ---------- 编辑用户弹窗 ----------
-const GRADES = ['高一', '高二', '高三', '初一', '初二', '初三'];
 const CLASS_LIST = ['1班', '2班', '3班', '4班', '5班', '6班', '7班', '8班', '9班', '10班'];
 
 function EditUserModal({ user, onClose, onSaved, isSuper }: { user: any; onClose: () => void; onSaved: () => void; isSuper: boolean }) {
   const [realName, setRealName] = useState(user.realName || '');
   const [email, setEmail] = useState(user.email || '');
   const [phoneNumber, setPhoneNumber] = useState(user.phoneNumber || '');
-  const [grade, setGrade] = useState(user.grade || '');
-  const [className, setClassName] = useState(user.className || '');
   const [remark, setRemark] = useState(user.remark || '');
   const [status, setStatus] = useState(user.status || 'NORMAL');
   // 角色选择值: 系统角色直接用枚举; 自定义角色用 "custom:<id>"
@@ -521,7 +518,7 @@ function EditUserModal({ user, onClose, onSaved, isSuper }: { user: any; onClose
   const save = async () => {
     setSaving(true); setErr('');
     try {
-      const payload: any = { realName, grade, className, remark, status, verified };
+      const payload: any = { realName, remark, status, verified };
       if (email !== (user.email || '')) payload.email = email || '';
       if (phoneNumber !== (user.phoneNumber || '')) payload.phoneNumber = phoneNumber || '';
       // 仅头像有变更时才上传, 避免无谓的大体积请求
@@ -551,7 +548,6 @@ function EditUserModal({ user, onClose, onSaved, isSuper }: { user: any; onClose
     } catch (e: any) { setErr(e.message); } finally { setSaving(false); }
   };
 
-  const classOptions = grade ? CLASS_LIST : [];
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" onClick={onClose}>
@@ -613,23 +609,6 @@ function EditUserModal({ user, onClose, onSaved, isSuper }: { user: any; onClose
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">手机号</label>
               <input type="tel" value={phoneNumber} onChange={e => setPhoneNumber(e.target.value.replace(/\D/g, ''))} className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/40" placeholder="选填" />
-            </div>
-          </div>
-
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">年级</label>
-              <select value={grade} onChange={e => setGrade(e.target.value)} className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm">
-                <option value="">不填写</option>
-                {GRADES.map(g => <option key={g} value={g}>{g}</option>)}
-              </select>
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">班级</label>
-              <select value={className} onChange={e => setClassName(e.target.value)} disabled={!grade} className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm disabled:opacity-50">
-                <option value="">不填写</option>
-                {classOptions.map(c => <option key={c} value={c}>{c}</option>)}
-              </select>
             </div>
           </div>
 
@@ -1021,8 +1000,6 @@ function CreateUserModal({ onClose, onDone, isSuper }: { onClose: () => void; on
   const [nickname, setNickname] = useState('');
   const [password, setPassword] = useState('');
   const [realName, setRealName] = useState('');
-  const [grade, setGrade] = useState('');
-  const [className, setClassName] = useState('');
   const [roleVal, setRoleVal] = useState('STUDENT');
   const [customRoles, setCustomRoles] = useState<{ id: string; name: string }[]>([]);
   const [status, setStatus] = useState('NORMAL');
@@ -1046,8 +1023,6 @@ function CreateUserModal({ onClose, onDone, isSuper }: { onClose: () => void; on
       if (nickname.trim()) body.nickname = nickname.trim();
       if (password.trim()) body.password = password.trim();
       if (realName.trim()) body.realName = realName.trim();
-      if (grade.trim()) body.grade = grade.trim();
-      if (className.trim()) body.className = className.trim();
       if (remark.trim()) body.remark = remark.trim();
       // 角色: 自定义 or 系统
       if (roleVal.startsWith('custom:')) {
@@ -1075,8 +1050,6 @@ function CreateUserModal({ onClose, onDone, isSuper }: { onClose: () => void; on
           <div><label className="block text-xs text-gray-500 mb-1">邮箱 (可选)</label><input value={email} onChange={e => setEmail(e.target.value)} type="email" className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm" placeholder="可选" /></div>
           <div><label className="block text-xs text-gray-500 mb-1">密码 (留空默认 123456)</label><input value={password} onChange={e => setPassword(e.target.value)} className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm" placeholder="可选, 至少6位" /></div>
           <div><label className="block text-xs text-gray-500 mb-1">真实姓名 (可选)</label><input value={realName} onChange={e => setRealName(e.target.value)} className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm" placeholder="可选" /></div>
-          <div><label className="block text-xs text-gray-500 mb-1">年级 (可选)</label><input value={grade} onChange={e => setGrade(e.target.value)} list="grades" className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm" placeholder="可选" /></div>
-          <div><label className="block text-xs text-gray-500 mb-1">班级 (可选)</label><input value={className} onChange={e => setClassName(e.target.value)} list="classes" className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm" placeholder="可选" /></div>
           <div><label className="block text-xs text-gray-500 mb-1">身份</label><select value={roleVal} onChange={e => setRoleVal(e.target.value)} className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm">
             <optgroup label="系统角色">
               <option value="STUDENT">学生</option><option value="TEACHER">教师</option><option value="USER">用户</option><option value="ADMIN">管理员</option>{isSuper && <option value="SUPER_ADMIN">超级管理员</option>}
@@ -1094,8 +1067,6 @@ function CreateUserModal({ onClose, onDone, isSuper }: { onClose: () => void; on
             <label htmlFor="verified-create" className="text-sm text-gray-600">已认证 (管理员身份默认已认证)</label>
           </div>
         </div>
-        <datalist id="grades"><option value="高一" /><option value="高二" /><option value="高三" /><option value="初一" /><option value="初二" /><option value="初三" /></datalist>
-        <datalist id="classes"><option value="1班" /><option value="2班" /><option value="3班" /><option value="4班" /><option value="5班" /><option value="6班" /></datalist>
         {err && <p className="mt-3 text-sm text-red-500">{err}</p>}
         {result && <p className="mt-3 text-sm text-green-600">{result}</p>}
         <div className="mt-4 flex gap-3">
@@ -1111,8 +1082,6 @@ function CreateUserModal({ onClose, onDone, isSuper }: { onClose: () => void; on
 function BatchUpdateModal({ selectedIds, onClose, onDone }: { selectedIds: Set<string>; onClose: () => void; onDone: () => void }) {
   const [role, setRole] = useState('');
   const [status, setStatus] = useState('');
-  const [grade, setGrade] = useState('');
-  const [className, setClassName] = useState('');
   const [verified, setVerified] = useState<string>('');
   const [remark, setRemark] = useState('');
   const [saving, setSaving] = useState(false);
@@ -1125,8 +1094,6 @@ function BatchUpdateModal({ selectedIds, onClose, onDone }: { selectedIds: Set<s
       const item: any = { userId };
       if (role) item.role = role;
       if (status) item.status = status;
-      if (grade !== undefined) item.grade = grade;
-      if (className !== undefined) item.className = className;
       if (remark !== undefined) item.remark = remark;
       if (verified !== '') item.verified = verified === 'true';
       return item;
@@ -1149,8 +1116,6 @@ function BatchUpdateModal({ selectedIds, onClose, onDone }: { selectedIds: Set<s
         <div className="space-y-3">
           <div><label className="block text-xs text-gray-500 mb-1">身份 (不变)</label><select value={role} onChange={e => setRole(e.target.value)} className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"><option value="">不变</option><option value="STUDENT">学生</option><option value="TEACHER">教师</option><option value="USER">用户</option><option value="ADMIN">管理员</option></select></div>
           <div><label className="block text-xs text-gray-500 mb-1">状态 (不变)</label><select value={status} onChange={e => setStatus(e.target.value)} className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"><option value="">不变</option><option value="NORMAL">正常</option><option value="GRADUATED">毕业生</option><option value="BANNED">封禁</option></select></div>
-          <div><label className="block text-xs text-gray-500 mb-1">年级 (留空=不变)</label><input value={grade} onChange={e => setGrade(e.target.value)} className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm" placeholder="留空=不变" /></div>
-          <div><label className="block text-xs text-gray-500 mb-1">班级 (留空=不变)</label><input value={className} onChange={e => setClassName(e.target.value)} className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm" placeholder="留空=不变" /></div>
           <div><label className="block text-xs text-gray-500 mb-1">认证状态 (不变)</label><select value={verified} onChange={e => setVerified(e.target.value)} className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"><option value="">不变</option><option value="true">已认证</option><option value="false">未认证</option></select></div>
           <div><label className="block text-xs text-gray-500 mb-1">备注 (留空=不变)</label><input value={remark} onChange={e => setRemark(e.target.value)} className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm" placeholder="留空=不变" /></div>
         </div>
@@ -2212,7 +2177,7 @@ function VerificationReviewTab() {
                           </span>
                         )}
                       </div>
-                      <div className="text-xs text-gray-400">{u.realName || '未填写真名'} {u.studentId ? `· 学号 ${u.studentId}` : ''} {u.grade ? `· ${u.grade}${u.className || ''}` : ''}</div>
+                      <div className="text-xs text-gray-400">{u.realName || '未填写真名'} {u.studentId ? `· 学号 ${u.studentId}` : ''}</div>
                     </div>
                   </div>
                   {statusBadge(u.verificationStatus)}

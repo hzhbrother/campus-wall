@@ -14,8 +14,6 @@ export default function RegisterPage() {
     email: '',
     emailCode: '',
     realName: '',
-    grade: '',
-    className: '',
     password: '',
     confirmPassword: '',
     remark: '',
@@ -67,11 +65,10 @@ export default function RegisterPage() {
         email: form.email.trim(),
         emailCode: form.emailCode.trim(),
         realName: form.realName,
-        className: form.className,
         password: form.password,
         remark: form.remark,
       });
-      router.replace('/');
+      router.replace('/profile');
     } catch (e: any) {
       setErr(e.message);
     } finally {
@@ -142,14 +139,6 @@ export default function RegisterPage() {
               <input className="w-full pl-10 pr-4 py-3 rounded-xl border border-slate-200 bg-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/40"
                 placeholder="请输入您的真实姓名" value={form.realName} onChange={e => set('realName', e.target.value)} />
             </div>
-          </div>
-
-          {/* 班级 (可选) */}
-          <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1.5">班级 <span className="text-xs text-slate-400 font-normal">可选</span></label>
-            <input type="text" value={form.className} onChange={e => set('className', e.target.value)}
-              placeholder="如: 高一(3)班"
-              className="w-full px-3 py-3 rounded-xl border border-slate-200 bg-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/40" />
           </div>
 
           {/* 密码 */}

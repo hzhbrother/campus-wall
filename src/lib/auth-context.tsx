@@ -34,7 +34,9 @@ export interface AuthUser {
   bannedUntil?: string | null;
   points?: number;
   userNumber?: number | null;
-  school?: { id: string; name: string; gradeCount: number } | null;
+  schoolId?: string | null;
+  organizationId?: string | null;
+  school?: { id: string; name: string; stage?: string | null } | null;
   organization?: { id: string; name: string } | null;
   credibilityScore?: number;
   banReason?: string | null;
@@ -45,7 +47,7 @@ interface AuthCtx {
   user: AuthUser | null;
   loading: boolean;
   login: (account: string, password: string) => Promise<AuthUser>;
-  register: (data: { nickname: string; email: string; emailCode: string; password: string; realName?: string; grade?: string; className?: string; remark?: string }) => Promise<AuthUser>;
+  register: (data: { nickname: string; email: string; emailCode: string; password: string; realName?: string; remark?: string }) => Promise<AuthUser>;
   applyToken: (token: string) => Promise<AuthUser | null>;
   logout: () => void;
   refreshUser: () => Promise<AuthUser | null>;

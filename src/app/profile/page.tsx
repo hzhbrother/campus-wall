@@ -10,6 +10,7 @@ import { usePageRefresh } from '@/lib/use-page-refresh';
 import { VerifiedBadge } from '@/components/VerifiedBadge';
 import { BadgesView } from '@/components/BadgesView';
 import { CheckInView } from '@/components/CheckInView';
+import { JoinOrgModal } from '@/components/JoinOrgModal';
 import { formatUserCode } from '@/lib/user-number';
 import { DEFAULT_ROLE_PERMISSIONS } from '@/lib/permissions';
 import type { AdminTab } from '@/components/admin/AdminPanel';
@@ -35,9 +36,6 @@ const Arrow = () => (
 );
 
 // ---------- 个人资料编辑 ----------
-const GRADES = ['高一', '高二', '高三', '初一', '初二', '初三'];
-const CLASS_LIST = ['1班', '2班', '3班', '4班', '5班', '6班', '7班', '8班', '9班', '10班'];
-
 function EditProfile({ user, onSaved, forcePhone = false }: { user: any; onSaved: () => void; forcePhone?: boolean }) {
   const router = useRouter();
   const [nickname, setNickname] = useState(user?.nickname || '');
@@ -45,8 +43,6 @@ function EditProfile({ user, onSaved, forcePhone = false }: { user: any; onSaved
   const [countryCode, setCountryCode] = useState(user?.countryCode || '+86');
   const [phoneNumber, setPhoneNumber] = useState(user?.phoneNumber || '');
   const [email, setEmail] = useState(user?.email || '');
-  const [grade, setGrade] = useState(user?.grade || '');
-  const [className, setClassName] = useState(user?.className || '');
   const [remark, setRemark] = useState(user?.remark || '');
   const [avatar, setAvatar] = useState(user?.avatar || '');
   const [schoolId, setSchoolId] = useState(user?.school?.id || '');
@@ -87,8 +83,6 @@ function EditProfile({ user, onSaved, forcePhone = false }: { user: any; onSaved
     reader.onload = () => setAvatar(reader.result as string);
     reader.readAsDataURL(file);
   };
-
-  const classOptions = grade ? CLASS_LIST : [];
 
   // 发送邮箱绑定验证码
   const sendEmailBindCode = async () => {
@@ -133,7 +127,7 @@ function EditProfile({ user, onSaved, forcePhone = false }: { user: any; onSaved
         countryCode: hasPhone ? countryCode : '',
         phoneNumber: hasPhone ? phoneNumber : '',
         email: email.trim(),
-        grade, className, remark, avatar,
+        remark, avatar,
         schoolId, organizationId,
       };
       if (emailChanged) payload.emailCode = emailCode.trim();
@@ -205,32 +199,6 @@ function EditProfile({ user, onSaved, forcePhone = false }: { user: any; onSaved
       <Row label={<>真实姓名<span className="ml-1 text-red-500">*</span></>}>
         <input value={realName} onChange={e => setRealName(e.target.value)} className="w-32 text-right text-[15px] text-gray-900 outline-none" placeholder="请输入真实姓名" />
       </Row>
-
-      <Row label="年级" onClick={() => setEditingField(editingField === 'grade' ? null : 'grade')}>
-        <span className={`text-[15px] ${grade ? 'text-gray-900' : 'text-gray-400'}`}>{grade || '不填写'}</span>
-        <Arrow />
-      </Row>
-      {editingField === 'grade' && (
-        <div className="px-1 py-2 border-b border-gray-100">
-          <select value={grade} onChange={e => { setGrade(e.target.value); setClassName(''); setEditingField(null); }} className="w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm">
-            <option value="">不填写</option>
-            {GRADES.map(g => <option key={g} value={g}>{g}</option>)}
-          </select>
-        </div>
-      )}
-
-      <Row label="班级" onClick={() => grade && setEditingField(editingField === 'class' ? null : 'class')}>
-        <span className={`text-[15px] ${className ? 'text-gray-900' : 'text-gray-400'}`}>{className || (grade ? '请选择' : '不填写')}</span>
-        {grade && <Arrow />}
-      </Row>
-      {editingField === 'class' && grade && (
-        <div className="px-1 py-2 border-b border-gray-100">
-          <select value={className} onChange={e => { setClassName(e.target.value); setEditingField(null); }} className="w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm">
-            <option value="">不填写</option>
-            {classOptions.map(c => <option key={c} value={c}>{c}</option>)}
-          </select>
-        </div>
-      )}
 
       {/* 所属学校 / 团体 (互斥) */}
       <Row label="所属学校" onClick={() => setEditingField(editingField === 'school' ? null : 'school')}>
@@ -321,6 +289,7 @@ function ProfilePageInner() {
   const [showPwdModal, setShowPwdModal] = useState(false);
   const [showNotifModal, setShowNotifModal] = useState(false);
   const [showVerifyModal, setShowVerifyModal] = useState(false);
+  const [showJoinOrg, setShowJoinOrg] = useState(false);
   const [showAvatarLightbox, setShowAvatarLightbox] = useState(false);
   const [profileBg, setProfileBg] = useState('');
 
@@ -343,6 +312,14 @@ function ProfilePageInner() {
       .then(d => { if (d.profile_bg) setProfileBg(d.profile_bg); })
       .catch(() => {});
   }, []);
+
+  // 新用户未加入学校/团体时, 弹出加入引导 (仅弹一次, 跳过不再显示)
+  useEffect(() => {
+    if (loading || !user) return;
+    if (!user.schoolId && !user.organizationId) {
+      setShowJoinOrg(true);
+    }
+  }, [loading, user]);
 
   useEffect(() => {
     if (searchParams.get('edit') === '1') {
@@ -671,6 +648,14 @@ function ProfilePageInner() {
 
       {/* 通知设置弹窗 */}
       {showNotifModal && <NotificationSettingsModal onClose={() => setShowNotifModal(false)} />}
+
+      {/* 加入学校/团体引导弹窗 */}
+      {showJoinOrg && (
+        <JoinOrgModal
+          onClose={() => setShowJoinOrg(false)}
+          onJoined={() => { setShowJoinOrg(false); refreshUser(); }}
+        />
+      )}
 
       {/* 实名认证弹窗 */}
       {showVerifyModal && user && (
