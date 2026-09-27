@@ -28,24 +28,23 @@ function StatusBadge({ status }: { status: string }) {
   return <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${map[status] || 'bg-gray-100 text-gray-600'}`}>{label[status] || status}</span>;
 }
 
-// AI 图片真实性检测结果标签
+// 图片真实性检测结果标签 (仅在疑似时提示, 不展示常规"已检测"字样)
 function AiCheckBadge({ check }: { check: any }) {
   if (!check) return null;
   const { isAiGenerated, confidence, note } = check;
-  // 未配置检测服务时不显示
-  if (check.provider === 'none' && !isAiGenerated && !confidence) return null;
-  const color = isAiGenerated
-    ? confidence === 'high' ? 'bg-red-100 text-red-700'
+  // 未配置检测服务 / 未检测到疑似痕迹 → 完全不显示 (避免无意义提示)
+  if (!isAiGenerated) return null;
+  const color =
+    confidence === 'high' ? 'bg-red-100 text-red-700'
       : confidence === 'medium' ? 'bg-orange-100 text-orange-700'
-      : 'bg-amber-100 text-amber-700'
-    : 'bg-green-100 text-green-700';
-  const icon = isAiGenerated ? '🤖' : '✅';
-  const label = isAiGenerated
-    ? confidence === 'high' ? '疑似 AI 生成' : confidence === 'medium' ? '可能 AI 生成' : '轻微 AI 痕迹'
-    : '未检测到 AI 痕迹';
+      : 'bg-amber-100 text-amber-700';
+  const label =
+    confidence === 'high' ? '图片存疑, 请重点核对'
+      : confidence === 'medium' ? '图片可能存疑'
+      : '图片轻微存疑';
   return (
     <div className={`mt-2 inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-medium ${color}`}>
-      <span>{icon}</span>
+      <span>⚠️</span>
       <span>{label}</span>
       {note && <span className="font-normal opacity-80">· {note}</span>}
     </div>
@@ -466,6 +465,7 @@ function UsersTab({ isSuper }: { isSuper: boolean }) {
                   <button onClick={() => api.del(`/api/admin/users/${u.id}/ban`).then(() => load()).catch(e => setErr(e.message))} className="rounded-lg bg-green-50 px-3 py-1.5 text-xs text-green-600 hover:bg-green-100">解封</button>
                 )}
                 <button onClick={() => setBanUser(u)} className="rounded-lg bg-orange-50 px-3 py-1.5 text-xs text-orange-600 hover:bg-orange-100">封禁</button>
+                <a href={`/users/${u.id}`} target="_blank" rel="noreferrer" className="rounded-lg bg-slate-50 px-3 py-1.5 text-xs text-slate-600 hover:bg-slate-100">查看主页</a>
                 {isSuper && <button onClick={() => setDeleteTarget(u)} className="rounded-lg bg-red-50 px-3 py-1.5 text-xs text-red-600 hover:bg-red-100">删除</button>}
                 <button onClick={() => setEditUser(u)} className="rounded-lg bg-blue-50 px-4 py-1.5 text-xs text-blue-600 hover:bg-blue-100">编辑</button>
               </div>
@@ -506,6 +506,7 @@ function EditUserModal({ user, onClose, onSaved, isSuper }: { user: any; onClose
   const [verified, setVerified] = useState(!!user.verified);
   const [rejectReason, setRejectReason] = useState('');
   const [avatar, setAvatar] = useState(user.avatar || '');
+  const [newPassword, setNewPassword] = useState('');          // 管理员重置密码
   const [saving, setSaving] = useState(false);
   const [err, setErr] = useState('');
 
@@ -565,6 +566,11 @@ function EditUserModal({ user, onClose, onSaved, isSuper }: { user: any; onClose
       } else if (verified !== !!user.verified) {
         // 非待审核状态下的手动操作 (跳过照片审核)
         payload.verificationStatus = verified ? 'APPROVED' : 'NONE';
+      }
+      // 密码重置: 非空时一并提交 (后端做 hash + 长度校验)
+      if (newPassword.trim()) {
+        if (newPassword.length < 6) { setErr('密码至少 6 位'); setSaving(false); return; }
+        payload.password = newPassword;
       }
       await api.patch(`/api/admin/users/${user.id}`, payload);
       onSaved();
@@ -730,6 +736,20 @@ function EditUserModal({ user, onClose, onSaved, isSuper }: { user: any; onClose
           {/* 资质/荣誉认证已移至独立的「资质/荣誉审核」标签页 */}
           <div className="rounded-lg border border-purple-100 bg-purple-50/50 px-3 py-2.5">
             <div className="text-xs text-purple-600">🏅 资质/荣誉认证请前往「资质/荣誉审核」标签页管理</div>
+          </div>
+
+          {/* 密码重置 (留空则不修改) */}
+          <div className="rounded-lg border border-amber-200 bg-amber-50/50 px-3 py-2.5">
+            <label className="block text-sm font-medium text-gray-700 mb-1">🔑 重置密码</label>
+            <input
+              type="text"
+              value={newPassword}
+              onChange={e => setNewPassword(e.target.value)}
+              className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/40"
+              placeholder="留空不修改; 填写后保存即重置 (至少 6 位)"
+              autoComplete="new-password"
+            />
+            <p className="mt-1 text-xs text-amber-700/80">管理员可强制重置用户密码, 保存后用户需用新密码登录。</p>
           </div>
 
           <div>

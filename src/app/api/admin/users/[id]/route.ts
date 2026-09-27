@@ -2,6 +2,7 @@
 // DELETE /api/admin/users/:id 删除用户 (ADMIN+)
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
+import bcrypt from 'bcryptjs';
 import { UserRole, UserStatus, VerificationStatus, NotificationType } from '@prisma/client';
 import { requireRole, requirePermission } from '@/lib/server-auth';
 import { updateUser, deleteUser } from '@/lib/admin-service';
@@ -30,6 +31,8 @@ const Schema = z.object({
   qualificationVerified: z.boolean().optional(),
   qualificationStatus: z.enum(['APPROVED', 'REJECTED', 'NONE', 'PENDING']).optional(),
   qualificationRejectReason: z.string().max(200).optional().or(z.literal('')),
+  // 管理员重置密码 (留空不修改)
+  password: z.string().min(6).max(64).optional().or(z.literal('')),
 });
 
 export async function PATCH(req: NextRequest, { params }: { params: { id: string } }) {
@@ -78,6 +81,10 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
     }
     if (dto.status) data.status = dto.status as UserStatus;
     if (dto.role) data.role = dto.role as UserRole;
+    // 密码重置: bcrypt hash 后写入 (留空则不修改)
+    if (dto.password) {
+      data.password = await bcrypt.hash(dto.password, 10);
+    }
     if (dto.verified !== undefined) {
       data.verified = dto.verified;
       data.verifiedAt = dto.verified ? new Date() : null;
@@ -107,6 +114,16 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
     data.verificationPhoto = null;
   }
     const updated = await updateUser(params.id, data, me.id);
+
+    // 密码被重置时通知用户 (不在通知里写明文密码, 由用户向管理员询问)
+    if (dto.password) {
+      await createNotification({
+        userId: params.id,
+        type: NotificationType.SYSTEM,
+        title: '🔑 密码已被管理员重置',
+        content: '您的账号密码已被管理员重置, 请使用新密码登录。如非本人操作请联系管理员。',
+      });
+    }
 
     // 认证通过/驳回后给用户发通知
     if (dto.verificationStatus === 'APPROVED') {
