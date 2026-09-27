@@ -19,6 +19,7 @@ export function JoinOrgModal({ onClose, onJoined }: Props) {
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState('');
+  const [search, setSearch] = useState('');
 
   useEffect(() => {
     Promise.all([
@@ -44,7 +45,11 @@ export function JoinOrgModal({ onClose, onJoined }: Props) {
     finally { setBusy(false); }
   };
 
-  const list = tab === 'school' ? schools : orgs;
+  const allItems = tab === 'school' ? schools : orgs;
+  const keyword = search.trim().toLowerCase();
+  const list = keyword
+    ? allItems.filter(item => item.name.toLowerCase().includes(keyword))
+    : allItems;
 
   return (
     <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/50 sm:items-center" onClick={onClose}>
@@ -61,26 +66,44 @@ export function JoinOrgModal({ onClose, onJoined }: Props) {
           {/* 切换: 学校 / 团体 */}
           <div className="mb-3 grid grid-cols-2 gap-2">
             <button
-              onClick={() => { setTab('school'); setSelected(null); }}
+              onClick={() => { setTab('school'); setSelected(null); setSearch(''); }}
               className={`rounded-lg py-2.5 text-sm font-medium ${tab === 'school' ? 'bg-blue-500 text-white' : 'bg-gray-100 text-gray-600'}`}
             >
               🏫 学校
             </button>
             <button
-              onClick={() => { setTab('org'); setSelected(null); }}
+              onClick={() => { setTab('org'); setSelected(null); setSearch(''); }}
               className={`rounded-lg py-2.5 text-sm font-medium ${tab === 'org' ? 'bg-blue-500 text-white' : 'bg-gray-100 text-gray-600'}`}
             >
               👥 团体
             </button>
           </div>
 
+          {/* 搜索框 */}
+          <div className="relative mb-3">
+            <svg className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <circle cx="11" cy="11" r="8" />
+              <path d="m21 21-4.3-4.3" strokeLinecap="round" />
+            </svg>
+            <input
+              value={search}
+              onChange={e => setSearch(e.target.value)}
+              placeholder={`搜索${tab === 'school' ? '学校' : '团体'}名称`}
+              className="w-full rounded-lg border border-gray-200 bg-gray-50 py-2.5 pl-9 pr-3 text-sm outline-none focus:border-blue-400 focus:bg-white"
+            />
+          </div>
+
           {loading ? (
             <div className="py-10 text-center text-gray-400">加载中…</div>
           ) : list.length === 0 ? (
             <div className="py-10 text-center text-gray-400">
-              <div className="text-4xl mb-2">{tab === 'school' ? '🏫' : '👥'}</div>
-              <p className="text-sm">暂无{tab === 'school' ? '学校' : '团体'}可加入</p>
-              <p className="text-xs mt-1">请联系管理员添加</p>
+              <div className="text-4xl mb-2">{keyword ? '🔍' : (tab === 'school' ? '🏫' : '👥')}</div>
+              <p className="text-sm">
+                {keyword
+                  ? `未找到包含「${search}」的${tab === 'school' ? '学校' : '团体'}`
+                  : `暂无${tab === 'school' ? '学校' : '团体'}可加入`}
+              </p>
+              {!keyword && <p className="text-xs mt-1">请联系管理员添加</p>}
             </div>
           ) : (
             <div className="space-y-2">

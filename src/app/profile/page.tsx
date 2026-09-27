@@ -290,6 +290,7 @@ function ProfilePageInner() {
   const [showNotifModal, setShowNotifModal] = useState(false);
   const [showVerifyModal, setShowVerifyModal] = useState(false);
   const [showJoinOrg, setShowJoinOrg] = useState(false);
+  const [joinOrgDismissed, setJoinOrgDismissed] = useState(false);
   const [showAvatarLightbox, setShowAvatarLightbox] = useState(false);
   const [profileBg, setProfileBg] = useState('');
 
@@ -316,10 +317,10 @@ function ProfilePageInner() {
   // 新用户未加入学校/团体时, 弹出加入引导 (仅弹一次, 跳过不再显示)
   useEffect(() => {
     if (loading || !user) return;
-    if (!user.schoolId && !user.organizationId) {
+    if (!user.schoolId && !user.organizationId && !joinOrgDismissed) {
       setShowJoinOrg(true);
     }
-  }, [loading, user]);
+  }, [loading, user, joinOrgDismissed]);
 
   useEffect(() => {
     if (searchParams.get('edit') === '1') {
@@ -652,7 +653,7 @@ function ProfilePageInner() {
       {/* 加入学校/团体引导弹窗 */}
       {showJoinOrg && (
         <JoinOrgModal
-          onClose={() => setShowJoinOrg(false)}
+          onClose={() => { setShowJoinOrg(false); setJoinOrgDismissed(true); }}
           onJoined={() => { setShowJoinOrg(false); refreshUser(); }}
         />
       )}
