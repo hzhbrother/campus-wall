@@ -89,18 +89,23 @@ export async function POST(req: NextRequest) {
       getSiteConfigValue('sensitive_words', ''),
     ]);
 
+    // 内容与图片至少填一项 (允许纯图片发帖)
     const CreateSchema = z.object({
       title: z.string().max(100).optional().or(z.literal('')),
-      content: z.string().min(2).max(5000),
+      content: z.string().max(5000).optional().or(z.literal('')),
       category: z.enum([...categories] as [string, ...string[]]),
       images: z.array(z.string().max(3 * 1024 * 1024)).max(3).optional(),
       isAnonymous: z.boolean().optional(),
+    }).refine(d => (d.content?.trim() || '').length > 0 || (d.images?.length || 0) > 0, {
+      message: '内容和图片不能同时为空',
+      path: ['content'],
     });
 
     const dto = CreateSchema.parse(await req.json());
 
-    // 标题可选: 用户未填则自动从正文截取前 30 字
-    const title = dto.title?.trim() ? dto.title.trim() : (dto.content.length > 30 ? dto.content.slice(0, 30) + '…' : dto.content);
+    // 标题不自动提取: 用户没填就留空
+    const title = dto.title?.trim() || '';
+    const content = dto.content || '';
 
     // 匿名开关
     if (dto.isAnonymous && !allowAnonymous) {
@@ -110,7 +115,7 @@ export async function POST(req: NextRequest) {
     // 敏感词过滤
     if (sensitiveWords) {
       const words = sensitiveWords.split(',').map(s => s.trim()).filter(Boolean);
-      const text = dto.title + dto.content;
+      const text = (dto.title || '') + (dto.content || '');
       const hit = words.find(w => text.includes(w));
       if (hit) return NextResponse.json({ message: `内容包含敏感词: ${hit}` }, { status: 400 });
     }
@@ -129,7 +134,7 @@ export async function POST(req: NextRequest) {
     const post = await prisma.post.create({
       data: {
         title,
-        content: dto.content,
+        content,
         category: dto.category,
         images: dto.images || [],
         isAnonymous: dto.isAnonymous || false,
