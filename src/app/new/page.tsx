@@ -49,6 +49,7 @@ export default function NewPostPage() {
   const { user, loading } = useAuth();
   const router = useRouter();
   const [content, setContent] = useState('');
+  const [title, setTitle] = useState('');
   const [images, setImages] = useState<string[]>([]);
   const [category, setCategory] = useState('');
   const [categories, setCategories] = useState<string[]>(DEFAULT_CATEGORIES);
@@ -103,13 +104,14 @@ export default function NewPostPage() {
     if (!category) { setErr('请选择主题分类'); return; }
     setErr(''); setBusy(true);
     try {
-      const res = await api.post<{ id: string; status: string }>('/api/posts', {
-        title: content.slice(0, 30) + (content.length > 30 ? '…' : ''),
+      const payload: any = {
         content,
         category,
         images,
         isAnonymous,
-      });
+      };
+      if (title.trim()) payload.title = title.trim();
+      const res = await api.post<{ id: string; status: string }>('/api/posts', payload);
 
       if (res.status === 'PENDING') {
         alert('发布成功! 帖子正在审核中, 通过后将显示在信息流。');
@@ -159,6 +161,16 @@ export default function NewPostPage() {
       {/* 顶部提示 */}
       <div className="mx-4 mt-3 rounded-lg bg-orange-50 px-3 py-2 text-center text-xs text-orange-600">
         禁止发布重复信息, 广告营销类, 含二维码等内容
+      </div>
+
+      {/* 标题输入 (可选) */}
+      <div className="mt-3 px-4">
+        <input
+          value={title}
+          onChange={e => setTitle(e.target.value.slice(0, 50))}
+          placeholder="标题（可选，不填将自动从正文截取）"
+          className="w-full rounded-lg bg-slate-50 px-3 py-2.5 text-base text-slate-800 placeholder:text-slate-300 focus:outline-none focus:ring-1 focus:ring-blue-300"
+        />
       </div>
 
       {/* 内容输入 */}

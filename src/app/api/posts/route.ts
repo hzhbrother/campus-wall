@@ -86,7 +86,7 @@ export async function POST(req: NextRequest) {
     ]);
 
     const CreateSchema = z.object({
-      title: z.string().min(2).max(100),
+      title: z.string().max(100).optional().or(z.literal('')),
       content: z.string().min(2).max(5000),
       category: z.enum([...categories] as [string, ...string[]]),
       images: z.array(z.string().max(3 * 1024 * 1024)).max(3).optional(),
@@ -94,6 +94,9 @@ export async function POST(req: NextRequest) {
     });
 
     const dto = CreateSchema.parse(await req.json());
+
+    // 标题可选: 用户未填则自动从正文截取前 30 字
+    const title = dto.title?.trim() ? dto.title.trim() : (dto.content.length > 30 ? dto.content.slice(0, 30) + '…' : dto.content);
 
     // 匿名开关
     if (dto.isAnonymous && !allowAnonymous) {
@@ -121,7 +124,7 @@ export async function POST(req: NextRequest) {
 
     const post = await prisma.post.create({
       data: {
-        title: dto.title,
+        title,
         content: dto.content,
         category: dto.category,
         images: dto.images || [],
@@ -135,7 +138,7 @@ export async function POST(req: NextRequest) {
     // 帖子待审核时通知所有管理员
     if (status === PostStatus.PENDING) {
       const submitTime = new Date().toLocaleString('zh-CN');
-      const notifContent = `用户「${me.nickname || me.email}」于 ${submitTime} 发布了帖子「${dto.title}」，等待审核。\n点击查看详情并审核。`;
+      const notifContent = `用户「${me.nickname || me.email}」于 ${submitTime} 发布了帖子「${title}」，等待审核。\n点击查看详情并审核。`;
       await createNotification({
         targetRole: UserRole.SUPER_ADMIN,
         type: NotificationType.SYSTEM,

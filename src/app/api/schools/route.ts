@@ -11,7 +11,6 @@ const STAGES = ['幼儿园', '小学', '初中', '高中', '大学', '其他'];
 const CreateSchema = z.object({
   name: z.string().min(1, '学校名称不能为空').max(100),
   stage: z.enum(STAGES as [string, ...string[]]).optional().or(z.literal('')),
-  gradeCount: z.number().int().min(1).max(20).optional().default(12),
   description: z.string().max(500).optional().or(z.literal('')),
 });
 
@@ -35,7 +34,6 @@ export async function POST(req: NextRequest) {
       data: {
         name: dto.name,
         stage: dto.stage || null,
-        gradeCount: dto.gradeCount,
         description: dto.description || null,
       },
     });

@@ -2803,7 +2803,6 @@ function SchoolsManager() {
   const [editId, setEditId] = useState<string | null>(null);
   const [editName, setEditName] = useState('');
   const [editStage, setEditStage] = useState('');
-  const [editGradeCount, setEditGradeCount] = useState(12);
   const [editDesc, setEditDesc] = useState('');
 
   const load = useCallback(() => {
@@ -2829,7 +2828,6 @@ function SchoolsManager() {
       await api.patch(`/api/schools/${id}`, {
         name: editName.trim(),
         stage: editStage,
-        gradeCount: editGradeCount,
         description: editDesc.trim(),
       });
       setEditId(null);
@@ -2846,7 +2844,7 @@ function SchoolsManager() {
 
   return (
     <div>
-      <SectionTitle title="学校管理" desc="添加学校名称, 后续可编辑补充学段、年级数量等信息" />
+      <SectionTitle title="学校管理" desc="添加学校名称, 可编辑补充学段 (如初中/高中/大学) 等信息" />
       {err && <p className="mb-3 text-sm text-red-500">{err}</p>}
 
       {/* 新建表单: 只需学校名称 */}
@@ -2873,8 +2871,7 @@ function SchoolsManager() {
                     <option value="">选择学段</option>
                     {SCHOOL_STAGES.map(st => <option key={st} value={st}>{st}</option>)}
                   </select>
-                  <input type="number" min={1} max={20} value={editGradeCount} onChange={e => setEditGradeCount(Number(e.target.value))} placeholder="年级数量" className="rounded-lg border border-gray-200 px-3 py-2 text-sm outline-none focus:border-blue-400" />
-                  <input value={editDesc} onChange={e => setEditDesc(e.target.value)} placeholder="简介" className="rounded-lg border border-gray-200 px-3 py-2 text-sm outline-none focus:border-blue-400" />
+                  <input value={editDesc} onChange={e => setEditDesc(e.target.value)} placeholder="简介" className="rounded-lg border border-gray-200 px-3 py-2 text-sm outline-none focus:border-blue-400 sm:col-span-2" />
                 </div>
                 <div className="flex gap-2">
                   <button onClick={() => update(s.id)} disabled={saving} className="rounded-lg bg-blue-500 px-3 py-1.5 text-sm text-white disabled:opacity-50">保存</button>
@@ -2889,12 +2886,12 @@ function SchoolsManager() {
                     {s.stage && <span className="ml-2 rounded bg-blue-50 px-1.5 py-0.5 text-xs text-blue-600">{s.stage}</span>}
                   </div>
                   <div className="mt-0.5 text-xs text-gray-400">
-                    {s.gradeCount} 个年级 · {s._count?.users || 0} 名成员
+                    {s._count?.users || 0} 名成员
                     {s.description && ` · ${s.description}`}
                   </div>
                 </div>
                 <div className="flex gap-2">
-                  <button onClick={() => { setEditId(s.id); setEditName(s.name); setEditStage(s.stage || ''); setEditGradeCount(s.gradeCount); setEditDesc(s.description || ''); }} className="rounded-lg border border-gray-200 px-3 py-1.5 text-sm text-gray-600 hover:bg-gray-50">编辑</button>
+                  <button onClick={() => { setEditId(s.id); setEditName(s.name); setEditStage(s.stage || ''); setEditDesc(s.description || ''); }} className="rounded-lg border border-gray-200 px-3 py-1.5 text-sm text-gray-600 hover:bg-gray-50">编辑</button>
                   <button onClick={() => remove(s.id)} className="rounded-lg border border-red-200 px-3 py-1.5 text-sm text-red-500 hover:bg-red-50">删除</button>
                 </div>
               </div>

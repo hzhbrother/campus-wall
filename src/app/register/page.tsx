@@ -6,8 +6,6 @@ import Link from 'next/link';
 import { useAuth } from '@/lib/auth-context';
 import { api } from '@/lib/api';
 
-const GRADES = ['高一', '高二', '高三', '初一', '初二', '初三', '不填写'];
-
 export default function RegisterPage() {
   const { register } = useAuth();
   const router = useRouter();
@@ -69,7 +67,6 @@ export default function RegisterPage() {
         email: form.email.trim(),
         emailCode: form.emailCode.trim(),
         realName: form.realName,
-        grade: form.grade,
         className: form.className,
         password: form.password,
         remark: form.remark,
@@ -81,10 +78,6 @@ export default function RegisterPage() {
       setBusy(false);
     }
   };
-
-  const classOptions = form.grade && form.grade !== '不填写'
-    ? ['1班', '2班', '3班', '4班', '5班', '6班', '7班', '8班', '9班', '10班']
-    : [];
 
   return (
     <div className="min-h-[calc(100vh-56px)] flex flex-col items-center justify-center px-4 py-8">
@@ -151,26 +144,13 @@ export default function RegisterPage() {
             </div>
           </div>
 
-          {/* 年级 + 班级 */}
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1.5">年级</label>
-              <select value={form.grade} onChange={e => set('grade', e.target.value)}
-                className="w-full px-3 py-3 rounded-xl border border-slate-200 bg-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/40">
-                <option value="">不填写</option>
-                {GRADES.filter(g => g !== '不填写').map(g => <option key={g} value={g}>{g}</option>)}
-              </select>
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1.5">班级</label>
-              <select value={form.className} onChange={e => set('className', e.target.value)} disabled={!form.grade}
-                className="w-full px-3 py-3 rounded-xl border border-slate-200 bg-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/40 disabled:opacity-50 disabled:bg-slate-50">
-                <option value="">先选择年级</option>
-                {classOptions.map(c => <option key={c} value={c}>{c}</option>)}
-              </select>
-            </div>
+          {/* 班级 (可选) */}
+          <div>
+            <label className="block text-sm font-medium text-slate-700 mb-1.5">班级 <span className="text-xs text-slate-400 font-normal">可选</span></label>
+            <input type="text" value={form.className} onChange={e => set('className', e.target.value)}
+              placeholder="如: 高一(3)班"
+              className="w-full px-3 py-3 rounded-xl border border-slate-200 bg-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/40" />
           </div>
-          <p className="text-xs text-slate-400 -mt-2">可选，只能选择系统内已有的年级和班级</p>
 
           {/* 密码 */}
           <div>
