@@ -6,8 +6,11 @@ import { requirePermission } from '@/lib/server-auth';
 import { prisma } from '@/lib/prisma';
 import { errorResponse } from '@/lib/api-response';
 
+const STAGES = ['幼儿园', '小学', '初中', '高中', '大学', '其他'];
+
 const UpdateSchema = z.object({
   name: z.string().min(1).max(100).optional(),
+  stage: z.enum(STAGES as [string, ...string[]]).optional().or(z.literal('')),
   gradeCount: z.number().int().min(1).max(20).optional(),
   description: z.string().max(500).optional().or(z.literal('')),
 });
@@ -20,6 +23,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
       where: { id: params.id },
       data: {
         ...(dto.name !== undefined ? { name: dto.name } : {}),
+        ...(dto.stage !== undefined ? { stage: dto.stage || null } : {}),
         ...(dto.gradeCount !== undefined ? { gradeCount: dto.gradeCount } : {}),
         ...(dto.description !== undefined ? { description: dto.description || null } : {}),
       },

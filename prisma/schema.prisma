@@ -523,6 +523,7 @@ model CheckInRecord {
 model School {
   id          String   @id @default(cuid())
   name        String            // 学校名称
+  stage       String?           // 学段: 幼儿园/小学/初中/高中/大学/其他
   gradeCount  Int      @default(12) // 年级数量 (如 12 代表 1-12 年级)
   description String?           // 学校简介
   createdAt   DateTime @default(now())

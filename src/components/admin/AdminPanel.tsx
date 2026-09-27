@@ -2791,16 +2791,18 @@ function RoleEditModal({ role, onClose, onSaved }: { role: RoleItem | null; onCl
 }
 
 // ---------- 学校管理 ----------
+const SCHOOL_STAGES = ['幼儿园', '小学', '初中', '高中', '大学', '其他'];
+
 function SchoolsManager() {
   const [items, setItems] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState('');
   const [name, setName] = useState('');
-  const [gradeCount, setGradeCount] = useState(12);
   const [description, setDescription] = useState('');
   const [saving, setSaving] = useState(false);
   const [editId, setEditId] = useState<string | null>(null);
   const [editName, setEditName] = useState('');
+  const [editStage, setEditStage] = useState('');
   const [editGradeCount, setEditGradeCount] = useState(12);
   const [editDesc, setEditDesc] = useState('');
 
@@ -2814,8 +2816,8 @@ function SchoolsManager() {
     if (!name.trim()) { setErr('请输入学校名称'); return; }
     setSaving(true); setErr('');
     try {
-      await api.post('/api/schools', { name: name.trim(), gradeCount, description: description.trim() });
-      setName(''); setGradeCount(12); setDescription('');
+      await api.post('/api/schools', { name: name.trim(), description: description.trim() });
+      setName(''); setDescription('');
       load();
     } catch (e: any) { setErr(e.message); } finally { setSaving(false); }
   };
@@ -2824,7 +2826,12 @@ function SchoolsManager() {
     if (!editName.trim()) { setErr('请输入学校名称'); return; }
     setSaving(true); setErr('');
     try {
-      await api.patch(`/api/schools/${id}`, { name: editName.trim(), gradeCount: editGradeCount, description: editDesc.trim() });
+      await api.patch(`/api/schools/${id}`, {
+        name: editName.trim(),
+        stage: editStage,
+        gradeCount: editGradeCount,
+        description: editDesc.trim(),
+      });
       setEditId(null);
       load();
     } catch (e: any) { setErr(e.message); } finally { setSaving(false); }
@@ -2839,15 +2846,14 @@ function SchoolsManager() {
 
   return (
     <div>
-      <SectionTitle title="学校管理" desc="创建学校并设置年级数量, 用户可在资料中选择所属学校" />
+      <SectionTitle title="学校管理" desc="添加学校名称, 后续可编辑补充学段、年级数量等信息" />
       {err && <p className="mb-3 text-sm text-red-500">{err}</p>}
 
-      {/* 新建表单 */}
+      {/* 新建表单: 只需学校名称 */}
       <div className="mb-5 rounded-2xl border border-gray-200 p-4">
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-          <input value={name} onChange={e => setName(e.target.value)} placeholder="学校名称" className="rounded-lg border border-gray-200 px-3 py-2 text-sm outline-none focus:border-blue-400" />
-          <input type="number" min={1} max={20} value={gradeCount} onChange={e => setGradeCount(Number(e.target.value))} placeholder="年级数量" className="rounded-lg border border-gray-200 px-3 py-2 text-sm outline-none focus:border-blue-400" />
-          <input value={description} onChange={e => setDescription(e.target.value)} placeholder="简介 (选填)" className="rounded-lg border border-gray-200 px-3 py-2 text-sm outline-none focus:border-blue-400" />
+        <div className="flex gap-3">
+          <input value={name} onChange={e => setName(e.target.value)} placeholder="学校名称" className="flex-1 rounded-lg border border-gray-200 px-3 py-2 text-sm outline-none focus:border-blue-400" />
+          <input value={description} onChange={e => setDescription(e.target.value)} placeholder="简介 (选填)" className="flex-1 rounded-lg border border-gray-200 px-3 py-2 text-sm outline-none focus:border-blue-400" />
         </div>
         <button onClick={create} disabled={saving} className="mt-3 rounded-lg bg-blue-500 px-4 py-2 text-sm font-medium text-white hover:bg-blue-600 disabled:opacity-50">
           {saving ? '创建中…' : '+ 添加学校'}
@@ -2861,10 +2867,14 @@ function SchoolsManager() {
           <div key={s.id} className="rounded-2xl border border-gray-200 p-4">
             {editId === s.id ? (
               <div className="space-y-3">
-                <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-                  <input value={editName} onChange={e => setEditName(e.target.value)} className="rounded-lg border border-gray-200 px-3 py-2 text-sm outline-none focus:border-blue-400" />
-                  <input type="number" min={1} max={20} value={editGradeCount} onChange={e => setEditGradeCount(Number(e.target.value))} className="rounded-lg border border-gray-200 px-3 py-2 text-sm outline-none focus:border-blue-400" />
-                  <input value={editDesc} onChange={e => setEditDesc(e.target.value)} className="rounded-lg border border-gray-200 px-3 py-2 text-sm outline-none focus:border-blue-400" />
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                  <input value={editName} onChange={e => setEditName(e.target.value)} placeholder="学校名称" className="rounded-lg border border-gray-200 px-3 py-2 text-sm outline-none focus:border-blue-400" />
+                  <select value={editStage} onChange={e => setEditStage(e.target.value)} className="rounded-lg border border-gray-200 px-3 py-2 text-sm outline-none focus:border-blue-400">
+                    <option value="">选择学段</option>
+                    {SCHOOL_STAGES.map(st => <option key={st} value={st}>{st}</option>)}
+                  </select>
+                  <input type="number" min={1} max={20} value={editGradeCount} onChange={e => setEditGradeCount(Number(e.target.value))} placeholder="年级数量" className="rounded-lg border border-gray-200 px-3 py-2 text-sm outline-none focus:border-blue-400" />
+                  <input value={editDesc} onChange={e => setEditDesc(e.target.value)} placeholder="简介" className="rounded-lg border border-gray-200 px-3 py-2 text-sm outline-none focus:border-blue-400" />
                 </div>
                 <div className="flex gap-2">
                   <button onClick={() => update(s.id)} disabled={saving} className="rounded-lg bg-blue-500 px-3 py-1.5 text-sm text-white disabled:opacity-50">保存</button>
@@ -2874,14 +2884,17 @@ function SchoolsManager() {
             ) : (
               <div className="flex items-center justify-between">
                 <div>
-                  <div className="font-medium text-gray-900">{s.name}</div>
+                  <div className="font-medium text-gray-900">
+                    {s.name}
+                    {s.stage && <span className="ml-2 rounded bg-blue-50 px-1.5 py-0.5 text-xs text-blue-600">{s.stage}</span>}
+                  </div>
                   <div className="mt-0.5 text-xs text-gray-400">
                     {s.gradeCount} 个年级 · {s._count?.users || 0} 名成员
                     {s.description && ` · ${s.description}`}
                   </div>
                 </div>
                 <div className="flex gap-2">
-                  <button onClick={() => { setEditId(s.id); setEditName(s.name); setEditGradeCount(s.gradeCount); setEditDesc(s.description || ''); }} className="rounded-lg border border-gray-200 px-3 py-1.5 text-sm text-gray-600 hover:bg-gray-50">编辑</button>
+                  <button onClick={() => { setEditId(s.id); setEditName(s.name); setEditStage(s.stage || ''); setEditGradeCount(s.gradeCount); setEditDesc(s.description || ''); }} className="rounded-lg border border-gray-200 px-3 py-1.5 text-sm text-gray-600 hover:bg-gray-50">编辑</button>
                   <button onClick={() => remove(s.id)} className="rounded-lg border border-red-200 px-3 py-1.5 text-sm text-red-500 hover:bg-red-50">删除</button>
                 </div>
               </div>
