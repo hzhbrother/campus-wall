@@ -64,13 +64,20 @@ export async function PATCH(req: NextRequest) {
     const { emailCode, ...data } = dto;
 
     // 学校与团体互斥: 设置一个时清空另一个
-    if (data.schoolId !== undefined) {
+    // 注意: 必须用 else if, 否则第一个 if 设置 organizationId=null 后,
+    // 第二个 if 的条件 (organizationId !== undefined) 会为 true, 导致 schoolId 被覆盖为 null
+    if (dto.schoolId) {
+      // 设置学校 → 清空团体
       data.organizationId = null;
-      data.schoolId = data.schoolId || null;
-    }
-    if (data.organizationId !== undefined) {
+      data.schoolId = dto.schoolId;
+    } else if (dto.organizationId) {
+      // 设置团体 → 清空学校
       data.schoolId = null;
-      data.organizationId = data.organizationId || null;
+      data.organizationId = dto.organizationId;
+    } else if (dto.schoolId !== undefined || dto.organizationId !== undefined) {
+      // 显式清空: 传了字段但都是空值
+      data.schoolId = null;
+      data.organizationId = null;
     }
 
     const user = await prisma.user.update({ where: { id: me.id }, data });
