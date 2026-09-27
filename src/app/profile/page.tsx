@@ -968,12 +968,12 @@ function VerificationModal({ user, onClose, onVerified, onSubmitted }: { user: a
 
   return (
     <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/50 sm:items-center" onClick={onClose}>
-      <div className="flex max-h-[92vh] w-full max-w-sm flex-col overflow-hidden rounded-t-3xl bg-white sm:rounded-2xl" onClick={e => e.stopPropagation()}>
-        <div className="sticky top-0 z-10 flex shrink-0 items-center justify-between border-b border-gray-100 bg-white px-4 py-3">
-          <h3 className="text-lg font-bold text-gray-900">{verifyLabel}</h3>
-          <button onClick={onClose} className="text-gray-400 hover:text-gray-600 text-xl">✕</button>
+      <div className="flex max-h-[88vh] w-full max-w-sm flex-col overflow-hidden rounded-t-3xl bg-white sm:rounded-2xl" onClick={e => e.stopPropagation()}>
+        <div className="flex shrink-0 items-center justify-between border-b border-gray-100 bg-white px-4 py-3">
+          <h3 className="text-base font-bold text-gray-900">{verifyLabel}</h3>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600 text-xl leading-none">✕</button>
         </div>
-        <div className="overflow-y-auto px-4 pb-6 pt-4">
+        <div className="flex-1 min-h-0 overflow-y-auto px-4 pb-6 pt-4">
 
         {/* 超级管理员: 身份认证自动通过 (资质认证仍需手动提交) */}
         {isSuperAdmin && !isQual ? (
