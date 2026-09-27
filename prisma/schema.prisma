@@ -525,6 +525,7 @@ model Qualification {
 
   user            User               @relation(fields: [userId], references: [id], onDelete: Cascade)
   comments        QualificationComment[]
+  likes           QualificationLike[]
 
   @@index([userId])
   @@index([status])
@@ -546,6 +547,21 @@ model QualificationComment {
 
   @@index([qualificationId, createdAt])
   @@index([authorId])
+}
+
+// 奖状/资质点赞
+model QualificationLike {
+  id              String    @id @default(cuid())
+  qualificationId String
+  userId          String
+  createdAt       DateTime  @default(now())
+
+  qualification   Qualification @relation(fields: [qualificationId], references: [id], onDelete: Cascade)
+  user            User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([qualificationId, userId])
+  @@index([qualificationId])
+  @@index([userId])
 }
 
 // ---- 签到记录 (积分) ----

@@ -23,7 +23,7 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
       where: { id: params.id },
       include: {
         user: { select: USER_SELECT },
-        _count: { select: { comments: true } },
+        _count: { select: { comments: true, likes: true } },
       },
     });
     if (!q) return NextResponse.json({ message: '资质/奖状不存在' }, { status: 404 });
@@ -38,7 +38,16 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
     const isAdmin = q.user.role === 'ADMIN' || q.user.role === 'SUPER_ADMIN';
     const user = { ...q.user, verified: q.user.verified || isAdmin };
 
-    return NextResponse.json({ ...q, user });
+    // 查看当前用户是否已点赞
+    let liked = false;
+    if (viewer) {
+      const hit = await prisma.qualificationLike.findUnique({
+        where: { qualificationId_userId: { qualificationId: params.id, userId: viewer.id } },
+      });
+      liked = !!hit;
+    }
+
+    return NextResponse.json({ ...q, user, liked });
   } catch (e) {
     return errorResponse(e);
   }
