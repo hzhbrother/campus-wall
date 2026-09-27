@@ -518,6 +518,12 @@ function ProfilePageInner() {
             </div>
           ))}
         </div>
+
+        {/* 修改密码弹窗 */}
+        {showPwdModal && <ChangePasswordModal onClose={() => setShowPwdModal(false)} />}
+
+        {/* 通知设置弹窗 */}
+        {showNotifModal && <NotificationSettingsModal onClose={() => setShowNotifModal(false)} />}
       </div>
     );
   }
