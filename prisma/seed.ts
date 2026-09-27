@@ -1,6 +1,23 @@
-// 数据库初始化 seed: 创建超级管理员 + 示例板块 + 示例帖子
+// 数据库初始化 seed: 创建超级管理员 + 默认勋章 (幂等, 可重复运行)
 import { PrismaClient, UserRole, PostStatus } from '@prisma/client';
 import * as bcrypt from 'bcryptjs';
+
+// 系统默认勋章 (管理员仍可在后台编辑名称/图标/阈值/启停; seed 只在缺失时补建, 不覆盖已有修改)
+const DEFAULT_BADGES = [
+  // 发帖/评论/获赞类
+  { name: '发帖达人',   description: '累计发布 10 篇帖子',     icon: '✍️', conditionType: 'POST_COUNT',    threshold: 10 },
+  { name: '发帖狂人',   description: '累计发布 50 篇帖子',     icon: '📝', conditionType: 'POST_COUNT',    threshold: 50 },
+  { name: '评论达人',   description: '累计发布 50 条评论',     icon: '💬', conditionType: 'COMMENT_COUNT', threshold: 50 },
+  { name: '人气王',     description: '累计获得 100 个赞',      icon: '❤️', conditionType: 'LIKE_COUNT',    threshold: 100 },
+  // 签到类 (与 CheckInView.tsx 的 REWARD_RULES 对应)
+  { name: '签到新手',   description: '连续签到 7 天',          icon: '🌱', conditionType: 'CHECKIN_DAYS',   threshold: 7 },
+  { name: '签到达人',   description: '连续签到 30 天',         icon: '🔥', conditionType: 'CHECKIN_DAYS',   threshold: 30 },
+  { name: '签到狂魔',   description: '连续签到 100 天',       icon: '💯', conditionType: 'CHECKIN_DAYS',   threshold: 100 },
+  { name: '签到之神',   description: '连续签到 365 天',       icon: '👑', conditionType: 'CHECKIN_DAYS',   threshold: 365 },
+  // 积分类
+  { name: '积分新星',   description: '累计获得 100 积分',      icon: '⭐', conditionType: 'POINTS',         threshold: 100 },
+  { name: '积分富翁',   description: '累计获得 1000 积分',     icon: '💰', conditionType: 'POINTS',         threshold: 1000 },
+] as const;
 
 const prisma = new PrismaClient();
 
@@ -10,6 +27,7 @@ async function main() {
 
   const passwordHash = await bcrypt.hash(adminPwd, 10);
 
+  // 超级管理员: 已存在则更新角色, 不存在则创建
   const admin = await prisma.user.upsert({
     where: { email: adminEmail },
     update: { role: UserRole.SUPER_ADMIN },
@@ -20,16 +38,13 @@ async function main() {
       role: UserRole.SUPER_ADMIN,
     },
   });
-
   console.log('✅ 超级管理员已就绪:', admin.email, 'role:', admin.role);
 
-  // 创建一个普通用户 + 示例帖子便于联调
-  let demoUser = await prisma.user.findFirst({
-    where: { email: 'demo@campus.edu' },
-  });
-  if (!demoUser) {
+  // 示例用户 + 示例帖子: 仅在从未创建过的情况下创建 (幂等 — 已有则跳过)
+  const existingDemo = await prisma.user.findFirst({ where: { email: 'demo@campus.edu' } });
+  if (!existingDemo) {
     const demoPwd = await bcrypt.hash('Demo@12345', 10);
-    demoUser = await prisma.user.create({
+    const demoUser = await prisma.user.create({
       data: {
         email: 'demo@campus.edu',
         nickname: '校园小明',
@@ -37,7 +52,6 @@ async function main() {
         role: UserRole.USER,
       },
     });
-
     await prisma.post.create({
       data: {
         authorId: demoUser.id,
@@ -50,6 +64,27 @@ async function main() {
     });
     console.log('✅ 示例用户 demo@campus.edu / Demo@12345 已创建');
   }
+
+  // 系统默认勋章: 按 name 去重, 已存在则跳过, 不存在则补建 — 后台修改不会被覆盖
+  let createdCount = 0;
+  for (const b of DEFAULT_BADGES) {
+    const exists = await prisma.badge.findFirst({ where: { name: b.name } });
+    if (!exists) {
+      await prisma.badge.create({
+        data: {
+          name: b.name,
+          description: b.description,
+          icon: b.icon,
+          conditionType: b.conditionType,
+          threshold: b.threshold,
+          isActive: true,
+        },
+      });
+      createdCount++;
+      console.log(`🏅 已创建勋章: ${b.name}`);
+    }
+  }
+  if (createdCount === 0) console.log('✅ 默认勋章均已存在, 跳过创建');
 
   console.log('🌱 Seed 完成');
 }

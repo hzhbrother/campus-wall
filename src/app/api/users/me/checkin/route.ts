@@ -53,8 +53,13 @@ export async function POST(req: NextRequest) {
     }
     streak += 1; // 含今天
 
-    // 连续签到 7 天及以上得 2 分, 否则 1 分
-    const points = streak >= 7 ? 2 : 1;
+    // 连续签到积分梯度 (与前端 REWARD_RULES 保持一致)
+    const points =
+      streak >= 100 ? 12 :
+      streak >= 30  ? 8  :
+      streak >= 15  ? 5  :
+      streak >= 7   ? 3  :
+      streak >= 3   ? 2  : 1;
 
     await prisma.checkInRecord.create({ data: { userId: me.id, date: today, points } });
     await prisma.user.update({ where: { id: me.id }, data: { points: { increment: points } } });
