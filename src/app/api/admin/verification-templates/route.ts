@@ -2,8 +2,8 @@
 // POST /api/admin/verification-templates        创建模板
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
-import { UserRole, VerificationTemplateType } from '@prisma/client';
-import { requireRole } from '@/lib/server-auth';
+import { VerificationTemplateType } from '@prisma/client';
+import { requirePermission } from '@/lib/server-auth';
 import { prisma } from '@/lib/prisma';
 import { errorResponse } from '@/lib/api-response';
 
@@ -26,7 +26,7 @@ const CreateSchema = z.object({
 
 export async function GET(req: NextRequest) {
   try {
-    await requireRole(req, UserRole.SUPER_ADMIN);
+    await requirePermission(req, 'template.manage');
     const templates = await prisma.verificationTemplate.findMany({
       orderBy: [{ isActive: 'desc' }, { createdAt: 'desc' }],
     });
@@ -38,7 +38,7 @@ export async function GET(req: NextRequest) {
 
 export async function POST(req: NextRequest) {
   try {
-    await requireRole(req, UserRole.SUPER_ADMIN);
+    await requirePermission(req, 'template.manage');
     const dto = CreateSchema.parse(await req.json());
     // 新建模板默认非激活
     const tpl = await prisma.verificationTemplate.create({

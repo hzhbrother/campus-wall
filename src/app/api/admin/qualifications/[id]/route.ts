@@ -15,7 +15,7 @@ const ReviewSchema = z.object({
 
 export async function PATCH(req: NextRequest, { params }: { params: { id: string } }) {
   try {
-    await requirePermission(req, 'user.edit');
+    await requirePermission(req, 'qualification.review');
     const dto = ReviewSchema.parse(await req.json());
 
     const q = await prisma.qualification.findUnique({ where: { id: params.id } });
@@ -68,7 +68,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
 
 export async function DELETE(req: NextRequest, { params }: { params: { id: string } }) {
   try {
-    await requirePermission(req, 'user.edit');
+    await requirePermission(req, 'qualification.review');
     await prisma.qualification.delete({ where: { id: params.id } });
     return NextResponse.json({ message: '已删除' });
   } catch (e: any) {

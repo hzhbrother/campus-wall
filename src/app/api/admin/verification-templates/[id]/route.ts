@@ -3,8 +3,8 @@
 // POST   /api/admin/verification-templates/[id]/activate  设为激活模板
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
-import { UserRole, VerificationTemplateType } from '@prisma/client';
-import { requireRole } from '@/lib/server-auth';
+import { VerificationTemplateType } from '@prisma/client';
+import { requirePermission } from '@/lib/server-auth';
 import { prisma } from '@/lib/prisma';
 import { errorResponse } from '@/lib/api-response';
 
@@ -27,7 +27,7 @@ const UpdateSchema = z.object({
 
 export async function PATCH(req: NextRequest, { params }: { params: { id: string } }) {
   try {
-    await requireRole(req, UserRole.SUPER_ADMIN);
+    await requirePermission(req, 'template.manage');
     const dto = UpdateSchema.parse(await req.json());
     const data: any = {};
     if (dto.name !== undefined) data.name = dto.name;
@@ -44,7 +44,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
 
 export async function DELETE(req: NextRequest, { params }: { params: { id: string } }) {
   try {
-    await requireRole(req, UserRole.SUPER_ADMIN);
+    await requirePermission(req, 'template.manage');
     await prisma.verificationTemplate.delete({ where: { id: params.id } });
     return NextResponse.json({ message: '删除成功' });
   } catch (e) {

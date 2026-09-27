@@ -11,6 +11,7 @@ import { VerifiedBadge } from '@/components/VerifiedBadge';
 import { BadgesView } from '@/components/BadgesView';
 import { CheckInView } from '@/components/CheckInView';
 import { formatUserCode } from '@/lib/user-number';
+import { DEFAULT_ROLE_PERMISSIONS } from '@/lib/permissions';
 import type { AdminTab } from '@/components/admin/AdminPanel';
 
 // 管理后台懒加载 (大幅减少首屏体积)
@@ -328,6 +329,14 @@ function ProfilePageInner() {
   const isSuper = user?.role === 'SUPER_ADMIN';
   const forcePhone = searchParams.get('forcePhone') === '1';
 
+  // 判断当前用户是否拥有某权限 (前端标签可见性用, 真正的权限校验在后端)
+  const hasPerm = useCallback((code: string): boolean => {
+    if (!user) return false;
+    if (user.role === 'SUPER_ADMIN') return true;
+    if (user.customRole?.permissions) return user.customRole.permissions.includes(code);
+    return (DEFAULT_ROLE_PERMISSIONS[user.role] || []).includes(code);
+  }, [user]);
+
   // 加载个人中心背景图 (管理员可在站点设置中配置)
   useEffect(() => {
     api.get<{ profile_bg?: string }>('/api/site-config')
@@ -364,28 +373,30 @@ function ProfilePageInner() {
 
   // ---- 管理后台视图 ----
   if (isAdminView(view)) {
-    const adminTabs: { key: AdminTab; label: string }[] = [
+    // 标签可见性: 基于权限 (超管全权限; 自定义角色按 customRole.permissions; 系统角色按默认权限)
+    const allTabs: { key: AdminTab; label: string; perm?: string }[] = [
       { key: 'overview', label: '数据概览' },
-      { key: 'posts', label: '帖子管理' },
-      { key: 'moderation', label: '内容审核' },
-      { key: 'comments', label: '评论管理' },
-      { key: 'users', label: '用户管理' },
-      { key: 'verification', label: '实名认证审核' },
-      { key: 'qualifications', label: '资质/荣誉审核' },
-      { key: 'appeals', label: '申诉审核' },
-      { key: 'notifications', label: '通知发布' },
-      { key: 'schools', label: '学校管理' },
-      { key: 'orgs', label: '团体管理' },
-      // 站点配置类 (SMTP/站点信息/协议) + 角色管理 + 识别模板 仅超级管理员可见
+      { key: 'posts', label: '帖子管理', perm: 'post.view' },
+      { key: 'moderation', label: '内容审核', perm: 'post.moderate' },
+      { key: 'comments', label: '评论管理', perm: 'comment.view' },
+      { key: 'users', label: '用户管理', perm: 'user.view' },
+      { key: 'verification', label: '实名认证审核', perm: 'verification.review' },
+      { key: 'qualifications', label: '资质/荣誉审核', perm: 'qualification.review' },
+      { key: 'appeals', label: '申诉审核', perm: 'appeal.view' },
+      { key: 'notifications', label: '通知发布', perm: 'notification.send' },
+      { key: 'schools', label: '学校管理', perm: 'school.manage' },
+      { key: 'orgs', label: '团体管理', perm: 'org.manage' },
+      { key: 'badges', label: '勋章管理', perm: 'badge.manage' },
+      { key: 'template', label: '识别模板', perm: 'template.manage' },
+      // 站点配置类 + 角色管理 仅超级管理员可见 (role.manage / settings.* 为超管专属权限)
       ...(isSuper ? [
-        { key: 'roles' as AdminTab, label: '角色管理' },
-        { key: 'badges' as AdminTab, label: '勋章管理' },
-        { key: 'template' as AdminTab, label: '识别模板' },
-        { key: 'email' as AdminTab, label: '邮件配置' },
-        { key: 'settings' as AdminTab, label: '站点设置' },
-        { key: 'agreement' as AdminTab, label: '协议管理' },
+        { key: 'roles' as AdminTab, label: '角色管理', perm: 'role.manage' },
+        { key: 'email' as AdminTab, label: '邮件配置', perm: 'settings.email' },
+        { key: 'settings' as AdminTab, label: '站点设置', perm: 'settings.site' },
+        { key: 'agreement' as AdminTab, label: '协议管理', perm: 'settings.agreement' },
       ] : []),
     ];
+    const adminTabs = allTabs.filter(t => !t.perm || hasPerm(t.perm));
     const tab = view as AdminTab;
     return (
       <div className="space-y-4">

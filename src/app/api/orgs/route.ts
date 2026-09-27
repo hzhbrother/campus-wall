@@ -2,8 +2,7 @@
 // POST /api/orgs   创建团体 (ADMIN+)
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
-import { requireRole } from '@/lib/server-auth';
-import { UserRole } from '@prisma/client';
+import { requirePermission } from '@/lib/server-auth';
 import { prisma } from '@/lib/prisma';
 import { errorResponse } from '@/lib/api-response';
 
@@ -26,7 +25,7 @@ export async function GET() {
 
 export async function POST(req: NextRequest) {
   try {
-    await requireRole(req, UserRole.ADMIN);
+    await requirePermission(req, 'org.manage');
     const dto = CreateSchema.parse(await req.json());
     const org = await prisma.organization.create({
       data: {

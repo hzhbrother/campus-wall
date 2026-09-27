@@ -2,8 +2,7 @@
 // DELETE /api/admin/badges/[id] 删除勋章
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
-import { requireRole } from '@/lib/server-auth';
-import { UserRole } from '@prisma/client';
+import { requirePermission } from '@/lib/server-auth';
 import { prisma } from '@/lib/prisma';
 import { errorResponse } from '@/lib/api-response';
 
@@ -18,7 +17,7 @@ const UpdateSchema = z.object({
 
 export async function PATCH(req: NextRequest, { params }: { params: { id: string } }) {
   try {
-    await requireRole(req, UserRole.SUPER_ADMIN);
+    await requirePermission(req, 'badge.manage');
     const dto = UpdateSchema.parse(await req.json());
     const data: any = {};
     if (dto.name !== undefined) data.name = dto.name;
@@ -37,7 +36,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
 
 export async function DELETE(req: NextRequest, { params }: { params: { id: string } }) {
   try {
-    await requireRole(req, UserRole.SUPER_ADMIN);
+    await requirePermission(req, 'badge.manage');
     await prisma.badge.delete({ where: { id: params.id } });
     return NextResponse.json({ ok: true });
   } catch (e) {

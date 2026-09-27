@@ -6,7 +6,7 @@ import { errorResponse } from '@/lib/api-response';
 
 export async function GET(req: NextRequest) {
   try {
-    await requirePermission(req, 'user.edit');
+    await requirePermission(req, 'qualification.review');
     const sp = new URL(req.url).searchParams;
     const status = sp.get('status') || 'PENDING'; // PENDING | ALL | APPROVED | REJECTED
     const category = sp.get('category') || ''; // QUALIFICATION | HONOR | ''

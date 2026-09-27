@@ -2,8 +2,7 @@
 // DELETE /api/orgs/[id]  删除团体 (ADMIN+)
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
-import { requireRole } from '@/lib/server-auth';
-import { UserRole } from '@prisma/client';
+import { requirePermission } from '@/lib/server-auth';
 import { prisma } from '@/lib/prisma';
 import { errorResponse } from '@/lib/api-response';
 
@@ -14,7 +13,7 @@ const UpdateSchema = z.object({
 
 export async function PATCH(req: NextRequest, { params }: { params: { id: string } }) {
   try {
-    await requireRole(req, UserRole.ADMIN);
+    await requirePermission(req, 'org.manage');
     const dto = UpdateSchema.parse(await req.json());
     const org = await prisma.organization.update({
       where: { id: params.id },
@@ -32,7 +31,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
 
 export async function DELETE(req: NextRequest, { params }: { params: { id: string } }) {
   try {
-    await requireRole(req, UserRole.ADMIN);
+    await requirePermission(req, 'org.manage');
     await prisma.organization.delete({ where: { id: params.id } });
     return NextResponse.json({ message: '已删除' });
   } catch (e) {

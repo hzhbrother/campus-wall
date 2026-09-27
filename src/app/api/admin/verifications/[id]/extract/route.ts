@@ -7,7 +7,7 @@ import { extractIdInfo, isVisionEnabled } from '@/lib/ai-vision';
 
 export async function POST(req: NextRequest, { params }: { params: { id: string } }) {
   try {
-    await requirePermission(req, 'user.edit');
+    await requirePermission(req, 'verification.review');
     if (!isVisionEnabled()) {
       return NextResponse.json({ message: '未配置 AI 视觉识别, 请手动审核' }, { status: 503 });
     }

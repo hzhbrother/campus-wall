@@ -3,8 +3,7 @@
 // DELETE /api/admin/badges/[id]/grant?userId=xxx  撤销用户的徽章 (SUPER_ADMIN)
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
-import { requireRole } from '@/lib/server-auth';
-import { UserRole } from '@prisma/client';
+import { requirePermission } from '@/lib/server-auth';
 import { prisma } from '@/lib/prisma';
 import { errorResponse } from '@/lib/api-response';
 import { createNotification } from '@/lib/notification-service';
@@ -15,7 +14,7 @@ const GrantSchema = z.object({
 
 export async function GET(req: NextRequest, { params }: { params: { id: string } }) {
   try {
-    await requireRole(req, UserRole.SUPER_ADMIN);
+    await requirePermission(req, 'badge.manage');
     const holders = await prisma.userBadge.findMany({
       where: { badgeId: params.id },
       orderBy: { earnedAt: 'desc' },
@@ -31,7 +30,7 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
 
 export async function POST(req: NextRequest, { params }: { params: { id: string } }) {
   try {
-    await requireRole(req, UserRole.SUPER_ADMIN);
+    await requirePermission(req, 'badge.manage');
     const dto = GrantSchema.parse(await req.json());
 
     const badge = await prisma.badge.findUnique({ where: { id: params.id } });
@@ -63,7 +62,7 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
 
 export async function DELETE(req: NextRequest, { params }: { params: { id: string } }) {
   try {
-    await requireRole(req, UserRole.SUPER_ADMIN);
+    await requirePermission(req, 'badge.manage');
     const url = new URL(req.url);
     const userId = url.searchParams.get('userId');
     if (!userId) return NextResponse.json({ message: '缺少 userId 参数' }, { status: 400 });

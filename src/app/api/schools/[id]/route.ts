@@ -2,8 +2,7 @@
 // DELETE /api/schools/[id]  删除学校 (ADMIN+)
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
-import { requireRole } from '@/lib/server-auth';
-import { UserRole } from '@prisma/client';
+import { requirePermission } from '@/lib/server-auth';
 import { prisma } from '@/lib/prisma';
 import { errorResponse } from '@/lib/api-response';
 
@@ -15,7 +14,7 @@ const UpdateSchema = z.object({
 
 export async function PATCH(req: NextRequest, { params }: { params: { id: string } }) {
   try {
-    await requireRole(req, UserRole.ADMIN);
+    await requirePermission(req, 'school.manage');
     const dto = UpdateSchema.parse(await req.json());
     const school = await prisma.school.update({
       where: { id: params.id },
@@ -34,7 +33,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
 
 export async function DELETE(req: NextRequest, { params }: { params: { id: string } }) {
   try {
-    await requireRole(req, UserRole.ADMIN);
+    await requirePermission(req, 'school.manage');
     await prisma.school.delete({ where: { id: params.id } });
     return NextResponse.json({ message: '已删除' });
   } catch (e) {

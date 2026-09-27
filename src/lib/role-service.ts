@@ -51,8 +51,8 @@ export async function seedRoles() {
     await prisma.role.upsert({
       where: { code: r.code },
       update: {
-        // 已存在的系统角色: 仅同步名称与权限 (不覆盖超级管理员可能修改过的名称)
-        // 这里保守策略: 若名称仍是默认值则同步, 否则保留自定义
+        // 已存在的系统角色: 同步默认权限 (确保新增功能权限对系统角色生效; 名称保留自定义)
+        permissions: r.permissions,
       },
       create: {
         code: r.code,

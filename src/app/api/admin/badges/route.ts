@@ -2,8 +2,7 @@
 // POST /api/admin/badges  创建勋章 (SUPER_ADMIN)
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
-import { requireRole, requirePermission } from '@/lib/server-auth';
-import { UserRole } from '@prisma/client';
+import { requirePermission } from '@/lib/server-auth';
 import { prisma } from '@/lib/prisma';
 import { errorResponse } from '@/lib/api-response';
 
@@ -18,7 +17,7 @@ const CreateSchema = z.object({
 
 export async function GET(req: NextRequest) {
   try {
-    await requirePermission(req, 'user.edit');
+    await requirePermission(req, 'badge.manage');
     const badges = await prisma.badge.findMany({ orderBy: { createdAt: 'desc' } });
     return NextResponse.json({ items: badges });
   } catch (e) {
@@ -28,7 +27,7 @@ export async function GET(req: NextRequest) {
 
 export async function POST(req: NextRequest) {
   try {
-    await requireRole(req, UserRole.SUPER_ADMIN);
+    await requirePermission(req, 'badge.manage');
     const dto = CreateSchema.parse(await req.json());
     const badge = await prisma.badge.create({
       data: {

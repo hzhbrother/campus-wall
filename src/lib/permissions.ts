@@ -30,6 +30,20 @@ export const PERMISSIONS: PermissionMeta[] = [
   { code: 'comment.view', name: '查看所有评论', group: '评论管理' },
   { code: 'comment.delete', name: '删除评论', group: '评论管理' },
 
+  // ---- 认证审核 ----
+  { code: 'verification.review', name: '实名认证审核', group: '认证审核' },
+  { code: 'qualification.review', name: '资质/荣誉认证审核', group: '认证审核' },
+
+  // ---- 勋章管理 ----
+  { code: 'badge.manage', name: '勋章管理与授予', group: '勋章管理' },
+
+  // ---- 模板管理 ----
+  { code: 'template.manage', name: '身份认证模板管理', group: '模板管理' },
+
+  // ---- 基础数据 ----
+  { code: 'school.manage', name: '学校管理', group: '基础数据' },
+  { code: 'org.manage', name: '团体管理', group: '基础数据' },
+
   // ---- 申诉管理 ----
   { code: 'appeal.view', name: '查看封禁申诉', group: '申诉管理' },
   { code: 'appeal.handle', name: '处理封禁申诉', group: '申诉管理' },
@@ -70,6 +84,9 @@ export const DEFAULT_ROLE_PERMISSIONS: Record<string, string[]> = {
     'user.view', 'user.create', 'user.edit', 'user.ban', 'user.import', 'user.batch', 'user.role',
     'post.view', 'post.moderate', 'post.edit', 'post.delete', 'post.pin',
     'comment.view', 'comment.delete',
+    'verification.review', 'qualification.review',
+    'badge.manage',
+    'school.manage', 'org.manage',
     'appeal.view', 'appeal.handle',
     'notification.send',
   ],
