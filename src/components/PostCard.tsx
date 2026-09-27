@@ -78,12 +78,12 @@ export function PostCard({ post }: { post: PostListItem }) {
         </div>
 
         {/* 图片: 列表视图只显示数量提示, 不渲染完整 base64 (点击进入详情查看) */}
-        {(post.images?.length > 0 || (post.imageCount && post.imageCount > 0)) && (
+        {((post.images?.length || 0) > 0 || (post.imageCount || 0) > 0) ? (
           <div className="mt-3 flex items-center gap-2 rounded-xl bg-slate-50 px-3 py-2 text-sm text-slate-500">
             <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"><rect x="3" y="3" width="18" height="18" rx="2" /><circle cx="8.5" cy="8.5" r="1.5" /><path d="m21 15-5-5L5 21" strokeLinecap="round" strokeLinejoin="round" /></svg>
             附图 {post.imageCount || post.images?.length || 0} 张 (点击查看)
           </div>
-        )}
+        ) : null}
 
         {/* 底部互动栏 */}
         <div className="mt-3 flex items-center justify-between text-slate-400">
