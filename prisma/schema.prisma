@@ -148,6 +148,7 @@ model User {
   aiImageCheck Json? // AI 图片真实性检测结果 (身份认证照片)
   lastReadNotificationsAt DateTime? // 上次标记全部已读的时间 (用于广播通知未读计算)
   points Int @default(0) // 积分 (签到等获得)
+  followsPublic Boolean @default(true) // 我的关注列表是否对外公开 (false=仅自己可见)
   userNumber Int? // 用户编号 (顺序号, 用于生成 XYS/XY 编号)
   schoolId     String?          // 所属学校
   organizationId String?        // 所属团体
@@ -172,6 +173,8 @@ model User {
   checkIns     CheckInRecord[]
   school       School?          @relation(fields: [schoolId], references: [id])
   organization Organization?    @relation(fields: [organizationId], references: [id])
+  follows      Follow[]         @relation("FollowerUser") // 我关注了谁
+  followers    Follow[]         @relation("FollowedUser") // 谁关注了我
 
   @@index([email])
   @@index([role])
@@ -457,9 +460,10 @@ model SiteConfig {
 
 model Badge {
   id          String   @id @default(cuid())
-  name        String            // 勋章名称, 如 "发帖达人"
-  description String?           // 勋章描述
-  icon        String?           // 勋章图标 (emoji 或 base64)
+  name        String            // 徽章/勋章名称, 如 "发帖达人"
+  description String?           // 徽章/勋章描述
+  icon        String?           // 图标 (emoji 或 base64, 兼容旧数据)
+  imageUrl    String?           // 自定义徽章图片 URL (透明背景 PNG 优先, 设置后优先于 icon)
   // 获得条件: type=POST_COUNT 发帖数达到 threshold; type=LIKE_COUNT 获赞数; type=COMMENT_COUNT 评论数; type=CHECKIN_DAYS 连续签到天数; type=POINTS 积分达到
   conditionType String         // POST_COUNT | LIKE_COUNT | COMMENT_COUNT | CHECKIN_DAYS | POINTS | MANUAL
   threshold   Int      @default(1) // 条件阈值
@@ -480,7 +484,22 @@ model UserBadge {
   badge     Badge    @relation(fields: [badgeId], references: [id], onDelete: Cascade)
 
   @@unique([userId, badgeId])
-  @@index([userId])
+}
+
+// ---- 关注系统 ----
+
+model Follow {
+  id          String   @id @default(cuid())
+  followerId  String                     // 关注者
+  followingId String                    // 被关注者
+  createdAt   DateTime @default(now())
+
+  follower    User @relation("FollowerUser", fields: [followerId], references: [id], onDelete: Cascade)
+  following   User @relation("FollowedUser", fields: [followingId], references: [id], onDelete: Cascade)
+
+  @@unique([followerId, followingId])
+  @@index([followerId])
+  @@index([followingId])
 }
 
 // ---- 资质/荣誉认证 (一个用户可拥有多个, 需管理员审核) ----

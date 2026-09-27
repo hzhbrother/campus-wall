@@ -7,7 +7,7 @@ interface UserBadge {
   id: string;
   badgeId: string;
   earnedAt: string;
-  badge: { id: string; name: string; description?: string | null; icon?: string | null; conditionType: string; threshold: number };
+  badge: { id: string; name: string; description?: string | null; icon?: string | null; imageUrl?: string | null; conditionType: string; threshold: number };
 }
 
 interface Qualification {
@@ -28,7 +28,7 @@ export function BadgesView({ onBack }: { onBack: () => void }) {
   const [badges, setBadges] = useState<UserBadge[]>([]);
   const [quals, setQuals] = useState<Qualification[]>([]);
   const [loading, setLoading] = useState(true);
-  const [lightbox, setLightbox] = useState<{ icon: string | null; name: string; description: string | null; earnedAt: string } | null>(null);
+  const [lightbox, setLightbox] = useState<{ imageUrl: string | null; icon: string | null; name: string; description: string | null; earnedAt: string } | null>(null);
   // 证书/荣誉图片放大灯箱
   const [certLightbox, setCertLightbox] = useState<{ type: string; photo: string } | null>(null);
 
@@ -184,26 +184,31 @@ export function BadgesView({ onBack }: { onBack: () => void }) {
           {/* ---- 勋章 ---- */}
           <div className="rounded-2xl bg-white p-5 shadow-sm">
             <div className="flex items-center justify-between mb-3">
-              <h3 className="text-lg font-bold text-gray-900">🎖️ 我的勋章</h3>
+              <h3 className="text-lg font-bold text-gray-900">🎖️ 我的徽章</h3>
               <span className="text-xs text-gray-400">{badges.length} 枚</span>
             </div>
-            <p className="text-xs text-gray-400 mb-4">点击勋章可放大查看, 完成任务即可获得勋章</p>
+            <p className="text-xs text-gray-400 mb-4">点击徽章可放大查看, 完成任务即可获得徽章</p>
             {badges.length === 0 ? (
               <div className="py-8 text-center text-gray-400">
                 <div className="text-4xl mb-2">🏅</div>
-                <p className="text-sm">还没有勋章, 快去发帖、签到获得吧~</p>
+                <p className="text-sm">还没有徽章, 快去发帖、签到获得吧~</p>
               </div>
             ) : (
               <div className="grid grid-cols-3 gap-4">
                 {badges.map(ub => (
                   <button
                     key={ub.id}
-                    onClick={() => setLightbox({ icon: ub.badge.icon || null, name: ub.badge.name, description: ub.badge.description || null, earnedAt: ub.earnedAt })}
+                    onClick={() => setLightbox({ imageUrl: ub.badge.imageUrl || null, icon: ub.badge.icon || null, name: ub.badge.name, description: ub.badge.description || null, earnedAt: ub.earnedAt })}
                     className="flex flex-col items-center text-center"
                   >
-                    <div className="h-16 w-16 rounded-full bg-gradient-to-br from-yellow-400 to-amber-500 flex items-center justify-center text-3xl shadow-lg shadow-amber-200 hover:scale-110 transition-transform">
-                      {ub.badge.icon || '🏅'}
-                    </div>
+                    {ub.badge.imageUrl ? (
+                      /* eslint-disable-next-line @next/next/no-img-element */
+                      <img src={ub.badge.imageUrl} alt={ub.badge.name} className="h-16 w-16 rounded-full object-cover hover:scale-110 transition-transform" />
+                    ) : (
+                      <div className="h-16 w-16 rounded-full bg-gradient-to-br from-yellow-400 to-amber-500 flex items-center justify-center text-3xl shadow-lg shadow-amber-200 hover:scale-110 transition-transform">
+                        {ub.badge.icon || '🏅'}
+                      </div>
+                    )}
                     <div className="mt-2 text-sm font-medium text-gray-800">{ub.badge.name}</div>
                     {ub.badge.description && <div className="text-[11px] text-gray-400 mt-0.5 line-clamp-2">{ub.badge.description}</div>}
                     <div className="text-[11px] text-amber-600 mt-1">{new Date(ub.earnedAt).getFullYear()} 年获得</div>
@@ -219,9 +224,14 @@ export function BadgesView({ onBack }: { onBack: () => void }) {
       {lightbox && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80" onClick={() => setLightbox(null)}>
           <div className="flex flex-col items-center" onClick={e => e.stopPropagation()}>
-            <div className="h-32 w-32 rounded-full bg-gradient-to-br from-yellow-400 to-amber-500 flex items-center justify-center text-7xl shadow-2xl">
-              {lightbox.icon || '🏅'}
-            </div>
+            {lightbox.imageUrl ? (
+              /* eslint-disable-next-line @next/next/no-img-element */
+              <img src={lightbox.imageUrl} alt={lightbox.name} className="h-32 w-32 rounded-full object-cover shadow-2xl" />
+            ) : (
+              <div className="h-32 w-32 rounded-full bg-gradient-to-br from-yellow-400 to-amber-500 flex items-center justify-center text-7xl shadow-2xl">
+                {lightbox.icon || '🏅'}
+              </div>
+            )}
             <div className="mt-4 text-xl font-bold text-white">{lightbox.name}</div>
             {lightbox.description && (
               <div className="mt-2 text-sm text-white/70 max-w-xs text-center">{lightbox.description}</div>

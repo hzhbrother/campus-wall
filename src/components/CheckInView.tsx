@@ -13,10 +13,10 @@ const REWARD_RULES = [
   { days: 30,   text: '连续 30 天起, +8 积分/天',   isBadge: false },
   { days: 100,  text: '连续 100 天起, +12 积分/天', isBadge: false },
   // 勋章里程碑
-  { days: 7,    text: '连续 7 天: 「签到新手」勋章',  isBadge: true },
-  { days: 30,   text: '连续 30 天: 「签到达人」勋章', isBadge: true },
-  { days: 100,  text: '连续 100 天: 「签到狂魔」勋章', isBadge: true },
-  { days: 365,  text: '连续 365 天: 「签到之神」勋章', isBadge: true },
+  { days: 7,    text: '连续 7 天: 「签到新手」徽章',  isBadge: true },
+  { days: 30,   text: '连续 30 天: 「签到达人」徽章', isBadge: true },
+  { days: 100,  text: '连续 100 天: 「签到狂魔」徽章', isBadge: true },
+  { days: 365,  text: '连续 365 天: 「签到之神」徽章', isBadge: true },
 ];
 
 export function CheckInView({ onBack, onPointsChanged }: { onBack: () => void; onPointsChanged?: () => void }) {
@@ -189,7 +189,7 @@ export function CheckInView({ onBack, onPointsChanged }: { onBack: () => void; o
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70" onClick={() => setNewBadge(null)}>
           <div className="text-center" onClick={e => e.stopPropagation()}>
             <div className="text-7xl mb-4 animate-bounce">{newBadge.icon || '🏅'}</div>
-            <div className="text-2xl font-bold text-white mb-2">🎉 恭喜获得新勋章</div>
+            <div className="text-2xl font-bold text-white mb-2">🎉 恭喜获得新徽章</div>
             <div className="text-xl text-amber-300 font-bold">{newBadge.name}</div>
             <p className="mt-4 text-sm text-white/60">点击空白处关闭</p>
           </div>

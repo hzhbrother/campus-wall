@@ -24,7 +24,8 @@ interface UserProfile {
   organization: { id: string; name: string } | null;
   createdAt: string;
   qualifications: { id: string; type: string; category: string; verifiedAt: string | null; photo: string | null; photo2: string | null; displayPhoto: string | null }[];
-  _count: { posts: number; comments: number; favorites: number; likesReceived: number };
+  followsPublic?: boolean; // 仅本人可见
+  _count: { posts: number; comments: number; favorites: number; likesReceived: number; follows: number; followers: number };
 }
 
 interface Post {
@@ -60,6 +61,9 @@ export default function UserProfilePage() {
   const [lightboxBadge, setLightboxBadge] = useState<{ icon: string | null; name: string; description: string | null } | null>(null);
   const [lightboxCert, setLightboxCert] = useState<{ type: string; photo: string } | null>(null);
   const [badges, setBadges] = useState<{ badge: { id: string; name: string; icon: string | null; description: string | null }; earnedAt: string }[]>([]);
+  const [following, setFollowing] = useState(false);
+  const [followBusy, setFollowBusy] = useState(false);
+  const [followsPublicBusy, setFollowsPublicBusy] = useState(false);
   // 墙龄自动刷新: 每天 0 点更新一次 now, 触发重新计算天数
   const [now, setNow] = useState(Date.now());
   useEffect(() => {
@@ -100,6 +104,56 @@ export default function UserProfilePage() {
   // 挂载 + 标签页激活时刷新
   usePageRefresh(loadAll, [loadAll]);
   useEffect(() => { loadAll(); }, [loadAll]);
+
+  // 非本人主页: 加载自己关注列表, 判断是否已关注该用户
+  useEffect(() => {
+    if (!me?.id || isOwn || !userId) return;
+    let cancelled = false;
+    api.get<{ items: { id: string }[] }>(`/api/users/me/follow?page=1&pageSize=200`)
+      .then(d => {
+        if (cancelled) return;
+        const list = d.items || [];
+        setFollowing(list.some(it => it.id === userId));
+      })
+      .catch(() => {});
+    return () => { cancelled = true; };
+  }, [me?.id, isOwn, userId]);
+
+  // 关注/取消关注
+  const toggleFollow = async () => {
+    if (followBusy || !userId) return;
+    setFollowBusy(true);
+    try {
+      if (following) {
+        await api.del(`/api/users/me/follow/${userId}`);
+        setFollowing(false);
+      } else {
+        await api.post('/api/users/me/follow', { userId });
+        setFollowing(true);
+      }
+    } catch (e: any) {
+      alert(e.message || '操作失败');
+    } finally {
+      setFollowBusy(false);
+    }
+  };
+
+  // 切换关注列表公开/隐藏 (乐观更新)
+  const toggleFollowsPublic = async () => {
+    if (followsPublicBusy || !profile) return;
+    const prev = profile.followsPublic;
+    setProfile(p => p ? { ...p, followsPublic: !prev } : p);
+    setFollowsPublicBusy(true);
+    try {
+      await api.patch('/api/users/me', { followsPublic: !prev });
+    } catch (e: any) {
+      // 回滚
+      setProfile(p => p ? { ...p, followsPublic: prev } : p);
+      alert(e.message || '更新失败');
+    } finally {
+      setFollowsPublicBusy(false);
+    }
+  };
 
   // 墙龄: 从注册日到今天的天数 (now 每日 0 点自动刷新)
   const wallDays = profile
@@ -200,10 +254,15 @@ export default function UserProfilePage() {
             </Link>
           ) : (
             <button
-              onClick={() => router.back()}
-              className="mb-1 rounded-full border border-gray-200 px-3.5 py-1 text-sm text-gray-600 hover:bg-gray-50"
+              onClick={toggleFollow}
+              disabled={followBusy}
+              className={`mb-1 rounded-full border px-3.5 py-1 text-sm transition disabled:opacity-50 ${
+                following
+                  ? 'border-gray-200 bg-gray-50 text-gray-500 hover:bg-gray-100'
+                  : 'border-blue-500 bg-blue-500 text-white hover:bg-blue-600'
+              }`}
             >
-              返回
+              {following ? '✓ 已关注' : '+ 关注'}
             </button>
           )}
         </div>
@@ -251,6 +310,43 @@ export default function UserProfilePage() {
             </button>
           ))}
         </div>
+
+        {/* 关注 / 粉丝 统计 — 可点击跳转列表 */}
+        <div className="mt-3 flex items-center justify-center gap-4 text-sm">
+          <Link
+            href={`/users/${userId}/follows?type=following`}
+            className="flex items-center gap-1 text-gray-600 hover:text-blue-500"
+          >
+            <span className="font-bold text-gray-900">{counts.follows ?? 0}</span>
+            <span>关注</span>
+          </Link>
+          <span className="text-gray-200">|</span>
+          <Link
+            href={`/users/${userId}/follows?type=followers`}
+            className="flex items-center gap-1 text-gray-600 hover:text-blue-500"
+          >
+            <span className="font-bold text-gray-900">{counts.followers ?? 0}</span>
+            <span>粉丝</span>
+          </Link>
+        </div>
+
+        {/* 关注列表隐私开关 (仅本人可见) */}
+        {isOwn && (
+          <div className="mt-3 flex items-center justify-center gap-2 text-xs text-gray-500">
+            <span>我的关注列表：</span>
+            <button
+              onClick={toggleFollowsPublic}
+              disabled={followsPublicBusy}
+              className={`rounded-full border px-2.5 py-0.5 transition disabled:opacity-50 ${
+                profile.followsPublic
+                  ? 'border-blue-300 bg-blue-50 text-blue-600'
+                  : 'border-gray-200 bg-gray-50 text-gray-500'
+              }`}
+            >
+              {profile.followsPublic ? '公开' : '仅自己可见'}
+            </button>
+          </div>
+        )}
       </div>
 
       {/* 头像放大灯箱 */}
@@ -298,7 +394,7 @@ export default function UserProfilePage() {
           {/* 证书/勋章 (badges) */}
           {badges.length > 0 && (
             <div>
-              <h3 className="text-sm font-bold text-gray-900 mb-2">🎖️ 证书/勋章</h3>
+              <h3 className="text-sm font-bold text-gray-900 mb-2">🎖️ 证书/徽章</h3>
               <div className="grid grid-cols-4 gap-3">
                 {badges.map(ub => (
                   <button

@@ -8,6 +8,7 @@ interface Badge {
   name: string;
   description: string | null;
   icon: string | null;
+  imageUrl: string | null;
   conditionType: string;
   threshold: number;
   isActive: boolean;
@@ -54,7 +55,7 @@ export function BadgesManager() {
   useEffect(() => { load(); }, [load]);
 
   const remove = async (id: string) => {
-    if (!confirm('确定删除该勋章?')) return;
+    if (!confirm('确定删除该徽章?')) return;
     try {
       await api.del(`/api/admin/badges/${id}`);
       load();
@@ -72,14 +73,14 @@ export function BadgesManager() {
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <div>
-          <h3 className="text-lg font-bold text-gray-900">勋章管理</h3>
-          <p className="text-xs text-gray-400 mt-0.5">配置勋章获得条件, 用户满足条件后自动授予 (发帖/评论/点赞时触发); 手动类型的勋章可在此直接授予用户</p>
+          <h3 className="text-lg font-bold text-gray-900">徽章管理</h3>
+          <p className="text-xs text-gray-400 mt-0.5">配置徽章获得条件, 用户满足条件后自动授予 (发帖/评论/点赞时触发); 手动类型的徽章可在此直接授予用户</p>
         </div>
         <button
           onClick={() => { setEditing(null); setShowForm(true); }}
           className="rounded-full bg-slate-900 px-4 py-1.5 text-sm text-white hover:bg-slate-800"
         >
-          + 新建勋章
+          + 新建徽章
         </button>
       </div>
 
@@ -88,14 +89,14 @@ export function BadgesManager() {
       ) : items.length === 0 ? (
         <div className="py-12 text-center text-gray-400">
           <div className="text-4xl mb-2">🏅</div>
-          <p className="text-sm">还没有勋章, 点击右上角新建</p>
+          <p className="text-sm">还没有徽章, 点击右上角新建</p>
         </div>
       ) : (
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-gray-100 text-left text-xs text-gray-400">
-                <th className="py-2 pr-3">勋章</th>
+                <th className="py-2 pr-3">徽章</th>
                 <th className="py-2 pr-3">描述</th>
                 <th className="py-2 pr-3">条件</th>
                 <th className="py-2 pr-3">阈值</th>
@@ -108,7 +109,11 @@ export function BadgesManager() {
                 <tr key={b.id} className="border-b border-gray-50">
                   <td className="py-3 pr-3">
                     <div className="flex items-center gap-2">
-                      <span className="text-2xl">{b.icon || '🏅'}</span>
+                      {b.imageUrl ? (
+                        <img src={b.imageUrl} alt={b.name} className="h-8 w-8 rounded-full object-cover" />
+                      ) : (
+                        <span className="text-2xl">{b.icon || '🏅'}</span>
+                      )}
                       <span className="font-medium text-gray-800">{b.name}</span>
                     </div>
                   </td>
@@ -199,7 +204,7 @@ function GrantBadgeModal({ badge, onClose }: { badge: Badge; onClose: () => void
   };
 
   const revoke = async (userId: string) => {
-    if (!confirm('确认撤销该用户的勋章?')) return;
+    if (!confirm('确认撤销该用户的徽章?')) return;
     setBusy(true); setMsg('');
     try {
       await api.del(`/api/admin/badges/${badge.id}/grant?userId=${userId}`);
@@ -216,7 +221,11 @@ function GrantBadgeModal({ badge, onClose }: { badge: Badge; onClose: () => void
       <div className="w-full max-w-lg rounded-2xl bg-white p-5 max-h-[85vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-2">
-            <span className="text-2xl">{badge.icon || '🏅'}</span>
+            {badge.imageUrl ? (
+              <img src={badge.imageUrl} alt={badge.name} className="h-8 w-8 rounded-full object-cover" />
+            ) : (
+              <span className="text-2xl">{badge.icon || '🏅'}</span>
+            )}
             <h3 className="text-lg font-bold text-gray-900">授予「{badge.name}」</h3>
           </div>
           <button onClick={onClose} className="text-gray-400 text-xl">✕</button>
@@ -261,12 +270,12 @@ function GrantBadgeModal({ badge, onClose }: { badge: Badge; onClose: () => void
         {/* 已有此勋章的用户 */}
         <div>
           <div className="flex items-center justify-between mb-2">
-            <label className="text-sm font-medium text-gray-700">已拥有此勋章 ({holders.length})</label>
+            <label className="text-sm font-medium text-gray-700">已拥有此徽章 ({holders.length})</label>
           </div>
           {holdersLoading ? (
             <p className="py-4 text-center text-xs text-gray-400">加载中…</p>
           ) : holders.length === 0 ? (
-            <p className="py-4 text-center text-xs text-gray-400">暂无用户拥有此勋章</p>
+            <p className="py-4 text-center text-xs text-gray-400">暂无用户拥有此徽章</p>
           ) : (
             <div className="space-y-1 max-h-60 overflow-y-auto">
               {holders.map(h => (
@@ -299,6 +308,7 @@ function BadgeForm({ initial, onClose, onSaved }: { initial: Badge | null; onClo
   const [name, setName] = useState(initial?.name || '');
   const [description, setDescription] = useState(initial?.description || '');
   const [icon, setIcon] = useState(initial?.icon || '🏅');
+  const [imageUrl, setImageUrl] = useState(initial?.imageUrl || '');
   const [conditionType, setConditionType] = useState(initial?.conditionType || 'POST_COUNT');
   const [threshold, setThreshold] = useState(initial?.threshold || 1);
   const [isActive, setIsActive] = useState(initial?.isActive ?? true);
@@ -306,10 +316,10 @@ function BadgeForm({ initial, onClose, onSaved }: { initial: Badge | null; onClo
   const [msg, setMsg] = useState('');
 
   const submit = async () => {
-    if (!name.trim()) { setMsg('请填写勋章名称'); return; }
+    if (!name.trim()) { setMsg('请填写徽章名称'); return; }
     setBusy(true); setMsg('');
     try {
-      const payload = { name: name.trim(), description, icon, conditionType, threshold: Number(threshold), isActive };
+      const payload = { name: name.trim(), description, icon, imageUrl: imageUrl.trim() || '', conditionType, threshold: Number(threshold), isActive };
       if (initial) {
         await api.patch(`/api/admin/badges/${initial.id}`, payload);
       } else {
@@ -323,17 +333,22 @@ function BadgeForm({ initial, onClose, onSaved }: { initial: Badge | null; onClo
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" onClick={onClose}>
       <div className="w-full max-w-md rounded-2xl bg-white p-5" onClick={e => e.stopPropagation()}>
         <div className="mb-4 flex items-center justify-between">
-          <h3 className="text-lg font-bold text-gray-900">{initial ? '编辑勋章' : '新建勋章'}</h3>
+          <h3 className="text-lg font-bold text-gray-900">{initial ? '编辑徽章' : '新建徽章'}</h3>
           <button onClick={onClose} className="text-gray-400 text-xl">✕</button>
         </div>
         <div className="space-y-3">
           <div>
-            <label className="block text-sm text-gray-600 mb-1">勋章图标 (emoji)</label>
+            <label className="block text-sm text-gray-600 mb-1">徽章图标 (emoji)</label>
             <input value={icon} onChange={e => setIcon(e.target.value)} maxLength={4}
               className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm focus:border-blue-400 focus:outline-none" />
           </div>
           <div>
-            <label className="block text-sm text-gray-600 mb-1">勋章名称</label>
+            <label className="block text-sm text-gray-600 mb-1">徽章图片 URL</label>
+            <input value={imageUrl} onChange={e => setImageUrl(e.target.value)} placeholder="透明背景 PNG/SVG，留空则用 emoji 图标"
+              className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm focus:border-blue-400 focus:outline-none" />
+          </div>
+          <div>
+            <label className="block text-sm text-gray-600 mb-1">徽章名称</label>
             <input value={name} onChange={e => setName(e.target.value)} maxLength={50}
               className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm focus:border-blue-400 focus:outline-none" />
           </div>
@@ -360,7 +375,7 @@ function BadgeForm({ initial, onClose, onSaved }: { initial: Badge | null; onClo
           </div>
           <label className="flex items-center gap-2 text-sm text-gray-600">
             <input type="checkbox" checked={isActive} onChange={e => setIsActive(e.target.checked)} className="rounded" />
-            启用此勋章
+            启用此徽章
           </label>
           {msg && <p className="text-sm text-red-500">{msg}</p>}
         </div>

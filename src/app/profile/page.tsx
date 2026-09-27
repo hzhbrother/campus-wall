@@ -364,7 +364,7 @@ function ProfilePageInner() {
       { key: 'notifications', label: '通知发布', perm: 'notification.send' },
       { key: 'schools', label: '学校管理', perm: 'school.manage' },
       { key: 'orgs', label: '团体管理', perm: 'org.manage' },
-      { key: 'badges', label: '勋章管理', perm: 'badge.manage' },
+      { key: 'badges', label: '徽章管理', perm: 'badge.manage' },
       { key: 'template', label: '识别模板', perm: 'template.manage' },
       // 站点配置类 + 角色管理 仅超级管理员可见 (role.manage / settings.* 为超管专属权限)
       ...(isSuper ? [
@@ -423,7 +423,7 @@ function ProfilePageInner() {
   const menuItems = [
     { key: 'verification', label: '认证', icon: '✅' },
     { key: 'violations', label: '违规与信用', icon: '📋' },
-    { key: 'badges', label: '证书/勋章', icon: '🎖️' },
+    { key: 'badges', label: '证书/徽章', icon: '🎖️' },
     { key: 'checkin', label: '签到积分', icon: '🪙' },
     { key: 'security', label: '账户与安全', icon: '🔒' },
     ...(isAdmin ? [{ key: 'admin', label: '管理后台', icon: '⚙️' }] : []),

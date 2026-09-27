@@ -2,9 +2,13 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { errorResponse } from '@/lib/api-response';
+import { getUserFromRequest } from '@/lib/server-auth';
 
-export async function GET(_req: NextRequest, { params }: { params: { id: string } }) {
+export async function GET(req: NextRequest, { params }: { params: { id: string } }) {
   try {
+    // 判断访问者是否为本用户本人 (本人可见 followsPublic 隐私开关)
+    const me = await getUserFromRequest(req);
+    const isSelf = me?.id === params.id;
     const user = await prisma.user.findUnique({
       where: { id: params.id },
       select: {
@@ -15,7 +19,10 @@ export async function GET(_req: NextRequest, { params }: { params: { id: string 
         createdAt: true,
         school: { select: { id: true, name: true } },
         organization: { select: { id: true, name: true } },
-        _count: { select: { posts: true, comments: true, favorites: true } },
+        // 关注/粉丝统计数 (通过 _count 返回)
+        _count: { select: { posts: true, comments: true, favorites: true, follows: true, followers: true } },
+        // 仅本人返回 (下方从对外响应中剥离)
+        followsPublic: true,
       },
     });
     if (!user) return NextResponse.json({ message: '用户不存在' }, { status: 404 });
@@ -35,7 +42,16 @@ export async function GET(_req: NextRequest, { params }: { params: { id: string 
         photo: true, photo2: true, displayPhoto: true,
       },
     });
-    return NextResponse.json({ ...user, verified, qualifications, _count: { ...user._count, likesReceived } });
+    // 公开响应: 剥离 followsPublic, 仅本人可见
+    const { followsPublic, ...publicUser } = user;
+    const body: Record<string, any> = {
+      ...publicUser,
+      verified,
+      qualifications,
+      _count: { ...publicUser._count, likesReceived },
+    };
+    if (isSelf) body.followsPublic = followsPublic;
+    return NextResponse.json(body);
   } catch (e) {
     return errorResponse(e);
   }
