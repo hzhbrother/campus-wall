@@ -53,7 +53,7 @@ export async function detectAiImage(base64: string): Promise<AiImageCheckResult>
     return {
       isAiGenerated: false,
       confidence: 'low',
-      note: `AI 检测异常: ${e?.message || '未知错误'}, 请人工复核`,
+      note: '',
       provider: PROVIDER,
     };
   }

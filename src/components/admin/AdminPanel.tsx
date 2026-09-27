@@ -28,7 +28,7 @@ function StatusBadge({ status }: { status: string }) {
   return <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${map[status] || 'bg-gray-100 text-gray-600'}`}>{label[status] || status}</span>;
 }
 
-// 图片真实性检测结果: 无异常不显示; 有异常直接写具体内容
+// 图片真实性检测结果: 无异常不显示; 有异常显示"AI检测结果：原因"
 function AiCheckBadge({ check }: { check: any }) {
   if (!check) return null;
   const { isAiGenerated, confidence, note } = check;
@@ -38,11 +38,10 @@ function AiCheckBadge({ check }: { check: any }) {
     confidence === 'high' ? 'bg-red-100 text-red-700'
       : confidence === 'medium' ? 'bg-orange-100 text-orange-700'
       : 'bg-amber-100 text-amber-700';
-  // 直接展示具体异常说明 (note), 不带任何"AI 检测"标题
+  // 格式: AI检测结果：[具体原因]
   return (
     <div className={`mt-2 inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-medium ${color}`}>
-      <span>⚠️</span>
-      <span>{note || '图片存疑, 请重点核对'}</span>
+      <span>AI检测结果：{note || '图片存疑, 请重点核对'}</span>
     </div>
   );
 }
