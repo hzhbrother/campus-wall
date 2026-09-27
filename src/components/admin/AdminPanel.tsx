@@ -3021,6 +3021,9 @@ function QualificationReviewTab({ isSuper }: { isSuper: boolean }) {
   const [reviewTarget, setReviewTarget] = useState<any>(null);
   const [rejectReason, setRejectReason] = useState('');
   const [displayPhoto, setDisplayPhoto] = useState<'photo' | 'photo2'>('photo');
+  const [editType, setEditType] = useState('');          // 管理员可修改资质名称
+  const [editCategory, setEditCategory] = useState<'QUALIFICATION' | 'HONOR'>('QUALIFICATION');
+  const [previewImg, setPreviewImg] = useState<string | null>(null); // 图片放大预览
   const [busy, setBusy] = useState(false);
 
   const load = useCallback(() => {
@@ -3040,6 +3043,24 @@ function QualificationReviewTab({ isSuper }: { isSuper: boolean }) {
     setBusy(true);
     try {
       const payload: any = { status: 'APPROVED', displayPhoto };
+      // 若管理员修改了名称/类别, 一并提交
+      if (editType.trim() && editType.trim() !== reviewTarget.type) payload.type = editType.trim();
+      if (editCategory !== reviewTarget.category) payload.category = editCategory;
+      await api.patch(`/api/admin/qualifications/${id}`, payload);
+      setReviewTarget(null);
+      load();
+    } catch (e: any) { alert(e.message); }
+    finally { setBusy(false); }
+  };
+
+  // 单独保存名称/类别修改 (不改变审核状态, 适用于已通过/已驳回的记录也要改名)
+  const saveEdit = async (id: string) => {
+    setBusy(true);
+    try {
+      const payload: any = {};
+      if (editType.trim() && editType.trim() !== reviewTarget.type) payload.type = editType.trim();
+      if (editCategory !== reviewTarget.category) payload.category = editCategory;
+      if (Object.keys(payload).length === 0) { alert('未做修改'); return; }
       await api.patch(`/api/admin/qualifications/${id}`, payload);
       setReviewTarget(null);
       load();
@@ -3134,9 +3155,12 @@ function QualificationReviewTab({ isSuper }: { isSuper: boolean }) {
                   </div>
                 </div>
                 <div className="flex shrink-0 gap-2">
-                  {q.status === 'PENDING' && (
-                    <button onClick={() => { setReviewTarget(q); setRejectReason(''); setDisplayPhoto(q.displayPhoto === 'photo2' ? 'photo2' : 'photo'); }} className="rounded-lg bg-blue-50 px-3 py-1.5 text-xs text-blue-600 hover:bg-blue-100">审核</button>
-                  )}
+                  <button
+                    onClick={() => { setReviewTarget(q); setRejectReason(''); setDisplayPhoto(q.displayPhoto === 'photo2' ? 'photo2' : 'photo'); setEditType(q.type || ''); setEditCategory(q.category || 'QUALIFICATION'); }}
+                    className={`rounded-lg px-3 py-1.5 text-xs ${q.status === 'PENDING' ? 'bg-blue-50 text-blue-600 hover:bg-blue-100' : 'bg-gray-50 text-gray-600 hover:bg-gray-100'}`}
+                  >
+                    {q.status === 'PENDING' ? '审核' : '✏️ 编辑'}
+                  </button>
                   {q.status === 'APPROVED' && isSuper && (
                     <button onClick={() => revoke(q.id)} className="rounded-lg bg-amber-50 px-3 py-1.5 text-xs text-amber-600 hover:bg-amber-100">↩️ 撤回</button>
                   )}
@@ -3144,20 +3168,22 @@ function QualificationReviewTab({ isSuper }: { isSuper: boolean }) {
               </div>
               {(q.photo || q.photo2) && (
                 <div className="mt-3">
-                  <div className="text-xs text-gray-500 mb-1">证明材料 {q.displayPhoto && <span className="text-blue-500">(公开展示: {q.displayPhoto === 'photo2' ? '反面' : '正面'})</span>}</div>
+                  <div className="text-xs text-gray-500 mb-1">证明材料 (点击图片放大) {q.displayPhoto && <span className="text-blue-500">(公开展示: {q.displayPhoto === 'photo2' ? '反面' : '正面'})</span>}</div>
                   <div className="flex gap-2 flex-wrap">
                     {q.photo && (
-                      <div className="relative">
+                      <div className="relative cursor-zoom-in" onClick={() => setPreviewImg(q.photo)}>
                         {/* eslint-disable-next-line @next/next/no-img-element */}
-                        <img src={q.photo} alt="证明材料正面" className="max-h-40 rounded-lg border border-gray-200" />
+                        <img src={q.photo} alt="证明材料正面" className="max-h-40 rounded-lg border border-gray-200 object-contain" />
                         <span className="absolute top-1 left-1 rounded bg-black/60 px-1.5 py-0.5 text-[10px] text-white">正面</span>
+                        <span className="absolute bottom-1 right-1 rounded bg-black/60 px-1.5 py-0.5 text-[10px] text-white">🔍 放大</span>
                       </div>
                     )}
                     {q.photo2 && (
-                      <div className="relative">
+                      <div className="relative cursor-zoom-in" onClick={() => setPreviewImg(q.photo2)}>
                         {/* eslint-disable-next-line @next/next/no-img-element */}
-                        <img src={q.photo2} alt="证明材料反面" className="max-h-40 rounded-lg border border-gray-200" />
+                        <img src={q.photo2} alt="证明材料反面" className="max-h-40 rounded-lg border border-gray-200 object-contain" />
                         <span className="absolute top-1 left-1 rounded bg-black/60 px-1.5 py-0.5 text-[10px] text-white">反面</span>
+                        <span className="absolute bottom-1 right-1 rounded bg-black/60 px-1.5 py-0.5 text-[10px] text-white">🔍 放大</span>
                       </div>
                     )}
                   </div>
@@ -3177,7 +3203,7 @@ function QualificationReviewTab({ isSuper }: { isSuper: boolean }) {
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" onClick={() => setReviewTarget(null)}>
           <div className="w-full max-w-md rounded-2xl bg-white p-5" onClick={e => e.stopPropagation()}>
             <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-bold text-gray-900">审核{reviewTarget.category === 'HONOR' ? '荣誉' : '资质'}认证</h3>
+              <h3 className="text-lg font-bold text-gray-900">{reviewTarget.status === 'PENDING' ? '审核' : '编辑'}{reviewTarget.category === 'HONOR' ? '荣誉' : '资质'}认证</h3>
               <button onClick={() => setReviewTarget(null)} className="text-gray-400 text-xl">✕</button>
             </div>
             <div className="space-y-3">
@@ -3190,39 +3216,56 @@ function QualificationReviewTab({ isSuper }: { isSuper: boolean }) {
                   <div className="text-xs text-gray-400">{reviewTarget.user?.realName || ''}</div>
                 </div>
               </div>
-              <div className="rounded-lg bg-gray-50 p-3">
-                <div className="text-xs text-gray-500">认证类型</div>
-                <div className="text-sm font-medium text-gray-900">{reviewTarget.type}</div>
+              {/* 管理员可修改资质/荣誉名称和类别 */}
+              <div className="rounded-lg bg-amber-50/60 border border-amber-200 p-3 space-y-2">
+                <div className="text-xs font-medium text-amber-700">✏️ 可修改认证信息 (改名后用户主页同步更新)</div>
+                <div className="grid grid-cols-3 gap-2">
+                  <div className="col-span-2">
+                    <label className="block text-xs text-gray-500 mb-1">认证名称</label>
+                    <input value={editType} onChange={e => setEditType(e.target.value)} placeholder="如: 学生会主席"
+                      className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/40" />
+                  </div>
+                  <div>
+                    <label className="block text-xs text-gray-500 mb-1">类别</label>
+                    <select value={editCategory} onChange={e => setEditCategory(e.target.value as 'QUALIFICATION' | 'HONOR')}
+                      className="w-full rounded-lg border border-gray-300 px-2 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/40">
+                      <option value="QUALIFICATION">资质</option>
+                      <option value="HONOR">荣誉</option>
+                    </select>
+                  </div>
+                </div>
               </div>
               {(reviewTarget.photo || reviewTarget.photo2) && (
                 <div>
-                  <div className="text-xs text-gray-500 mb-1">证明材料 (点击选择公开展示面)</div>
+                  <div className="text-xs text-gray-500 mb-1">证明材料 (点图选公开展示面, 点🔍放大)</div>
                   <div className="grid grid-cols-2 gap-2">
                     {reviewTarget.photo ? (
-                      <button
-                        type="button"
-                        onClick={() => setDisplayPhoto('photo')}
+                      <div
                         className={`relative rounded-lg border-2 overflow-hidden transition ${displayPhoto === 'photo' ? 'border-blue-500 ring-2 ring-blue-200' : 'border-gray-200'}`}
                       >
-                        {/* eslint-disable-next-line @next/next/no-img-element */}
-                        <img src={reviewTarget.photo} alt="正面" className="w-full max-h-56 object-contain bg-gray-50" />
+                        <button type="button" onClick={() => setDisplayPhoto('photo')} className="block w-full">
+                          {/* eslint-disable-next-line @next/next/no-img-element */}
+                          <img src={reviewTarget.photo} alt="正面" className="w-full max-h-56 object-contain bg-gray-50" />
+                        </button>
                         <span className="absolute top-1 left-1 rounded bg-black/60 px-1.5 py-0.5 text-[10px] text-white">正面</span>
                         {displayPhoto === 'photo' && <span className="absolute top-1 right-1 rounded bg-blue-500 px-1.5 py-0.5 text-[10px] text-white">展示中</span>}
-                      </button>
+                        <button type="button" onClick={() => setPreviewImg(reviewTarget.photo)} className="absolute bottom-1 right-1 rounded bg-black/60 px-1.5 py-0.5 text-[10px] text-white hover:bg-black/80">🔍 放大</button>
+                      </div>
                     ) : (
                       <div className="flex items-center justify-center rounded-lg border border-dashed border-gray-200 bg-gray-50 py-8 text-xs text-gray-400">无正面</div>
                     )}
                     {reviewTarget.photo2 ? (
-                      <button
-                        type="button"
-                        onClick={() => setDisplayPhoto('photo2')}
+                      <div
                         className={`relative rounded-lg border-2 overflow-hidden transition ${displayPhoto === 'photo2' ? 'border-blue-500 ring-2 ring-blue-200' : 'border-gray-200'}`}
                       >
-                        {/* eslint-disable-next-line @next/next/no-img-element */}
-                        <img src={reviewTarget.photo2} alt="反面" className="w-full max-h-56 object-contain bg-gray-50" />
+                        <button type="button" onClick={() => setDisplayPhoto('photo2')} className="block w-full">
+                          {/* eslint-disable-next-line @next/next/no-img-element */}
+                          <img src={reviewTarget.photo2} alt="反面" className="w-full max-h-56 object-contain bg-gray-50" />
+                        </button>
                         <span className="absolute top-1 left-1 rounded bg-black/60 px-1.5 py-0.5 text-[10px] text-white">反面</span>
                         {displayPhoto === 'photo2' && <span className="absolute top-1 right-1 rounded bg-blue-500 px-1.5 py-0.5 text-[10px] text-white">展示中</span>}
-                      </button>
+                        <button type="button" onClick={() => setPreviewImg(reviewTarget.photo2)} className="absolute bottom-1 right-1 rounded bg-black/60 px-1.5 py-0.5 text-[10px] text-white hover:bg-black/80">🔍 放大</button>
+                      </div>
                     ) : (
                       <div className="flex items-center justify-center rounded-lg border border-dashed border-gray-200 bg-gray-50 py-8 text-xs text-gray-400">无反面</div>
                     )}
@@ -3230,17 +3273,40 @@ function QualificationReviewTab({ isSuper }: { isSuper: boolean }) {
                   <p className="mt-1 text-xs text-gray-400">通过后将以所选面展示在用户个人主页</p>
                 </div>
               )}
-              <div>
-                <label className="block text-sm text-gray-600 mb-1">驳回原因 (驳回时填写)</label>
-                <input value={rejectReason} onChange={e => setRejectReason(e.target.value)} placeholder="如: 证明材料不清晰或信息不符"
-                  className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/40" />
-              </div>
+              {reviewTarget.status === 'PENDING' && (
+                <div>
+                  <label className="block text-sm text-gray-600 mb-1">驳回原因 (驳回时填写)</label>
+                  <input value={rejectReason} onChange={e => setRejectReason(e.target.value)} placeholder="如: 证明材料不清晰或信息不符"
+                    className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/40" />
+                </div>
+              )}
+              {reviewTarget.aiImageCheck && (
+                <div className="rounded-lg bg-gray-50 p-2"><AiCheckBadge check={reviewTarget.aiImageCheck} /></div>
+              )}
             </div>
             <div className="mt-5 flex gap-2">
-              <button onClick={() => reject(reviewTarget.id)} disabled={busy} className="flex-1 rounded-lg bg-red-500 py-2.5 text-sm font-medium text-white hover:bg-red-600 disabled:opacity-50">{busy ? '处理中…' : '驳回'}</button>
-              <button onClick={() => approve(reviewTarget.id)} disabled={busy} className="flex-1 rounded-lg bg-green-600 py-2.5 text-sm font-medium text-white hover:bg-green-700 disabled:opacity-50">{busy ? '处理中…' : '通过'}</button>
+              {reviewTarget.status === 'PENDING' ? (
+                <>
+                  <button onClick={() => reject(reviewTarget.id)} disabled={busy} className="flex-1 rounded-lg bg-red-500 py-2.5 text-sm font-medium text-white hover:bg-red-600 disabled:opacity-50">{busy ? '处理中…' : '驳回'}</button>
+                  <button onClick={() => approve(reviewTarget.id)} disabled={busy} className="flex-1 rounded-lg bg-green-600 py-2.5 text-sm font-medium text-white hover:bg-green-700 disabled:opacity-50">{busy ? '处理中…' : '通过'}</button>
+                </>
+              ) : (
+                <>
+                  <button onClick={() => setReviewTarget(null)} className="flex-1 rounded-lg bg-gray-100 py-2.5 text-sm font-medium text-gray-600 hover:bg-gray-200">取消</button>
+                  <button onClick={() => saveEdit(reviewTarget.id)} disabled={busy} className="flex-1 rounded-lg bg-blue-500 py-2.5 text-sm font-medium text-white hover:bg-blue-600 disabled:opacity-50">{busy ? '处理中…' : '保存修改'}</button>
+                </>
+              )}
             </div>
           </div>
+        </div>
+      )}
+
+      {/* 图片放大预览 (lightbox) */}
+      {previewImg && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/90 p-4" onClick={() => setPreviewImg(null)}>
+          <button className="absolute top-4 right-4 text-white text-3xl leading-none hover:opacity-70" onClick={() => setPreviewImg(null)}>✕</button>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src={previewImg} alt="放大预览" className="max-h-[92vh] max-w-[95vw] object-contain rounded-lg" onClick={e => e.stopPropagation()} />
         </div>
       )}
     </div>
