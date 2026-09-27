@@ -28,16 +28,26 @@ const UpdateSchema = z.object({
 export async function GET(req: NextRequest) {
   try {
     const me = await requireUser(req);
-    const user = await prisma.user.findUnique({
-      where: { id: me.id },
-      include: {
-        _count: { select: { posts: true, comments: true, likes: true } },
-        customRole: { select: { id: true, name: true, permissions: true } },
-        school: { select: { id: true, name: true } },
-        organization: { select: { id: true, name: true } },
-      },
-    });
-    return NextResponse.json(sanitize(user));
+    const [user, likesReceived] = await Promise.all([
+      prisma.user.findUnique({
+        where: { id: me.id },
+        include: {
+          // _count 同时返回 favorites, 避免前端统计栏"收藏"恒为 0
+          _count: { select: { posts: true, comments: true, likes: true, favorites: true } },
+          customRole: { select: { id: true, name: true, permissions: true } },
+          school: { select: { id: true, name: true } },
+          organization: { select: { id: true, name: true } },
+        },
+      }),
+      // "获赞" = 别人给我所有帖子点的赞总数 (Like 表通过 post 关联到 authorId=me.id)
+      prisma.like.count({ where: { post: { authorId: me.id } } }),
+    ]);
+    // 把 likesReceived 挂到 _count 上, 方便前端统一读取
+    const sanitized = sanitize(user) as any;
+    if (sanitized) {
+      sanitized._count = { ...(sanitized._count || {}), likesReceived };
+    }
+    return NextResponse.json(sanitized);
   } catch (e) {
     return errorResponse(e);
   }

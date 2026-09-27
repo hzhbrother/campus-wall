@@ -343,7 +343,7 @@ function ProfilePageInner() {
 
   if (loading) return <div className="min-h-screen flex items-center justify-center text-gray-400">加载中…</div>;
 
-  const counts = (user as any)?._count || { posts: 0, comments: 0, likes: 0, favorites: 0 };
+  const counts = (user as any)?._count || { posts: 0, comments: 0, likes: 0, favorites: 0, likesReceived: 0 };
 
   // 判断是否为管理后台标签
   const ADMIN_TABS: AdminTab[] = ['overview', 'posts', 'moderation', 'comments', 'users', 'verification', 'qualifications', 'template', 'appeals', 'notifications', 'settings', 'email', 'agreement', 'roles', 'badges', 'schools', 'orgs'];
@@ -601,16 +601,20 @@ function ProfilePageInner() {
       <div className="-mt-8 rounded-2xl bg-white p-4 shadow-sm">
         <div className="grid grid-cols-4 gap-2">
           {[
-            { label: '帖子', value: counts.posts, color: 'text-purple-500' },
-            { label: '获赞', value: counts.likesReceived || 0, color: 'text-red-500' },
-            { label: '收藏', value: counts.favorites || 0, color: 'text-amber-500' },
-            { label: '评论', value: counts.comments, color: 'text-blue-500' },
-          ].map(s => (
-            <div key={s.label} className="flex flex-col items-center py-2">
-              <div className={`text-xl font-bold ${s.color}`}>{s.value}</div>
-              <div className="text-xs text-gray-500 mt-0.5">{s.label}</div>
-            </div>
-          ))}
+            { label: '帖子', value: counts.posts ?? 0, color: 'text-purple-500' },
+            { label: '获赞', value: counts.likesReceived ?? 0, color: 'text-red-500' },
+            { label: '收藏', value: counts.favorites ?? 0, color: 'text-amber-500' },
+            { label: '评论', value: counts.comments ?? 0, color: 'text-blue-500' },
+          ].map(s => {
+            // 值为 0 时用淡灰色, 避免出现"突兀的彩色 0"
+            const dim = (s.value as number) === 0;
+            return (
+              <div key={s.label} className="flex flex-col items-center py-2">
+                <div className={`text-xl font-bold ${dim ? 'text-gray-300' : s.color}`}>{s.value}</div>
+                <div className="text-xs text-gray-500 mt-0.5">{s.label}</div>
+              </div>
+            );
+          })}
         </div>
       </div>
 
