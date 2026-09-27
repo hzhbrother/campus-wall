@@ -9,7 +9,7 @@ import { VerificationStatus, NotificationType } from '@prisma/client';
 import { createNotification } from '@/lib/notification-service';
 
 const ReviewSchema = z.object({
-  status: z.enum(['APPROVED', 'REJECTED', 'NONE']),
+  status: z.enum(['APPROVED', 'REJECTED', 'NONE', 'PENDING']),
   rejectReason: z.string().max(200).optional().or(z.literal('')),
   displayPhoto: z.enum(['photo', 'photo2']).optional(),
 });
@@ -39,6 +39,12 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
       data.verified = false;
       data.verifiedAt = null;
       data.rejectReason = dto.rejectReason || null;
+    } else if (dto.status === 'PENDING') {
+      // 撤回: 已通过的认证回到审核中 (仅超级管理员可操作)
+      data.status = VerificationStatus.PENDING;
+      data.verified = false;
+      data.verifiedAt = null;
+      data.rejectReason = null;
     } else {
       data.status = VerificationStatus.NONE;
       data.verified = false;
@@ -67,6 +73,13 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
         type: NotificationType.SYSTEM,
         title: `❌ ${catLabel}认证被驳回`,
         content: `您的「${q.type}」${catLabel}认证未通过, 原因: ${dto.rejectReason || '请重新提交'}`,
+      });
+    } else if (dto.status === 'PENDING') {
+      await createNotification({
+        userId: q.userId,
+        type: NotificationType.SYSTEM,
+        title: `↩️ ${catLabel}认证已撤回`,
+        content: `您的「${q.type}」${catLabel}认证已被管理员撤回, 重新进入审核队列。`,
       });
     }
 

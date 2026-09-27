@@ -28,6 +28,30 @@ function StatusBadge({ status }: { status: string }) {
   return <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${map[status] || 'bg-gray-100 text-gray-600'}`}>{label[status] || status}</span>;
 }
 
+// AI 图片真实性检测结果标签
+function AiCheckBadge({ check }: { check: any }) {
+  if (!check) return null;
+  const { isAiGenerated, confidence, note } = check;
+  // 未配置检测服务时不显示
+  if (check.provider === 'none' && !isAiGenerated && !confidence) return null;
+  const color = isAiGenerated
+    ? confidence === 'high' ? 'bg-red-100 text-red-700'
+      : confidence === 'medium' ? 'bg-orange-100 text-orange-700'
+      : 'bg-amber-100 text-amber-700'
+    : 'bg-green-100 text-green-700';
+  const icon = isAiGenerated ? '🤖' : '✅';
+  const label = isAiGenerated
+    ? confidence === 'high' ? '疑似 AI 生成' : confidence === 'medium' ? '可能 AI 生成' : '轻微 AI 痕迹'
+    : '未检测到 AI 痕迹';
+  return (
+    <div className={`mt-2 inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-medium ${color}`}>
+      <span>{icon}</span>
+      <span>{label}</span>
+      {note && <span className="font-normal opacity-80">· {note}</span>}
+    </div>
+  );
+}
+
 function fmtDate(iso: string) {
   try { return new Date(iso).toLocaleString('zh-CN'); } catch { return iso; }
 }
@@ -1969,7 +1993,7 @@ function mapFieldsToUser(fields: Record<string, string>) {
   return out;
 }
 
-function VerificationReviewTab() {
+function VerificationReviewTab({ isSuper }: { isSuper: boolean }) {
   const [items, setItems] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState('');
@@ -2111,6 +2135,17 @@ function VerificationReviewTab() {
     finally { setBusy(false); }
   };
 
+  // 撤回已通过的身份认证 (仅超级管理员)
+  const revokeVerification = async (id: string) => {
+    if (!confirm('确认撤回该用户的身份认证? 撤回后将重新进入审核队列。')) return;
+    setBusy(true);
+    try {
+      await api.patch(`/api/admin/users/${id}`, { verificationStatus: 'PENDING' });
+      load();
+    } catch (e: any) { alert(e.message); }
+    finally { setBusy(false); }
+  };
+
   const statusBadge = (s: string) => {
     const map: Record<string, string> = {
       APPROVED: 'bg-green-100 text-green-700',
@@ -2187,12 +2222,24 @@ function VerificationReviewTab() {
                   <div className="mt-2 text-xs text-red-500">驳回原因: {u.verificationRejectReason}</div>
                 )}
 
+                {u.aiImageCheck && (
+                  <AiCheckBadge check={u.aiImageCheck} />
+                )}
+
                 {isReviewable && (
                   <button
                     onClick={() => openReview(u)}
                     className="mt-3 w-full rounded-lg bg-blue-50 py-2 text-sm text-blue-600 hover:bg-blue-100"
                   >
                     进入人工复审
+                  </button>
+                )}
+                {u.verificationStatus === 'APPROVED' && isSuper && (
+                  <button
+                    onClick={() => revokeVerification(u.id)}
+                    className="mt-3 w-full rounded-lg bg-amber-50 py-2 text-sm text-amber-600 hover:bg-amber-100"
+                  >
+                    ↩️ 撤回到审核中
                   </button>
                 )}
               </div>
@@ -2965,7 +3012,7 @@ function OrgsManager() {
 }
 
 // ---------- 资质/荣誉认证审核 ----------
-function QualificationReviewTab() {
+function QualificationReviewTab({ isSuper }: { isSuper: boolean }) {
   const [items, setItems] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState('');
@@ -3007,6 +3054,17 @@ function QualificationReviewTab() {
       await api.patch(`/api/admin/qualifications/${id}`, { status: 'REJECTED', rejectReason: rejectReason.trim() });
       setReviewTarget(null);
       setRejectReason('');
+      load();
+    } catch (e: any) { alert(e.message); }
+    finally { setBusy(false); }
+  };
+
+  // 撤回已通过的资质/荣誉认证 (仅超级管理员)
+  const revoke = async (id: string) => {
+    if (!confirm('确认撤回该资质/荣誉认证? 撤回后将重新进入审核队列。')) return;
+    setBusy(true);
+    try {
+      await api.patch(`/api/admin/qualifications/${id}`, { status: 'PENDING' });
       load();
     } catch (e: any) { alert(e.message); }
     finally { setBusy(false); }
@@ -3075,11 +3133,14 @@ function QualificationReviewTab() {
                     </p>
                   </div>
                 </div>
-                {q.status === 'PENDING' && (
-                  <div className="flex shrink-0 gap-2">
+                <div className="flex shrink-0 gap-2">
+                  {q.status === 'PENDING' && (
                     <button onClick={() => { setReviewTarget(q); setRejectReason(''); setDisplayPhoto(q.displayPhoto === 'photo2' ? 'photo2' : 'photo'); }} className="rounded-lg bg-blue-50 px-3 py-1.5 text-xs text-blue-600 hover:bg-blue-100">审核</button>
-                  </div>
-                )}
+                  )}
+                  {q.status === 'APPROVED' && isSuper && (
+                    <button onClick={() => revoke(q.id)} className="rounded-lg bg-amber-50 px-3 py-1.5 text-xs text-amber-600 hover:bg-amber-100">↩️ 撤回</button>
+                  )}
+                </div>
               </div>
               {(q.photo || q.photo2) && (
                 <div className="mt-3">
@@ -3105,6 +3166,7 @@ function QualificationReviewTab() {
               {q.rejectReason && (
                 <div className="mt-2 rounded-lg bg-red-50 px-3 py-2 text-xs text-red-600">驳回原因: {q.rejectReason}</div>
               )}
+              {q.aiImageCheck && <AiCheckBadge check={q.aiImageCheck} />}
             </div>
           ))}
         </div>
@@ -3193,8 +3255,8 @@ export function AdminPanel({ tab, isSuper }: { tab: AdminTab; isSuper: boolean }
     case 'moderation': return <ModerationTab />;
     case 'comments': return <CommentsTab />;
     case 'users': return <UsersTab isSuper={isSuper} />;
-    case 'verification': return <VerificationReviewTab />;
-    case 'qualifications': return <QualificationReviewTab />;
+    case 'verification': return <VerificationReviewTab isSuper={isSuper} />;
+    case 'qualifications': return <QualificationReviewTab isSuper={isSuper} />;
     case 'template': return <TemplateManager />;
     case 'appeals': return <BanAppealsTab />;
     case 'notifications': return <NotificationSender />;

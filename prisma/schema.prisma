@@ -145,6 +145,7 @@ model User {
   qualificationPhoto String? // 资质认证证明材料照片
   qualificationStatus VerificationStatus @default(NONE) // 资质认证审核状态
   qualificationRejectReason String? // 资质认证驳回原因
+  aiImageCheck Json? // AI 图片真实性检测结果 (身份认证照片)
   lastReadNotificationsAt DateTime? // 上次标记全部已读的时间 (用于广播通知未读计算)
   points Int @default(0) // 积分 (签到等获得)
   userNumber Int? // 用户编号 (顺序号, 用于生成 XYS/XY 编号)
@@ -496,6 +497,7 @@ model Qualification {
   verified        Boolean            @default(false)
   verifiedAt      DateTime?
   rejectReason    String?
+  aiImageCheck    Json?                             // AI 图片真实性检测结果
   createdAt       DateTime           @default(now())
   updatedAt       DateTime           @updatedAt
 

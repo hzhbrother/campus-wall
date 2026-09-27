@@ -22,13 +22,13 @@ const Schema = z.object({
   status: z.enum(['NORMAL', 'GRADUATED', 'BANNED']).optional(),
   role: z.enum(['USER', 'STUDENT', 'TEACHER', 'ADMIN', 'SUPER_ADMIN']).optional(),
   verified: z.boolean().optional(),
-  // 认证审核: APPROVED 通过 / REJECTED 驳回 (驳回时需传 rejectReason)
-  verificationStatus: z.enum(['APPROVED', 'REJECTED', 'NONE']).optional(),
+  // 认证审核: APPROVED 通过 / REJECTED 驳回 / PENDING 撤回 (回到审核中)
+  verificationStatus: z.enum(['APPROVED', 'REJECTED', 'NONE', 'PENDING']).optional(),
   verificationRejectReason: z.string().max(200).optional().or(z.literal('')),
   // 资质认证 (学生会/广播站等)
   qualificationType: z.string().max(50).optional().or(z.literal('')),
   qualificationVerified: z.boolean().optional(),
-  qualificationStatus: z.enum(['APPROVED', 'REJECTED', 'NONE']).optional(),
+  qualificationStatus: z.enum(['APPROVED', 'REJECTED', 'NONE', 'PENDING']).optional(),
   qualificationRejectReason: z.string().max(200).optional().or(z.literal('')),
 });
 
@@ -63,6 +63,12 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
       data.qualificationVerifiedAt = null;
       data.qualificationStatus = VerificationStatus.REJECTED;
       data.qualificationRejectReason = dto.qualificationRejectReason || null;
+    } else if (dto.qualificationStatus === 'PENDING') {
+      // 撤回: 已通过的资质认证回到审核中
+      data.qualificationVerified = false;
+      data.qualificationVerifiedAt = null;
+      data.qualificationStatus = VerificationStatus.PENDING;
+      data.qualificationRejectReason = null;
     } else if (dto.qualificationStatus === 'NONE') {
       data.qualificationVerified = false;
       data.qualificationVerifiedAt = null;
@@ -87,6 +93,12 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
     data.verifiedAt = null;
     data.verificationStatus = VerificationStatus.REJECTED;
     data.verificationRejectReason = dto.verificationRejectReason || null;
+  } else if (dto.verificationStatus === 'PENDING') {
+    // 撤回: 已通过的身份认证回到审核中
+    data.verified = false;
+    data.verifiedAt = null;
+    data.verificationStatus = VerificationStatus.PENDING;
+    data.verificationRejectReason = null;
   } else if (dto.verificationStatus === 'NONE') {
     data.verified = false;
     data.verifiedAt = null;
@@ -111,6 +123,13 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
         title: '❌ 身份认证被驳回',
         content: `您的身份认证未通过, 原因: ${dto.verificationRejectReason || '请重新提交'}`,
       });
+    } else if (dto.verificationStatus === 'PENDING') {
+      await createNotification({
+        userId: params.id,
+        type: NotificationType.SYSTEM,
+        title: '↩️ 身份认证已撤回',
+        content: '您的身份认证已被管理员撤回, 重新进入审核队列。',
+      });
     }
     if (dto.qualificationStatus === 'APPROVED') {
       await createNotification({
@@ -125,6 +144,13 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
         type: NotificationType.SYSTEM,
         title: '❌ 资质认证被驳回',
         content: `您的资质认证未通过, 原因: ${dto.qualificationRejectReason || '请重新提交'}`,
+      });
+    } else if (dto.qualificationStatus === 'PENDING') {
+      await createNotification({
+        userId: params.id,
+        type: NotificationType.SYSTEM,
+        title: '↩️ 资质认证已撤回',
+        content: '您的资质认证已被管理员撤回, 重新进入审核队列。',
       });
     }
 
