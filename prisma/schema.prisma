@@ -489,7 +489,9 @@ model Qualification {
   userId          String
   type            String                          // 资质/荣誉名称, 如 "学生会主席" / "优秀志愿者"
   category        String             @default("QUALIFICATION") // QUALIFICATION(资质) / HONOR(荣誉)
-  photo           String?                         // 证明材料 (证书/奖状 base64)
+  photo           String?                         // 证明材料 (证书/奖状 base64) — 正面
+  photo2          String?                         // 证明材料第二张 (卡面反面/证书内页 base64)
+  displayPhoto    String?                         // 公开展示哪一面: "photo" | "photo2" (管理员审核时选择)
   status          VerificationStatus @default(NONE)
   verified        Boolean            @default(false)
   verifiedAt      DateTime?
