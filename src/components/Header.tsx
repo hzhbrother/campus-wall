@@ -55,6 +55,13 @@ export function Header() {
   useEffect(() => { loadSite(); }, []);
   useEffect(() => { loadUnread(); }, [user]);
 
+  // 消息页标记已读时, 同步刷新未读数角标
+  useEffect(() => {
+    const onUpdated = () => loadUnread();
+    window.addEventListener('notifications:updated', onUpdated);
+    return () => window.removeEventListener('notifications:updated', onUpdated);
+  }, [user]);
+
   return (
     <header className="sticky top-0 z-20 bg-white border-b border-slate-100">
       {banRemain && (

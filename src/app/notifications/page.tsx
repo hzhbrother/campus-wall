@@ -87,6 +87,7 @@ export default function NotificationsPage() {
       setItems(items.map(i => i.id === id ? { ...i, isRead: true } : i));
       if (tab === 'unread') setItems(items.filter(i => i.id !== id));
       refreshUnread();
+      window.dispatchEvent(new Event('notifications:updated'));
     } catch (e) { console.error(e); }
   };
 
@@ -96,6 +97,7 @@ export default function NotificationsPage() {
       if (tab === 'unread') setItems([]);
       else setItems(items.map(i => ({ ...i, isRead: true })));
       refreshUnread();
+      window.dispatchEvent(new Event('notifications:updated'));
     } catch (e) { console.error(e); }
   };
 

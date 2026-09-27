@@ -967,11 +967,12 @@ function VerificationModal({ user, onClose, onVerified, onSubmitted }: { user: a
 
   return (
     <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/50 sm:items-center" onClick={onClose}>
-      <div className="w-full max-w-sm rounded-t-3xl bg-white p-4 pb-6 sm:rounded-2xl" onClick={e => e.stopPropagation()}>
-        <div className="flex items-center justify-between mb-4">
+      <div className="flex max-h-[92vh] w-full max-w-sm flex-col overflow-hidden rounded-t-3xl bg-white sm:rounded-2xl" onClick={e => e.stopPropagation()}>
+        <div className="sticky top-0 z-10 flex shrink-0 items-center justify-between border-b border-gray-100 bg-white px-4 py-3">
           <h3 className="text-lg font-bold text-gray-900">{verifyLabel}</h3>
           <button onClick={onClose} className="text-gray-400 hover:text-gray-600 text-xl">✕</button>
         </div>
+        <div className="overflow-y-auto px-4 pb-6 pt-4">
 
         {/* 超级管理员: 身份认证自动通过 (资质认证仍需手动提交) */}
         {isSuperAdmin && !isQual ? (
@@ -1306,6 +1307,7 @@ function VerificationModal({ user, onClose, onVerified, onSubmitted }: { user: a
         {(isPending || isAiReviewing) && (
           <p className="mt-3 text-center text-xs text-gray-400">审核期间无法重复提交, 请等待结果</p>
         )}
+        </div>
       </div>
     </div>
   );

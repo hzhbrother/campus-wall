@@ -1,7 +1,8 @@
 'use client';
 
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
 import Link from 'next/link';
+import { usePathname } from 'next/navigation';
 import { api } from '@/lib/api';
 import { PostCard, PostListItem } from '@/components/PostCard';
 import { usePageRefresh } from '@/lib/use-page-refresh';
@@ -49,6 +50,16 @@ export default function HomePage() {
 
   // 挂载 + 标签页激活时全量刷新
   usePageRefresh(refreshAll, [refreshAll]);
+
+  // 从消息页返回主页时强制刷新 (SPA 路由切换不会触发 visibilitychange/focus)
+  const pathname = usePathname();
+  const prevPathRef = useRef(pathname);
+  useEffect(() => {
+    const cameFromNotifications = prevPathRef.current === '/notifications' && pathname === '/';
+    prevPathRef.current = pathname;
+    if (cameFromNotifications) refreshAll();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pathname]);
 
   useEffect(() => { load(); }, [load]);
 
