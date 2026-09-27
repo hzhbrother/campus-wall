@@ -42,7 +42,10 @@ export async function GET(req: NextRequest) {
         orderBy,
         skip: (page - 1) * pageSize,
         take: pageSize,
-        include: { author: { select: { id: true, nickname: true, avatar: true, role: true, verified: true } } },
+        include: {
+          author: { select: { id: true, nickname: true, avatar: true, role: true, verified: true } },
+          _count: { select: { favorites: true } },
+        },
       }),
       prisma.post.count({ where }),
     ]);
@@ -53,6 +56,7 @@ export async function GET(req: NextRequest) {
       content: p.content.length > 200 ? p.content.slice(0, 200) + '…' : p.content,
       images: [],  // 列表不返回 base64 图片, 只返回数量
       imageCount: p.images?.length || 0,
+      favoriteCount: p._count?.favorites || 0,
       // 管理员/超级管理员默认已认证
       author: { ...p.author, verified: p.author.verified || p.author.role === 'ADMIN' || p.author.role === 'SUPER_ADMIN' },
     }));
