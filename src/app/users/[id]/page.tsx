@@ -25,7 +25,7 @@ interface UserProfile {
   school: { id: string; name: string; gradeCount: number } | null;
   organization: { id: string; name: string } | null;
   createdAt: string;
-  qualifications: { id: string; type: string; category: string; verifiedAt: string | null }[];
+  qualifications: { id: string; type: string; category: string; verifiedAt: string | null; photo: string | null; photo2: string | null; displayPhoto: string | null }[];
   _count: { posts: number; comments: number; favorites: number; likesReceived: number };
 }
 
@@ -60,6 +60,7 @@ export default function UserProfilePage() {
   const [savingCover, setSavingCover] = useState(false);
   const [showAvatarLightbox, setShowAvatarLightbox] = useState(false);
   const [lightboxBadge, setLightboxBadge] = useState<{ icon: string | null; name: string; description: string | null } | null>(null);
+  const [lightboxCert, setLightboxCert] = useState<{ type: string; photo: string } | null>(null);
   const [badges, setBadges] = useState<{ badge: { id: string; name: string; icon: string | null; description: string | null }; earnedAt: string }[]>([]);
   // 墙龄自动刷新: 每天 0 点更新一次 now, 触发重新计算天数
   const [now, setNow] = useState(Date.now());
@@ -270,16 +271,34 @@ export default function UserProfilePage() {
       {/* 荣誉认证 (证书) / 资质认证 / 勋章 */}
       {((profile.qualifications?.length ?? 0) > 0 || profile.qualificationVerified || badges.length > 0) && (
         <div className="mx-3 mt-3 rounded-2xl bg-white p-4 shadow-sm space-y-4">
-          {/* 荣誉认证 (证书类) */}
+          {/* 荣誉认证 (证书类, 以图片形式展示, 可点击放大) */}
           {(profile.qualifications?.filter((q: any) => q.category === 'HONOR').length ?? 0) > 0 && (
             <div>
               <h3 className="text-sm font-bold text-gray-900 mb-2">📜 荣誉证书</h3>
-              <div className="flex flex-wrap gap-2">
-                {profile.qualifications!.filter((q: any) => q.category === 'HONOR').map((q: any) => (
-                  <span key={q.id} className="inline-flex items-center gap-1 rounded-full bg-amber-50 px-3 py-1 text-sm text-amber-700">
-                    🏆 {q.type}
-                  </span>
-                ))}
+              <div className="grid grid-cols-2 gap-3">
+                {profile.qualifications!.filter((q: any) => q.category === 'HONOR').map((q: any) => {
+                  const displayPhoto = q.displayPhoto === 'photo2' ? q.photo2 : (q.photo || q.photo2);
+                  return (
+                    <div key={q.id} className="rounded-xl border border-gray-100 overflow-hidden">
+                      <div className="flex items-center gap-1 px-2 py-1.5 bg-amber-50">
+                        <span className="text-amber-600 text-xs">🏆</span>
+                        <span className="text-xs font-medium text-gray-800 truncate">{q.type}</span>
+                      </div>
+                      {displayPhoto ? (
+                        <button
+                          onClick={() => setLightboxCert({ type: q.type, photo: displayPhoto })}
+                          className="block w-full bg-gray-50 hover:bg-gray-100 transition-colors"
+                        >
+                          {/* eslint-disable-next-line @next/next/no-img-element */}
+                          <img src={displayPhoto} alt={q.type} className="w-full max-h-48 object-contain" />
+                          <div className="py-1 text-center text-[10px] text-gray-400">点击放大</div>
+                        </button>
+                      ) : (
+                        <div className="py-6 text-center text-xs text-gray-400">暂无证书图片</div>
+                      )}
+                    </div>
+                  );
+                })}
               </div>
             </div>
           )}
@@ -319,6 +338,18 @@ export default function UserProfilePage() {
               <div className="mt-2 text-sm text-white/70 max-w-xs text-center">{lightboxBadge.description}</div>
             )}
             <button onClick={() => setLightboxBadge(null)} className="mt-6 rounded-full bg-white/20 px-5 py-2 text-sm text-white hover:bg-white/30">关闭</button>
+          </div>
+        </div>
+      )}
+
+      {/* 荣誉证书放大灯箱 */}
+      {lightboxCert && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4" onClick={() => setLightboxCert(null)}>
+          <div className="flex flex-col items-center max-w-3xl w-full" onClick={e => e.stopPropagation()}>
+            <div className="mb-3 text-lg font-bold text-white">{lightboxCert.type}</div>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src={lightboxCert.photo} alt={lightboxCert.type} className="max-h-[75vh] max-w-full rounded-lg shadow-2xl" />
+            <button onClick={() => setLightboxCert(null)} className="mt-4 rounded-full bg-white/20 px-5 py-2 text-sm text-white hover:bg-white/30">关闭</button>
           </div>
         </div>
       )}

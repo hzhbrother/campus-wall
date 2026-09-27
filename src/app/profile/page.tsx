@@ -793,6 +793,7 @@ const VERIFY_TYPE_OPTIONS: { value: VerifyType; label: string; icon: string; des
 
 function VerificationModal({ user, onClose, onVerified, onSubmitted }: { user: any; onClose: () => void; onVerified: () => void; onSubmitted?: () => void }) {
   const [photo, setPhoto] = useState<string>('');
+  const [photo2, setPhoto2] = useState<string>(''); // 第二张照片 (卡面反面/证书内页)
   const [templateId, setTemplateId] = useState<string>('');
   const [verifyType, setVerifyType] = useState<VerifyType | ''>('');
   const [photoType, setPhotoType] = useState<'CARD' | 'FACE'>('CARD');
@@ -912,16 +913,14 @@ function VerificationModal({ user, onClose, onVerified, onSubmitted }: { user: a
     reader.readAsDataURL(file);
   });
 
-  const onCapture = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  const onCapture = (e: React.ChangeEvent<HTMLInputElement>, target: 'photo' | 'photo2' = 'photo') => {
     const file = e.target.files?.[0];
     if (!file) return;
     setMsg('');
-    try {
-      const dataUrl = await compress(file);
-      setPhoto(dataUrl);
-    } catch {
-      setMsg('图片处理失败, 请重试');
-    }
+    compress(file).then(dataUrl => {
+      if (target === 'photo2') setPhoto2(dataUrl);
+      else setPhoto(dataUrl);
+    }).catch(() => setMsg('图片处理失败, 请重试'));
     e.target.value = '';
   };
 
@@ -933,11 +932,13 @@ function VerificationModal({ user, onClose, onVerified, onSubmitted }: { user: a
       try {
         const payload: any = { type: qualName.trim(), category: qualCategory };
         if (photo) payload.photo = photo;
+        if (photo2) payload.photo2 = photo2;
         const res: any = await api.post('/api/users/me/qualifications', payload);
         setMsg(res?.message || '资质认证申请已提交');
         await refreshQualStatus();
         onSubmitted?.();
         setPhoto('');
+        setPhoto2('');
         setQualName('');
       } catch (e: any) { setMsg(e.message); } finally { setBusy(false); }
       return;
@@ -1251,7 +1252,76 @@ function VerificationModal({ user, onClose, onVerified, onSubmitted }: { user: a
                   </div>
                 )}
 
-                {photo ? (
+                {/* 照片上传区
+                    - 资质/荣誉认证: 支持上传两张 (正面/封面 + 反面/内页), 均可选
+                    - 身份认证: 单张照片 */}
+                {isQual ? (
+                  <div className="mb-3 space-y-3">
+                    {/* 第一张: 正面/封面 */}
+                    <div>
+                      <div className="text-xs font-medium text-gray-600 mb-1.5">证明材料 ① (正面/封面) <span className="text-gray-400 font-normal">— 可选</span></div>
+                      {photo ? (
+                        <div className="relative">
+                          {/* eslint-disable-next-line @next/next/no-img-element */}
+                          <img src={photo} alt="证明材料正面" className="w-full rounded-xl border border-gray-200" />
+                          <button onClick={() => setPhoto('')} className="absolute top-2 right-2 h-7 w-7 rounded-full bg-black/60 text-white text-sm">✕</button>
+                        </div>
+                      ) : (
+                        <div className="grid grid-cols-2 gap-2">
+                          <label className="flex flex-col items-center justify-center rounded-xl border-2 border-dashed border-gray-300 py-5 cursor-pointer hover:border-blue-400 hover:bg-blue-50/50 transition">
+                            <svg className="h-7 w-7 text-gray-400 mb-1" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+                              <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z" strokeLinecap="round" strokeLinejoin="round"/>
+                              <circle cx="12" cy="13" r="4"/>
+                            </svg>
+                            <span className="text-xs text-blue-600 font-medium">拍照</span>
+                            <input type="file" accept="image/*" capture="environment" className="hidden" onChange={e => onCapture(e, 'photo')} />
+                          </label>
+                          <label className="flex flex-col items-center justify-center rounded-xl border-2 border-dashed border-gray-300 py-5 cursor-pointer hover:border-blue-400 hover:bg-blue-50/50 transition">
+                            <svg className="h-7 w-7 text-gray-400 mb-1" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+                              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" strokeLinecap="round" strokeLinejoin="round"/>
+                              <polyline points="17 8 12 3 7 8" strokeLinecap="round" strokeLinejoin="round"/>
+                              <line x1="12" y1="3" x2="12" y2="15" strokeLinecap="round" strokeLinejoin="round"/>
+                            </svg>
+                            <span className="text-xs text-blue-600 font-medium">从相册上传</span>
+                            <input ref={inputRef} type="file" accept="image/*" className="hidden" onChange={e => onCapture(e, 'photo')} />
+                          </label>
+                        </div>
+                      )}
+                    </div>
+                    {/* 第二张: 反面/内页 */}
+                    <div>
+                      <div className="text-xs font-medium text-gray-600 mb-1.5">证明材料 ② (反面/内页) <span className="text-gray-400 font-normal">— 可选, 卡面类建议上传</span></div>
+                      {photo2 ? (
+                        <div className="relative">
+                          {/* eslint-disable-next-line @next/next/no-img-element */}
+                          <img src={photo2} alt="证明材料反面" className="w-full rounded-xl border border-gray-200" />
+                          <button onClick={() => setPhoto2('')} className="absolute top-2 right-2 h-7 w-7 rounded-full bg-black/60 text-white text-sm">✕</button>
+                        </div>
+                      ) : (
+                        <div className="grid grid-cols-2 gap-2">
+                          <label className="flex flex-col items-center justify-center rounded-xl border-2 border-dashed border-gray-300 py-5 cursor-pointer hover:border-blue-400 hover:bg-blue-50/50 transition">
+                            <svg className="h-7 w-7 text-gray-400 mb-1" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+                              <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z" strokeLinecap="round" strokeLinejoin="round"/>
+                              <circle cx="12" cy="13" r="4"/>
+                            </svg>
+                            <span className="text-xs text-blue-600 font-medium">拍照</span>
+                            <input type="file" accept="image/*" capture="environment" className="hidden" onChange={e => onCapture(e, 'photo2')} />
+                          </label>
+                          <label className="flex flex-col items-center justify-center rounded-xl border-2 border-dashed border-gray-300 py-5 cursor-pointer hover:border-blue-400 hover:bg-blue-50/50 transition">
+                            <svg className="h-7 w-7 text-gray-400 mb-1" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+                              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" strokeLinecap="round" strokeLinejoin="round"/>
+                              <polyline points="17 8 12 3 7 8" strokeLinecap="round" strokeLinejoin="round"/>
+                              <line x1="12" y1="3" x2="12" y2="15" strokeLinecap="round" strokeLinejoin="round"/>
+                            </svg>
+                            <span className="text-xs text-blue-600 font-medium">从相册上传</span>
+                            <input type="file" accept="image/*" className="hidden" onChange={e => onCapture(e, 'photo2')} />
+                          </label>
+                        </div>
+                      )}
+                    </div>
+                    <p className="text-center text-xs text-gray-400">如为卡面类资质 (如工作证/会员卡), 建议上传正反面; 证书类可只传封面</p>
+                  </div>
+                ) : photo ? (
                   <div className="relative mb-3">
                     {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img src={photo} alt={photoLabel} className="w-full rounded-xl border border-gray-200" />

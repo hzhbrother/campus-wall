@@ -26,10 +26,14 @@ export async function GET(_req: NextRequest, { params }: { params: { id: string 
       where: { post: { authorId: params.id } },
     });
     // 已通过的资质/荣誉认证 (用于主页展示)
+    // 荣誉认证返回证明材料图片 (displayPhoto 决定展示哪一面), 资质认证仅返回文字
     const qualifications = await prisma.qualification.findMany({
       where: { userId: params.id, verified: true },
       orderBy: { verifiedAt: 'desc' },
-      select: { id: true, type: true, category: true, verifiedAt: true },
+      select: {
+        id: true, type: true, category: true, verifiedAt: true,
+        photo: true, photo2: true, displayPhoto: true,
+      },
     });
     return NextResponse.json({ ...user, verified, qualifications, _count: { ...user._count, likesReceived } });
   } catch (e) {

@@ -3011,6 +3011,7 @@ function QualificationReviewTab() {
   const [category, setCategory] = useState<'QUALIFICATION' | 'HONOR' | ''>('');
   const [reviewTarget, setReviewTarget] = useState<any>(null);
   const [rejectReason, setRejectReason] = useState('');
+  const [displayPhoto, setDisplayPhoto] = useState<'photo' | 'photo2'>('photo');
   const [busy, setBusy] = useState(false);
 
   const load = useCallback(() => {
@@ -3029,7 +3030,8 @@ function QualificationReviewTab() {
     if (!confirm('确认通过该资质/荣誉认证?')) return;
     setBusy(true);
     try {
-      await api.patch(`/api/admin/qualifications/${id}`, { status: 'APPROVED' });
+      const payload: any = { status: 'APPROVED', displayPhoto };
+      await api.patch(`/api/admin/qualifications/${id}`, payload);
       setReviewTarget(null);
       load();
     } catch (e: any) { alert(e.message); }
@@ -3113,14 +3115,29 @@ function QualificationReviewTab() {
                 </div>
                 {q.status === 'PENDING' && (
                   <div className="flex shrink-0 gap-2">
-                    <button onClick={() => { setReviewTarget(q); setRejectReason(''); }} className="rounded-lg bg-blue-50 px-3 py-1.5 text-xs text-blue-600 hover:bg-blue-100">审核</button>
+                    <button onClick={() => { setReviewTarget(q); setRejectReason(''); setDisplayPhoto(q.displayPhoto === 'photo2' ? 'photo2' : 'photo'); }} className="rounded-lg bg-blue-50 px-3 py-1.5 text-xs text-blue-600 hover:bg-blue-100">审核</button>
                   </div>
                 )}
               </div>
-              {q.photo && (
+              {(q.photo || q.photo2) && (
                 <div className="mt-3">
-                  <div className="text-xs text-gray-500 mb-1">证明材料</div>
-                  <img src={q.photo} alt="证明材料" className="max-h-48 rounded-lg border border-gray-200" />
+                  <div className="text-xs text-gray-500 mb-1">证明材料 {q.displayPhoto && <span className="text-blue-500">(公开展示: {q.displayPhoto === 'photo2' ? '反面' : '正面'})</span>}</div>
+                  <div className="flex gap-2 flex-wrap">
+                    {q.photo && (
+                      <div className="relative">
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img src={q.photo} alt="证明材料正面" className="max-h-40 rounded-lg border border-gray-200" />
+                        <span className="absolute top-1 left-1 rounded bg-black/60 px-1.5 py-0.5 text-[10px] text-white">正面</span>
+                      </div>
+                    )}
+                    {q.photo2 && (
+                      <div className="relative">
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img src={q.photo2} alt="证明材料反面" className="max-h-40 rounded-lg border border-gray-200" />
+                        <span className="absolute top-1 left-1 rounded bg-black/60 px-1.5 py-0.5 text-[10px] text-white">反面</span>
+                      </div>
+                    )}
+                  </div>
                 </div>
               )}
               {q.rejectReason && (
@@ -3153,10 +3170,40 @@ function QualificationReviewTab() {
                 <div className="text-xs text-gray-500">认证类型</div>
                 <div className="text-sm font-medium text-gray-900">{reviewTarget.type}</div>
               </div>
-              {reviewTarget.photo && (
+              {(reviewTarget.photo || reviewTarget.photo2) && (
                 <div>
-                  <div className="text-xs text-gray-500 mb-1">证明材料</div>
-                  <img src={reviewTarget.photo} alt="证明材料" className="w-full rounded-lg border border-gray-200" />
+                  <div className="text-xs text-gray-500 mb-1">证明材料 (点击选择公开展示面)</div>
+                  <div className="grid grid-cols-2 gap-2">
+                    {reviewTarget.photo ? (
+                      <button
+                        type="button"
+                        onClick={() => setDisplayPhoto('photo')}
+                        className={`relative rounded-lg border-2 overflow-hidden transition ${displayPhoto === 'photo' ? 'border-blue-500 ring-2 ring-blue-200' : 'border-gray-200'}`}
+                      >
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img src={reviewTarget.photo} alt="正面" className="w-full max-h-56 object-contain bg-gray-50" />
+                        <span className="absolute top-1 left-1 rounded bg-black/60 px-1.5 py-0.5 text-[10px] text-white">正面</span>
+                        {displayPhoto === 'photo' && <span className="absolute top-1 right-1 rounded bg-blue-500 px-1.5 py-0.5 text-[10px] text-white">展示中</span>}
+                      </button>
+                    ) : (
+                      <div className="flex items-center justify-center rounded-lg border border-dashed border-gray-200 bg-gray-50 py-8 text-xs text-gray-400">无正面</div>
+                    )}
+                    {reviewTarget.photo2 ? (
+                      <button
+                        type="button"
+                        onClick={() => setDisplayPhoto('photo2')}
+                        className={`relative rounded-lg border-2 overflow-hidden transition ${displayPhoto === 'photo2' ? 'border-blue-500 ring-2 ring-blue-200' : 'border-gray-200'}`}
+                      >
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img src={reviewTarget.photo2} alt="反面" className="w-full max-h-56 object-contain bg-gray-50" />
+                        <span className="absolute top-1 left-1 rounded bg-black/60 px-1.5 py-0.5 text-[10px] text-white">反面</span>
+                        {displayPhoto === 'photo2' && <span className="absolute top-1 right-1 rounded bg-blue-500 px-1.5 py-0.5 text-[10px] text-white">展示中</span>}
+                      </button>
+                    ) : (
+                      <div className="flex items-center justify-center rounded-lg border border-dashed border-gray-200 bg-gray-50 py-8 text-xs text-gray-400">无反面</div>
+                    )}
+                  </div>
+                  <p className="mt-1 text-xs text-gray-400">通过后将以所选面展示在用户个人主页</p>
                 </div>
               )}
               <div>

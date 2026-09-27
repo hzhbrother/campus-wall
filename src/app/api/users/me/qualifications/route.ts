@@ -14,6 +14,7 @@ const SubmitSchema = z.object({
   type: z.string().min(1).max(50, '名称最多 50 字'),
   category: z.enum(['QUALIFICATION', 'HONOR']).default('QUALIFICATION'),
   photo: z.string().min(1).max(Math.ceil(MAX_PHOTO_BYTES * 4 / 3) + 100).optional(),
+  photo2: z.string().min(1).max(Math.ceil(MAX_PHOTO_BYTES * 4 / 3) + 100).optional(),
 });
 
 export async function GET(req: NextRequest) {
@@ -47,12 +48,23 @@ export async function POST(req: NextRequest) {
       photoData = dto.photo;
     }
 
+    let photo2Data: string | null = null;
+    if (dto.photo2) {
+      const base64Data = dto.photo2.split(',')[1] || dto.photo2;
+      const byteLen = Math.floor((base64Data.length * 3) / 4);
+      if (byteLen > MAX_PHOTO_BYTES) {
+        return NextResponse.json({ message: '第二张证明材料过大, 请小于 5MB' }, { status: 400 });
+      }
+      photo2Data = dto.photo2;
+    }
+
     const q = await prisma.qualification.create({
       data: {
         userId: me.id,
         type: dto.type.trim(),
         category: dto.category,
         photo: photoData,
+        photo2: photo2Data,
         status: VerificationStatus.PENDING,
       },
     });

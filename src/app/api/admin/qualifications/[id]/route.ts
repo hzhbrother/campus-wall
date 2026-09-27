@@ -11,6 +11,7 @@ import { createNotification } from '@/lib/notification-service';
 const ReviewSchema = z.object({
   status: z.enum(['APPROVED', 'REJECTED', 'NONE']),
   rejectReason: z.string().max(200).optional().or(z.literal('')),
+  displayPhoto: z.enum(['photo', 'photo2']).optional(),
 });
 
 export async function PATCH(req: NextRequest, { params }: { params: { id: string } }) {
@@ -27,6 +28,12 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
       data.verified = true;
       data.verifiedAt = new Date();
       data.rejectReason = null;
+      // 通过时若未指定展示面, 默认用第一张; 若只有第二张则用第二张
+      if (dto.displayPhoto) {
+        data.displayPhoto = dto.displayPhoto;
+      } else if (!q.displayPhoto) {
+        data.displayPhoto = q.photo ? 'photo' : (q.photo2 ? 'photo2' : null);
+      }
     } else if (dto.status === 'REJECTED') {
       data.status = VerificationStatus.REJECTED;
       data.verified = false;
@@ -37,6 +44,10 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
       data.verified = false;
       data.verifiedAt = null;
       data.rejectReason = null;
+    }
+    // 允许管理员单独切换展示面 (即使已审核通过)
+    if (dto.displayPhoto) {
+      data.displayPhoto = dto.displayPhoto;
     }
 
     const updated = await prisma.qualification.update({ where: { id: params.id }, data });
