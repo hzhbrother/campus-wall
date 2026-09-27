@@ -59,7 +59,6 @@ export default function UserProfilePage() {
   const [savingCover, setSavingCover] = useState(false);
   const [showAvatarLightbox, setShowAvatarLightbox] = useState(false);
   const [lightboxBadge, setLightboxBadge] = useState<{ icon: string | null; name: string; description: string | null } | null>(null);
-  const [lightboxCert, setLightboxCert] = useState<{ type: string; photo: string } | null>(null);
   const [badges, setBadges] = useState<{ badge: { id: string; name: string; icon: string | null; description: string | null }; earnedAt: string }[]>([]);
   const [following, setFollowing] = useState(false);
   const [followBusy, setFollowBusy] = useState(false);
@@ -367,24 +366,33 @@ export default function UserProfilePage() {
                 {profile.qualifications!.filter((q: any) => q.category === 'HONOR').map((q: any) => {
                   const displayPhoto = q.displayPhoto === 'photo2' ? q.photo2 : (q.photo || q.photo2);
                   return (
-                    <div key={q.id} className="rounded-xl border border-gray-100 overflow-hidden">
+                    <Link
+                      key={q.id}
+                      href={`/users/${userId}/qualifications/${q.id}`}
+                      className="relative block rounded-xl border border-gray-100 overflow-hidden no-underline transition hover:border-amber-200 hover:shadow-sm"
+                    >
+                      {/* 右上角: 点击查看详情 */}
+                      <span className="absolute right-2 top-2 z-10 inline-flex items-center gap-0.5 rounded-full bg-black/40 px-1.5 py-0.5 text-[10px] text-white backdrop-blur-sm">
+                        <svg className="h-3 w-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                          <circle cx="11" cy="11" r="7" />
+                          <path d="m21 21-4.3-4.3" strokeLinecap="round" />
+                        </svg>
+                        详情
+                      </span>
                       <div className="flex items-center gap-1 px-2 py-1.5 bg-amber-50">
                         <span className="text-amber-600 text-xs">🏆</span>
                         <span className="text-xs font-medium text-gray-800 truncate">{q.type}</span>
                       </div>
                       {displayPhoto ? (
-                        <button
-                          onClick={() => setLightboxCert({ type: q.type, photo: displayPhoto })}
-                          className="block w-full bg-gray-50 hover:bg-gray-100 transition-colors"
-                        >
+                        <div className="block w-full bg-gray-50 transition-colors hover:bg-gray-100">
                           {/* eslint-disable-next-line @next/next/no-img-element */}
                           <img src={displayPhoto} alt={q.type} className="w-full max-h-48 object-contain" />
-                          <div className="py-1 text-center text-[10px] text-gray-400">点击放大</div>
-                        </button>
+                          <div className="py-1 text-center text-[10px] text-gray-400">点击查看详情</div>
+                        </div>
                       ) : (
                         <div className="py-6 text-center text-xs text-gray-400">暂无证书图片</div>
                       )}
-                    </div>
+                    </Link>
                   );
                 })}
               </div>
@@ -426,18 +434,6 @@ export default function UserProfilePage() {
               <div className="mt-2 text-sm text-white/70 max-w-xs text-center">{lightboxBadge.description}</div>
             )}
             <button onClick={() => setLightboxBadge(null)} className="mt-6 rounded-full bg-white/20 px-5 py-2 text-sm text-white hover:bg-white/30">关闭</button>
-          </div>
-        </div>
-      )}
-
-      {/* 荣誉证书放大灯箱 */}
-      {lightboxCert && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4" onClick={() => setLightboxCert(null)}>
-          <div className="flex flex-col items-center max-w-3xl w-full" onClick={e => e.stopPropagation()}>
-            <div className="mb-3 text-lg font-bold text-white">{lightboxCert.type}</div>
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={lightboxCert.photo} alt={lightboxCert.type} className="max-h-[75vh] max-w-full rounded-lg shadow-2xl" />
-            <button onClick={() => setLightboxCert(null)} className="mt-4 rounded-full bg-white/20 px-5 py-2 text-sm text-white hover:bg-white/30">关闭</button>
           </div>
         </div>
       )}

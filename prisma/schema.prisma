@@ -170,6 +170,7 @@ model User {
   customRole   Role?            @relation(fields: [roleId], references: [id])
   userBadges   UserBadge[]
   qualifications Qualification[]
+  qualificationComments QualificationComment[]
   checkIns     CheckInRecord[]
   school       School?          @relation(fields: [schoolId], references: [id])
   organization Organization?    @relation(fields: [organizationId], references: [id])
@@ -517,13 +518,34 @@ model Qualification {
   verifiedAt      DateTime?
   rejectReason    String?
   aiImageCheck    Json?                             // AI 图片真实性检测结果
+  // 详情页可见性: PUBLIC(公开) / FOLLOWERS(仅粉丝可见) / PRIVATE(不公开, 仅自己)
+  visibility      String             @default("PUBLIC")
   createdAt       DateTime           @default(now())
   updatedAt       DateTime           @updatedAt
 
   user            User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  comments        QualificationComment[]
 
   @@index([userId])
   @@index([status])
+}
+
+// 奖状/资质详情页评论 (独立于帖子评论, 避免动 Post 关系)
+model QualificationComment {
+  id              String    @id @default(cuid())
+  qualificationId String
+  authorId        String
+  content         String
+  parentId        String?    // 楼中楼回复
+  createdAt       DateTime  @default(now())
+
+  qualification   Qualification @relation(fields: [qualificationId], references: [id], onDelete: Cascade)
+  author          User          @relation(fields: [authorId], references: [id], onDelete: Cascade)
+  parent          QualificationComment? @relation("QualCommentReply", fields: [parentId], references: [id], onDelete: SetNull)
+  replies         QualificationComment[] @relation("QualCommentReply")
+
+  @@index([qualificationId, createdAt])
+  @@index([authorId])
 }
 
 // ---- 签到记录 (积分) ----
