@@ -118,9 +118,10 @@ function detectWithLocal(base64: string): AiImageCheckResult {
   const confidence: 'low' | 'medium' | 'high' =
     finalScore >= 75 ? 'high' : finalScore >= 50 ? 'medium' : 'low';
 
-  const note = reasons.length
-    ? `${isAi ? '疑似 AI 生成' : '未检测到明显 AI 痕迹'} (本地启发式, 分值 ${finalScore}): ${reasons.join('; ')}。请人工复核`
-    : '本地启发式检测未发现明显特征, 请人工复核';
+  // 无异常 → note 留空 (前端不渲染); 有异常 → 直接写具体原因
+  const note = isAi
+    ? reasons.join('; ')
+    : '';
 
   return {
     isAiGenerated: isAi,
@@ -265,8 +266,8 @@ async function detectWithHive(base64: string): Promise<AiImageCheckResult> {
     isAiGenerated: isAi,
     confidence,
     note: isAi
-      ? `疑似 AI 生成 (置信度 ${(aiScore * 100).toFixed(0)}%), 请人工复核`
-      : `未检测到明显 AI 痕迹 (AI 概率 ${(aiScore * 100).toFixed(0)}%)`,
+      ? `软件签名匹配 AI 生成工具, 置信度 ${(aiScore * 100).toFixed(0)}%`
+      : '',
     provider: 'hive',
     raw: data,
   };
@@ -294,8 +295,8 @@ async function detectWithSensity(base64: string): Promise<AiImageCheckResult> {
     isAiGenerated: isAi,
     confidence,
     note: isAi
-      ? `疑似 AI/深度伪造 (概率 ${(prob * 100).toFixed(0)}%), 请人工复核`
-      : `未检测到明显 AI 痕迹 (AI 概率 ${(prob * 100).toFixed(0)}%)`,
+      ? `疑似深度伪造, 概率 ${(prob * 100).toFixed(0)}%`
+      : '',
     provider: 'sensity',
     raw: data,
   };

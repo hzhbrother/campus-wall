@@ -28,25 +28,21 @@ function StatusBadge({ status }: { status: string }) {
   return <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${map[status] || 'bg-gray-100 text-gray-600'}`}>{label[status] || status}</span>;
 }
 
-// 图片真实性检测结果标签 (仅在疑似时提示, 不展示常规"已检测"字样)
+// 图片真实性检测结果: 无异常不显示; 有异常直接写具体内容
 function AiCheckBadge({ check }: { check: any }) {
   if (!check) return null;
   const { isAiGenerated, confidence, note } = check;
-  // 未配置检测服务 / 未检测到疑似痕迹 → 完全不显示 (避免无意义提示)
+  // 无异常 → 完全不显示
   if (!isAiGenerated) return null;
   const color =
     confidence === 'high' ? 'bg-red-100 text-red-700'
       : confidence === 'medium' ? 'bg-orange-100 text-orange-700'
       : 'bg-amber-100 text-amber-700';
-  const label =
-    confidence === 'high' ? '图片存疑, 请重点核对'
-      : confidence === 'medium' ? '图片可能存疑'
-      : '图片轻微存疑';
+  // 直接展示具体异常说明 (note), 不带任何"AI 检测"标题
   return (
     <div className={`mt-2 inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-medium ${color}`}>
       <span>⚠️</span>
-      <span>{label}</span>
-      {note && <span className="font-normal opacity-80">· {note}</span>}
+      <span>{note || '图片存疑, 请重点核对'}</span>
     </div>
   );
 }
