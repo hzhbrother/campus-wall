@@ -1325,38 +1325,22 @@ function VerificationModal({ user, onClose, onVerified, onSubmitted }: { user: a
                   </div>
                 ) : (
                   <div className="mb-3">
-                    <div className="grid grid-cols-2 gap-2">
-                      <label className="flex flex-col items-center justify-center rounded-xl border-2 border-dashed border-gray-300 py-6 cursor-pointer hover:border-blue-400 hover:bg-blue-50/50 transition">
-                        <svg className="h-8 w-8 text-gray-400 mb-1" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
-                          <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z" strokeLinecap="round" strokeLinejoin="round"/>
-                          <circle cx="12" cy="13" r="4"/>
-                        </svg>
-                        <span className="text-xs text-blue-600 font-medium">拍照</span>
-                        <input
-                          type="file"
-                          accept="image/*"
-                          capture="environment"
-                          className="hidden"
-                          onChange={onCapture}
-                        />
-                      </label>
-                      <label className="flex flex-col items-center justify-center rounded-xl border-2 border-dashed border-gray-300 py-6 cursor-pointer hover:border-blue-400 hover:bg-blue-50/50 transition">
-                        <svg className="h-8 w-8 text-gray-400 mb-1" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
-                          <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" strokeLinecap="round" strokeLinejoin="round"/>
-                          <polyline points="17 8 12 3 7 8" strokeLinecap="round" strokeLinejoin="round"/>
-                          <line x1="12" y1="3" x2="12" y2="15" strokeLinecap="round" strokeLinejoin="round"/>
-                        </svg>
-                        <span className="text-xs text-blue-600 font-medium">从相册上传</span>
-                        <input
-                          ref={inputRef}
-                          type="file"
-                          accept="image/*"
-                          className="hidden"
-                          onChange={onCapture}
-                        />
-                      </label>
-                    </div>
-                    <p className="mt-2 text-center text-xs text-gray-400">支持拍照或从相册选择, 上传后将自动压缩</p>
+                    {/* 身份认证 (人脸/卡面): 仅支持现场拍照, 不允许从相册选择 */}
+                    <label className="flex flex-col items-center justify-center rounded-xl border-2 border-dashed border-gray-300 py-8 cursor-pointer hover:border-blue-400 hover:bg-blue-50/50 transition">
+                      <svg className="h-10 w-10 text-gray-400 mb-1.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+                        <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z" strokeLinecap="round" strokeLinejoin="round"/>
+                        <circle cx="12" cy="13" r="4"/>
+                      </svg>
+                      <span className="text-sm text-blue-600 font-medium">{isFace ? '拍摄人脸照片' : '拍摄卡面照片'}</span>
+                      <input
+                        type="file"
+                        accept="image/*"
+                        capture={isFace ? 'user' : 'environment'}
+                        className="hidden"
+                        onChange={onCapture}
+                      />
+                    </label>
+                    <p className="mt-2 text-center text-xs text-gray-400">身份认证仅支持现场拍照, 不支持从相册选择</p>
                   </div>
                 )}
 
