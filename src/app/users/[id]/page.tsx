@@ -68,6 +68,8 @@ export default function UserProfilePage() {
   const coverFileRef = useRef<HTMLInputElement>(null);
   // 正在更新个人资料 (封面等): 期间阻止 onFocus 触发的 loadAll, 避免旧数据竞态覆盖
   const updatingRef = useRef(false);
+  // 弹窗打开时也阻止自动刷新 (微信选图返回会触发 visibilitychange/focus)
+  const modalOpenRef = useRef(false);
   const [showAvatarLightbox, setShowAvatarLightbox] = useState(false);
   const [lightboxBadge, setLightboxBadge] = useState<{ imageUrl: string | null; icon: string | null; name: string; description: string | null } | null>(null);
   const [badges, setBadges] = useState<{ badge: { id: string; name: string; icon: string | null; description: string | null; imageUrl: string | null }; earnedAt: string }[]>([]);
@@ -95,8 +97,8 @@ export default function UserProfilePage() {
 
   const loadAll = useCallback(() => {
     if (!userId) return;
-    // 正在更新资料时, 跳过刷新 (避免 onFocus 触发的旧数据覆盖刚更新的数据)
-    if (updatingRef.current) return;
+    // 弹窗打开或正在更新资料时, 跳过刷新 (微信选图返回会触发 visibilitychange/focus)
+    if (updatingRef.current || modalOpenRef.current) return;
     setLoading(true); setErr('');
     Promise.all([
       api.get<UserProfile>(`/api/users/${userId}`).catch(e => { setErr(e.message); return null; }),
@@ -174,6 +176,7 @@ export default function UserProfilePage() {
 
   // 打开封面上传弹窗
   const openCoverModal = () => {
+    modalOpenRef.current = true;
     setCoverPreview(profile?.coverImage || '');
     setCoverUrl(profile?.coverImage || '');
     setShowCoverModal(true);
@@ -212,7 +215,9 @@ export default function UserProfilePage() {
     try {
       // 空字符串表示移除封面
       await api.patch('/api/users/me', { coverImage: coverPreview || null });
+      // 关闭弹窗, 解除弹窗刷新锁
       setShowCoverModal(false);
+      modalOpenRef.current = false;
       updatingRef.current = false;
       await loadAll();
     } catch (e: any) {
@@ -220,6 +225,7 @@ export default function UserProfilePage() {
     } finally {
       setCoverSubmitting(false);
       updatingRef.current = false;
+      modalOpenRef.current = false;
     }
   };
 
@@ -559,7 +565,7 @@ export default function UserProfilePage() {
 
       {/* 封面上传弹窗 */}
       {showCoverModal && (
-        <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/50 sm:items-center" onClick={() => setShowCoverModal(false)}>
+        <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/50 sm:items-center" onClick={() => { setShowCoverModal(false); modalOpenRef.current = false; }}>
           <div className="w-full max-w-md rounded-t-3xl bg-white p-5 sm:rounded-2xl" onClick={e => e.stopPropagation()}>
             <div className="mb-4 flex items-center justify-between">
               <h3 className="text-lg font-bold text-gray-900">封面图</h3>
@@ -602,7 +608,7 @@ export default function UserProfilePage() {
                 {coverSubmitting ? '提交中…' : '提交'}
               </button>
               <button
-                onClick={() => setShowCoverModal(false)}
+                onClick={() => { setShowCoverModal(false); modalOpenRef.current = false; }}
                 className="flex-1 rounded-full border border-gray-200 py-2.5 text-sm text-gray-600 hover:bg-gray-50"
               >
                 取消
