@@ -422,6 +422,7 @@ function ProfilePageInner() {
 
   // ---- 首页视图 ----
   const menuItems = [
+    { key: 'homepage', label: '我的主页', icon: '🏠' },
     { key: 'verification', label: '认证', icon: '✅' },
     { key: 'violations', label: '违规与信用', icon: '📋' },
     { key: 'badges', label: '证书/徽章', icon: '🎖️' },
@@ -433,6 +434,7 @@ function ProfilePageInner() {
   ];
 
   const handleMenu = (key: string) => {
+    if (key === 'homepage' && user) { router.push(`/users/${user.id}`); return; }
     if (key === 'admin') { setView('overview'); return; }
     if (key === 'verification') { setShowVerifyModal(true); return; }
     if (key === 'violations') { setView('violations'); return; }

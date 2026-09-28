@@ -8,6 +8,7 @@ import Link from 'next/link';
 import { usePageRefresh } from '@/lib/use-page-refresh';
 import { VerifiedBadge } from '@/components/VerifiedBadge';
 import { formatUserCode } from '@/lib/user-number';
+import { compressImage } from '@/lib/image-compress';
 
 interface UserProfile {
   id: string;
@@ -159,24 +160,21 @@ export default function UserProfilePage() {
     ? Math.max(1, Math.floor((now - new Date(profile.createdAt).getTime()) / (24 * 60 * 60 * 1000)) + 1)
     : 0;
 
-  // 更换封面
+  // 更换封面 (压缩后上传, 避免大图超出请求体限制)
   const handleCoverFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    const reader = new FileReader();
-    reader.onload = async () => {
-      const dataUrl = reader.result as string;
-      setSavingCover(true);
-      try {
-        await api.patch('/api/users/me', { coverImage: dataUrl });
-        setProfile(p => p ? { ...p, coverImage: dataUrl } : p);
-      } catch (e: any) {
-        alert(e.message || '封面更新失败');
-      } finally {
-        setSavingCover(false);
-      }
-    };
-    reader.readAsDataURL(file);
+    setSavingCover(true);
+    try {
+      const dataUrl = await compressImage(file, 1280, 0.75);
+      await api.patch('/api/users/me', { coverImage: dataUrl });
+      setProfile(p => p ? { ...p, coverImage: dataUrl } : p);
+    } catch (e: any) {
+      alert(e.message || '封面更新失败');
+    } finally {
+      setSavingCover(false);
+      e.target.value = ''; // 重置, 允许重复选同一张
+    }
   };
 
   if (loading) return <div className="py-12 text-center text-gray-400">加载中…</div>;
