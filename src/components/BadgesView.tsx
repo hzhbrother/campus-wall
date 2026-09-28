@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { api } from '@/lib/api';
+import { BadgeCelebration } from './BadgeCelebration';
 
 interface UserBadge {
   id: string;
@@ -64,10 +65,12 @@ export function BadgesView({ onBack }: { onBack: () => void }) {
     return <span className={`rounded-full px-1.5 py-0.5 text-[10px] font-medium ${map[s] || 'bg-gray-100 text-gray-500'}`}>{label[s] || s}</span>;
   };
 
-  // 领取勋章: 调用 claim 接口, 成功后本地把 claimedAt 设为当前时间
+  // 领取勋章: 调用 claim 接口, 成功后本地把 claimedAt 设为当前时间 + 播放礼花动效
   const [claimingId, setClaimingId] = useState<string | null>(null);
+  const [celebration, setCelebration] = useState<{ imageUrl: string | null; icon: string | null; name: string; description: string | null } | null>(null);
   const handleClaim = async (ubId: string) => {
     if (claimingId) return;
+    const target = badges.find(b => b.id === ubId);
     setClaimingId(ubId);
     try {
       await api.post('/api/users/me/badges/' + ubId + '/claim');
@@ -76,7 +79,12 @@ export function BadgesView({ onBack }: { onBack: () => void }) {
       setBadges(prev => prev.map(b => b.id === ubId ? { ...b, claimedAt: nowIso } : b));
       // 灯箱里也同步更新
       setLightbox(l => l && l.id === ubId ? { ...l, claimedAt: nowIso } : l);
-      alert('🎉 领取成功');
+      // 关闭灯箱, 播放礼花动效 (3 秒后自动关闭)
+      setLightbox(null);
+      if (target) {
+        setCelebration({ imageUrl: target.badge.imageUrl || null, icon: target.badge.icon || null, name: target.badge.name, description: target.badge.description || null });
+        setTimeout(() => setCelebration(null), 3500);
+      }
     } catch (e: any) {
       alert(e.message || '领取失败');
     } finally {
@@ -227,9 +235,9 @@ export function BadgesView({ onBack }: { onBack: () => void }) {
                       >
                         {ub.badge.imageUrl ? (
                           /* eslint-disable-next-line @next/next/no-img-element */
-                          <img src={ub.badge.imageUrl} alt={ub.badge.name} className={`h-16 w-16 rounded-full object-cover hover:scale-110 transition-transform ${!claimed ? 'grayscale opacity-60' : ''}`} />
+                          <img src={ub.badge.imageUrl} alt={ub.badge.name} className={`h-16 w-16 object-contain hover:scale-110 transition-transform ${!claimed ? 'grayscale opacity-60' : ''}`} />
                         ) : (
-                          <div className={`h-16 w-16 rounded-full bg-gradient-to-br from-yellow-400 to-amber-500 flex items-center justify-center text-3xl shadow-lg shadow-amber-200 hover:scale-110 transition-transform ${!claimed ? 'grayscale opacity-60' : ''}`}>
+                          <div className={`flex h-16 w-16 items-center justify-center text-4xl hover:scale-110 transition-transform ${!claimed ? 'grayscale opacity-60' : ''}`}>
                             {ub.badge.icon || '🏅'}
                           </div>
                         )}
@@ -266,9 +274,9 @@ export function BadgesView({ onBack }: { onBack: () => void }) {
           <div className="flex flex-col items-center" onClick={e => e.stopPropagation()}>
             {lightbox.imageUrl ? (
               /* eslint-disable-next-line @next/next/no-img-element */
-              <img src={lightbox.imageUrl} alt={lightbox.name} className={`h-32 w-32 rounded-full object-cover shadow-2xl ${!lightbox.claimedAt ? 'grayscale opacity-60' : ''}`} />
+              <img src={lightbox.imageUrl} alt={lightbox.name} className={`h-32 w-32 object-contain drop-shadow-lg ${!lightbox.claimedAt ? 'grayscale opacity-60' : ''}`} />
             ) : (
-              <div className={`h-32 w-32 rounded-full bg-gradient-to-br from-yellow-400 to-amber-500 flex items-center justify-center text-7xl shadow-2xl ${!lightbox.claimedAt ? 'grayscale opacity-60' : ''}`}>
+              <div className={`flex h-32 w-32 items-center justify-center text-7xl ${!lightbox.claimedAt ? 'grayscale opacity-60' : ''}`}>
                 {lightbox.icon || '🏅'}
               </div>
             )}
@@ -302,6 +310,11 @@ export function BadgesView({ onBack }: { onBack: () => void }) {
             <button onClick={() => setCertLightbox(null)} className="mt-4 rounded-full bg-white/20 px-5 py-2 text-sm text-white hover:bg-white/30">关闭</button>
           </div>
         </div>
+      )}
+
+      {/* 徽章领取礼花动效 */}
+      {celebration && (
+        <BadgeCelebration badge={celebration} onClose={() => setCelebration(null)} />
       )}
     </div>
   );

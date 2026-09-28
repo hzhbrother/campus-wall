@@ -58,8 +58,8 @@ export default function UserProfilePage() {
   const [tab, setTab] = useState<'posts' | 'likes' | 'favorites' | 'comments'>('posts');
   const [savingCover, setSavingCover] = useState(false);
   const [showAvatarLightbox, setShowAvatarLightbox] = useState(false);
-  const [lightboxBadge, setLightboxBadge] = useState<{ icon: string | null; name: string; description: string | null } | null>(null);
-  const [badges, setBadges] = useState<{ badge: { id: string; name: string; icon: string | null; description: string | null }; earnedAt: string }[]>([]);
+  const [lightboxBadge, setLightboxBadge] = useState<{ imageUrl: string | null; icon: string | null; name: string; description: string | null } | null>(null);
+  const [badges, setBadges] = useState<{ badge: { id: string; name: string; icon: string | null; description: string | null; imageUrl: string | null }; earnedAt: string }[]>([]);
   const [following, setFollowing] = useState(false);
   const [followBusy, setFollowBusy] = useState(false);
   const [followsPublicBusy, setFollowsPublicBusy] = useState(false);
@@ -406,12 +406,17 @@ export default function UserProfilePage() {
                 {badges.map(ub => (
                   <button
                     key={ub.badge.id}
-                    onClick={() => setLightboxBadge({ icon: ub.badge.icon, name: ub.badge.name, description: ub.badge.description })}
+                    onClick={() => setLightboxBadge({ imageUrl: ub.badge.imageUrl || null, icon: ub.badge.icon, name: ub.badge.name, description: ub.badge.description })}
                     className="flex flex-col items-center text-center"
                   >
-                    <div className="h-12 w-12 rounded-full bg-gradient-to-br from-yellow-400 to-amber-500 flex items-center justify-center text-2xl shadow-sm hover:scale-110 transition-transform">
-                      {ub.badge.icon || '🏅'}
-                    </div>
+                    {ub.badge.imageUrl ? (
+                      /* eslint-disable-next-line @next/next/no-img-element */
+                      <img src={ub.badge.imageUrl} alt={ub.badge.name} className="h-12 w-12 object-contain hover:scale-110 transition-transform" />
+                    ) : (
+                      <div className="flex h-12 w-12 items-center justify-center text-2xl hover:scale-110 transition-transform">
+                        {ub.badge.icon || '🏅'}
+                      </div>
+                    )}
                     <div className="mt-1 text-[11px] text-gray-600 line-clamp-1">{ub.badge.name}</div>
                   </button>
                 ))}
@@ -425,9 +430,14 @@ export default function UserProfilePage() {
       {lightboxBadge && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80" onClick={() => setLightboxBadge(null)}>
           <div className="flex flex-col items-center" onClick={e => e.stopPropagation()}>
-            <div className="h-32 w-32 rounded-full bg-gradient-to-br from-yellow-400 to-amber-500 flex items-center justify-center text-7xl shadow-2xl">
-              {lightboxBadge.icon || '🏅'}
-            </div>
+            {lightboxBadge.imageUrl ? (
+              /* eslint-disable-next-line @next/next/no-img-element */
+              <img src={lightboxBadge.imageUrl} alt={lightboxBadge.name} className="h-32 w-32 object-contain drop-shadow-lg" />
+            ) : (
+              <div className="flex h-32 w-32 items-center justify-center text-7xl">
+                {lightboxBadge.icon || '🏅'}
+              </div>
+            )}
             <div className="mt-4 text-xl font-bold text-white">{lightboxBadge.name}</div>
             {lightboxBadge.description && (
               <div className="mt-2 text-sm text-white/70 max-w-xs text-center">{lightboxBadge.description}</div>
