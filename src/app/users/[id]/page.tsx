@@ -176,6 +176,7 @@ export default function UserProfilePage() {
     setCoverMenuOpen(false);
     try {
       await api.patch('/api/users/me', { coverImage: null });
+      updatingRef.current = false;
       await loadAll();
     } catch (e: any) {
       alert(e.message || '封面删除失败');
@@ -197,7 +198,8 @@ export default function UserProfilePage() {
     try {
       const dataUrl = await compressImage(file, 1280, 0.75);
       await api.patch('/api/users/me', { coverImage: dataUrl });
-      // 上传成功后手动刷新, 拿到最新数据 (包括封面)
+      // 上传成功: 先解除竞态锁, 再手动刷新拿到最新封面
+      updatingRef.current = false;
       await loadAll();
     } catch (e: any) {
       alert(e.message || '封面更新失败');
