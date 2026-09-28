@@ -21,8 +21,13 @@ const UpdateSchema = z.object({
   remark: z.string().max(200).optional().or(z.literal('')),
   schoolId: z.string().max(100).optional().or(z.literal('')),
   organizationId: z.string().max(100).optional().or(z.literal('')),
-  // 我的关注列表是否对外公开 (隐私开关)
+  // 隐私开关 (默认公开)
   followsPublic: z.boolean().optional(),
+  fansPublic: z.boolean().optional(),
+  badgesPublic: z.boolean().optional(),
+  honorsPublic: z.boolean().optional(),
+  favoritesPublic: z.boolean().optional(),
+  likesPublic: z.boolean().optional(),
   // 邮箱变更时需携带的验证码
   emailCode: z.string().length(6, '验证码为6位数字').optional(),
 });
@@ -75,8 +80,13 @@ export async function PATCH(req: NextRequest) {
     // 移除 emailCode (不存入数据库)
     const { emailCode, ...data } = dto;
 
-    // 关注列表是否对外公开 (隐私开关)
+    // 隐私开关 (默认公开)
     if (dto.followsPublic !== undefined) data.followsPublic = dto.followsPublic;
+    if (dto.fansPublic !== undefined) data.fansPublic = dto.fansPublic;
+    if (dto.badgesPublic !== undefined) data.badgesPublic = dto.badgesPublic;
+    if (dto.honorsPublic !== undefined) data.honorsPublic = dto.honorsPublic;
+    if (dto.favoritesPublic !== undefined) data.favoritesPublic = dto.favoritesPublic;
+    if (dto.likesPublic !== undefined) data.likesPublic = dto.likesPublic;
 
     // 学校与团体互斥: 设置一个时清空另一个
     // 注意: 必须用 else if, 否则第一个 if 设置 organizationId=null 后,

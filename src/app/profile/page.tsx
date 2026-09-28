@@ -288,6 +288,7 @@ function ProfilePageInner() {
   const [adminTab, setAdminTab] = useState<AdminTab>('overview');
   const [showPwdModal, setShowPwdModal] = useState(false);
   const [showNotifModal, setShowNotifModal] = useState(false);
+  const [showPrivacyModal, setShowPrivacyModal] = useState(false);
   const [showVerifyModal, setShowVerifyModal] = useState(false);
   const [showJoinOrg, setShowJoinOrg] = useState(false);
   const [joinOrgDismissed, setJoinOrgDismissed] = useState(false);
@@ -478,8 +479,9 @@ function ProfilePageInner() {
     const securityItems = [
       { key: 'password', label: '修改密码', icon: '🔑', onClick: () => setShowPwdModal(true) },
       { key: 'notif', label: '通知设置', icon: '🔔', onClick: () => setShowNotifModal(true) },
+      { key: 'privacy', label: '隐私设置', icon: '⚙️', onClick: () => setShowPrivacyModal(true) },
       { key: 'agreement', label: '用户协议', icon: '📄', onClick: () => router.push('/agreement') },
-      { key: 'privacy', label: '隐私政策', icon: '🛡️', onClick: () => router.push('/privacy') },
+      { key: 'privacyPolicy', label: '隐私政策', icon: '🛡️', onClick: () => router.push('/privacy') },
     ];
     return (
       <div className="space-y-4">
@@ -502,6 +504,9 @@ function ProfilePageInner() {
 
         {/* 通知设置弹窗 */}
         {showNotifModal && <NotificationSettingsModal onClose={() => setShowNotifModal(false)} />}
+
+        {/* 隐私设置弹窗 */}
+        {showPrivacyModal && <PrivacySettingsModal onClose={() => setShowPrivacyModal(false)} onSaved={() => refreshUser?.()} />}
       </div>
     );
   }
@@ -654,6 +659,9 @@ function ProfilePageInner() {
       {/* 通知设置弹窗 */}
       {showNotifModal && <NotificationSettingsModal onClose={() => setShowNotifModal(false)} />}
 
+      {/* 隐私设置弹窗 */}
+      {showPrivacyModal && <PrivacySettingsModal onClose={() => setShowPrivacyModal(false)} onSaved={() => refreshUser?.()} />}
+
       {/* 加入学校/团体引导弹窗 */}
       {showJoinOrg && (
         <JoinOrgModal
@@ -774,6 +782,85 @@ function NotificationSettingsModal({ onClose }: { onClose: () => void }) {
           </div>
         )}
         <button onClick={save} disabled={saving} className="mt-4 w-full rounded-lg bg-blue-600 py-2.5 text-sm font-medium text-white disabled:opacity-50">{saving ? '保存中…' : '保存'}</button>
+      </div>
+    </div>
+  );
+}
+
+// ---------- 隐私设置弹窗 ----------
+function PrivacySettingsModal({ onClose, onSaved }: { onClose: () => void; onSaved?: () => void }) {
+  const [settings, setSettings] = useState<{ followsPublic: boolean; fansPublic: boolean; badgesPublic: boolean; honorsPublic: boolean; favoritesPublic: boolean; likesPublic: boolean } | null>(null);
+  const [saving, setSaving] = useState(false);
+  const [msg, setMsg] = useState('');
+
+  // 加载时读取当前隐私设置
+  useEffect(() => {
+    api.get('/api/users/me')
+      .then((u: any) => {
+        setSettings({
+          followsPublic: !!u.followsPublic,
+          fansPublic: !!u.fansPublic,
+          badgesPublic: !!u.badgesPublic,
+          honorsPublic: !!u.honorsPublic,
+          favoritesPublic: !!u.favoritesPublic,
+          likesPublic: !!u.likesPublic,
+        });
+      })
+      .catch(console.error);
+  }, []);
+
+  const toggle = (k: keyof NonNullable<typeof settings>) => {
+    if (!settings) return;
+    setSettings({ ...settings, [k]: !settings[k] });
+  };
+
+  const save = async () => {
+    if (!settings) return;
+    setSaving(true); setMsg('');
+    try {
+      await api.patch('/api/users/me', settings);
+      setMsg('保存成功');
+      onSaved?.();
+      // 800ms 后关闭弹窗
+      setTimeout(() => onClose(), 800);
+    } catch (e: any) {
+      setMsg(e.message || '保存失败');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const items: { key: keyof NonNullable<typeof settings>; label: string; desc: string }[] = [
+    { key: 'followsPublic', label: '我的关注列表', desc: '别人能否看到我关注了谁' },
+    { key: 'fansPublic', label: '我的粉丝列表', desc: '别人能否看到我的粉丝' },
+    { key: 'badgesPublic', label: '我的勋章展示', desc: '主页是否对外展示我的勋章' },
+    { key: 'honorsPublic', label: '荣誉证书展示', desc: '主页是否对外展示我的证书' },
+    { key: 'favoritesPublic', label: '我的收藏数', desc: '主页是否显示收藏总数' },
+    { key: 'likesPublic', label: '我的获赞数', desc: '主页是否显示获赞总数' },
+  ];
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" onClick={onClose}>
+      <div className="w-full max-w-sm rounded-2xl bg-white p-5" onClick={e => e.stopPropagation()}>
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="text-lg font-bold text-gray-900">隐私设置</h3>
+          <button onClick={onClose} className="text-gray-400">✕</button>
+        </div>
+        {msg && <p className={`mb-3 text-sm ${msg.includes('成功') ? 'text-green-600' : 'text-red-500'}`}>{msg}</p>}
+        {!settings ? <p className="py-4 text-center text-sm text-gray-400">加载中…</p> : (
+          <div className="space-y-2">
+            {items.map(it => (
+              <label key={it.key} className="flex items-center justify-between rounded-lg border border-gray-100 p-3">
+                <div>
+                  <div className="text-sm font-medium text-gray-900">{it.label}</div>
+                  <div className="text-xs text-gray-400">{it.desc}</div>
+                </div>
+                <input type="checkbox" checked={settings[it.key]} onChange={() => toggle(it.key)} className="h-5 w-5" />
+              </label>
+            ))}
+          </div>
+        )}
+        <button onClick={save} disabled={saving || !settings} className="mt-4 w-full rounded-lg bg-blue-600 py-2.5 text-sm font-medium text-white disabled:opacity-50">{saving ? '保存中…' : '保存'}</button>
       </div>
     </div>
   );

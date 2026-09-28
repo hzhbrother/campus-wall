@@ -50,6 +50,7 @@ export async function checkAndAwardBadges(userId: string): Promise<{ id: string;
       // 检查是否已获得
       const existing = await prisma.userBadge.findUnique({ where: { userId_badgeId: { userId, badgeId: badge.id } } });
       if (!existing) {
+        // 创建时不设 claimedAt (null), 等待用户主动点击领取
         await prisma.userBadge.create({ data: { userId, badgeId: badge.id } });
         newlyAwarded.push({ id: badge.id, name: badge.name, icon: badge.icon, description: badge.description });
       }

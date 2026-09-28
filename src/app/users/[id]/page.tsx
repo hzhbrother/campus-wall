@@ -311,7 +311,7 @@ export default function UserProfilePage() {
         </div>
 
         {/* 关注 / 粉丝 统计 — 可点击跳转列表 */}
-        <div className="mt-3 flex items-center justify-center gap-4 text-sm">
+        <div className="mt-3 flex items-center justify-center gap-3 text-xs">
           <Link
             href={`/users/${userId}/follows?type=following`}
             className="flex items-center gap-1 text-gray-600 hover:text-blue-500"
@@ -362,7 +362,7 @@ export default function UserProfilePage() {
           {(profile.qualifications?.filter((q: any) => q.category === 'HONOR').length ?? 0) > 0 && (
             <div>
               <h3 className="text-sm font-bold text-gray-900 mb-2">📜 荣誉证书</h3>
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-3 gap-2">
                 {profile.qualifications!.filter((q: any) => q.category === 'HONOR').map((q: any) => {
                   const displayPhoto = q.displayPhoto === 'photo2' ? q.photo2 : (q.photo || q.photo2);
                   return (
@@ -386,8 +386,7 @@ export default function UserProfilePage() {
                       {displayPhoto ? (
                         <div className="block w-full bg-gray-50 transition-colors hover:bg-gray-100">
                           {/* eslint-disable-next-line @next/next/no-img-element */}
-                          <img src={displayPhoto} alt={q.type} className="w-full max-h-48 object-contain" />
-                          <div className="py-1 text-center text-[10px] text-gray-400">点击查看详情</div>
+                          <img src={displayPhoto} alt={q.type} className="w-full aspect-[3/4] object-cover" />
                         </div>
                       ) : (
                         <div className="py-6 text-center text-xs text-gray-400">暂无证书图片</div>

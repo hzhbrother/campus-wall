@@ -21,8 +21,13 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
         organization: { select: { id: true, name: true } },
         // 关注/粉丝统计数 (通过 _count 返回)
         _count: { select: { posts: true, comments: true, favorites: true, follows: true, followers: true } },
-        // 仅本人返回 (下方从对外响应中剥离)
+        // 隐私开关字段: 仅本人返回 (下方从对外响应中剥离)
         followsPublic: true,
+        fansPublic: true,
+        badgesPublic: true,
+        honorsPublic: true,
+        favoritesPublic: true,
+        likesPublic: true,
       },
     });
     if (!user) return NextResponse.json({ message: '用户不存在' }, { status: 404 });
@@ -42,15 +47,25 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
         photo: true, photo2: true, displayPhoto: true,
       },
     });
-    // 公开响应: 剥离 followsPublic, 仅本人可见
-    const { followsPublic, ...publicUser } = user;
+    // 公开响应: 剥离 6 个隐私开关字段, 仅本人可见时回填
+    const {
+      followsPublic, fansPublic, badgesPublic, honorsPublic, favoritesPublic, likesPublic,
+      ...publicUser
+    } = user;
     const body: Record<string, any> = {
       ...publicUser,
       verified,
       qualifications,
       _count: { ...publicUser._count, likesReceived },
     };
-    if (isSelf) body.followsPublic = followsPublic;
+    if (isSelf) {
+      body.followsPublic = followsPublic;
+      body.fansPublic = fansPublic;
+      body.badgesPublic = badgesPublic;
+      body.honorsPublic = honorsPublic;
+      body.favoritesPublic = favoritesPublic;
+      body.likesPublic = likesPublic;
+    }
     return NextResponse.json(body);
   } catch (e) {
     return errorResponse(e);

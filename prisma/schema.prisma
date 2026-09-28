@@ -148,7 +148,13 @@ model User {
   aiImageCheck Json? // AI 图片真实性检测结果 (身份认证照片)
   lastReadNotificationsAt DateTime? // 上次标记全部已读的时间 (用于广播通知未读计算)
   points Int @default(0) // 积分 (签到等获得)
-  followsPublic Boolean @default(true) // 我的关注列表是否对外公开 (false=仅自己可见)
+  // 隐私开关 (默认公开)
+  followsPublic    Boolean @default(true) // 我的关注列表是否对外公开
+  fansPublic       Boolean @default(true) // 我的粉丝列表是否对外公开
+  badgesPublic     Boolean @default(true) // 我的勋章是否在主页对外展示
+  honorsPublic     Boolean @default(true) // 我的荣誉证书是否在主页对外展示
+  favoritesPublic  Boolean @default(true) // 我的收藏数是否在主页对外展示
+  likesPublic      Boolean @default(true) // 我的获赞数是否在主页对外展示
   userNumber Int? // 用户编号 (顺序号, 用于生成 XYS/XY 编号)
   schoolId     String?          // 所属学校
   organizationId String?        // 所属团体
@@ -171,6 +177,7 @@ model User {
   userBadges   UserBadge[]
   qualifications Qualification[]
   qualificationComments QualificationComment[]
+  qualificationLikes QualificationLike[]
   checkIns     CheckInRecord[]
   school       School?          @relation(fields: [schoolId], references: [id])
   organization Organization?    @relation(fields: [organizationId], references: [id])
@@ -480,6 +487,7 @@ model UserBadge {
   userId    String
   badgeId   String
   earnedAt  DateTime @default(now()) // 获得时间 (用于显示年份)
+  claimedAt DateTime? // 领取时间 (null 表示待领取, 由用户主动点击领取)
 
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   badge     Badge    @relation(fields: [badgeId], references: [id], onDelete: Cascade)
