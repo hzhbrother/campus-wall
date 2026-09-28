@@ -7,7 +7,7 @@ import { compressImage } from '@/lib/image-compress';
 import TemplateManager from './TemplateManager';
 import { BadgesManager } from './BadgesManager';
 
-export type AdminTab = 'overview' | 'posts' | 'moderation' | 'comments' | 'users' | 'verification' | 'qualifications' | 'template' | 'appeals' | 'notifications' | 'settings' | 'email' | 'agreement' | 'roles' | 'badges' | 'schools' | 'orgs';
+export type AdminTab = 'overview' | 'posts' | 'moderation' | 'comments' | 'users' | 'avatars' | 'verification' | 'qualifications' | 'template' | 'appeals' | 'notifications' | 'settings' | 'email' | 'agreement' | 'roles' | 'badges' | 'schools' | 'orgs';
 
 // ---------- 通用 UI ----------
 function SectionTitle({ title, desc }: { title: string; desc?: string }) {
@@ -3471,6 +3471,111 @@ function QualificationReviewTab({ isSuper }: { isSuper: boolean }) {
   );
 }
 
+// ---------- 头像审核 ----------
+function AvatarReviewTab() {
+  const [items, setItems] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [busyId, setBusyId] = useState<string | null>(null);
+  const [rejectId, setRejectId] = useState<string | null>(null);
+  const [rejectReason, setRejectReason] = useState('');
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    try {
+      const d = await api.get<{ items: any[] }>('/api/admin/avatar-reviews');
+      setItems(d.items || []);
+    } catch { setItems([]); }
+    finally { setLoading(false); }
+  }, []);
+  useEffect(() => { load(); }, [load]);
+
+  // 通过: pendingAvatar -> avatar
+  const approve = async (id: string) => {
+    if (!confirm('确认通过该头像审核?')) return;
+    setBusyId(id);
+    try {
+      await api.patch(`/api/admin/users/${id}`, { avatarStatus: 'APPROVED' });
+      setItems(prev => prev.filter(i => i.id !== id));
+    } catch (e: any) { alert(e.message || '操作失败'); }
+    finally { setBusyId(null); }
+  };
+
+  // 驳回
+  const doReject = async (id: string) => {
+    const reason = rejectReason.trim();
+    if (!reason) { alert('请填写驳回原因'); return; }
+    setBusyId(id);
+    try {
+      await api.patch(`/api/admin/users/${id}`, { avatarStatus: 'REJECTED', avatarRejectReason: reason });
+      setItems(prev => prev.filter(i => i.id !== id));
+      setRejectId(null); setRejectReason('');
+    } catch (e: any) { alert(e.message || '操作失败'); }
+    finally { setBusyId(null); }
+  };
+
+  return (
+    <div className="space-y-4">
+      <SectionTitle title="头像审核" desc="用户上传的新头像在此审核。AI 自动过滤明显违规内容，不确定的进入人工审核。" />
+      {loading ? (
+        <p className="py-12 text-center text-sm text-gray-400">加载中…</p>
+      ) : items.length === 0 ? (
+        <div className="py-16 text-center text-gray-400">
+          <div className="text-4xl mb-2">✅</div>
+          <p className="text-sm">暂无待审核头像</p>
+        </div>
+      ) : (
+        <div className="grid gap-4 sm:grid-cols-2">
+          {items.map(u => (
+            <div key={u.id} className="rounded-2xl border border-gray-100 bg-white p-4 shadow-sm">
+              <div className="mb-3 flex items-center justify-between">
+                <span className="font-medium text-gray-800">{u.nickname}</span>
+                <span className="text-xs text-gray-400">{new Date(u.createdAt).toLocaleString('zh-CN')}</span>
+              </div>
+              {/* 旧头像 vs 新头像 对比 */}
+              <div className="flex items-center justify-center gap-4">
+                <div className="flex flex-col items-center">
+                  <span className="mb-1 text-xs text-gray-400">当前头像</span>
+                  <div className="h-20 w-20 overflow-hidden rounded-full bg-gray-100 ring-2 ring-gray-200">
+                    {u.avatar ? <img src={u.avatar} alt="旧头像" className="h-full w-full object-cover" /> : <div className="flex h-full w-full items-center justify-center text-gray-300">无</div>}
+                  </div>
+                </div>
+                <div className="text-2xl text-gray-300">→</div>
+                <div className="flex flex-col items-center">
+                  <span className="mb-1 text-xs text-orange-500">待审核</span>
+                  <div className="h-20 w-20 overflow-hidden rounded-full bg-gray-100 ring-2 ring-orange-300">
+                    {u.pendingAvatar ? <img src={u.pendingAvatar} alt="新头像" className="h-full w-full object-cover" /> : <div className="flex h-full w-full items-center justify-center text-gray-300">无</div>}
+                  </div>
+                </div>
+              </div>
+              {/* 操作按钮 */}
+              {rejectId === u.id ? (
+                <div className="mt-4 space-y-2">
+                  <input value={rejectReason} onChange={e => setRejectReason(e.target.value)} className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm" placeholder="请填写驳回原因 (将通知用户)" />
+                  <div className="flex gap-2">
+                    <button onClick={() => doReject(u.id)} disabled={busyId === u.id} className="flex-1 rounded-lg bg-red-500 py-2 text-sm font-medium text-white hover:bg-red-600 disabled:opacity-50">
+                      {busyId === u.id ? '处理中…' : '确认驳回'}
+                    </button>
+                    <button onClick={() => { setRejectId(null); setRejectReason(''); }} className="flex-1 rounded-lg border border-gray-200 py-2 text-sm text-gray-600 hover:bg-gray-50">取消</button>
+                  </div>
+                </div>
+              ) : (
+                <div className="mt-4 flex gap-2">
+                  <button onClick={() => approve(u.id)} disabled={busyId === u.id} className="flex-1 rounded-lg bg-green-500 py-2 text-sm font-medium text-white hover:bg-green-600 disabled:opacity-50">
+                    {busyId === u.id ? '处理中…' : '✓ 通过'}
+                  </button>
+                  <button onClick={() => setRejectId(u.id)} disabled={busyId === u.id} className="flex-1 rounded-lg bg-red-500 py-2 text-sm font-medium text-white hover:bg-red-600 disabled:opacity-50">
+                    ✗ 驳回
+                  </button>
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ---------- 管理后台主组件 ----------
 export function AdminPanel({ tab, isSuper }: { tab: AdminTab; isSuper: boolean }) {
   switch (tab) {
@@ -3479,6 +3584,7 @@ export function AdminPanel({ tab, isSuper }: { tab: AdminTab; isSuper: boolean }
     case 'moderation': return <ModerationTab />;
     case 'comments': return <CommentsTab />;
     case 'users': return <UsersTab isSuper={isSuper} />;
+    case 'avatars': return <AvatarReviewTab />;
     case 'verification': return <VerificationReviewTab isSuper={isSuper} />;
     case 'qualifications': return <QualificationReviewTab isSuper={isSuper} />;
     case 'template': return <TemplateManager />;

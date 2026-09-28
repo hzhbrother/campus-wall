@@ -390,7 +390,7 @@ function ProfilePageInner() {
   const counts = (user as any)?._count || { posts: 0, comments: 0, likes: 0, favorites: 0, likesReceived: 0 };
 
   // 判断是否为管理后台标签
-  const ADMIN_TABS: AdminTab[] = ['overview', 'posts', 'moderation', 'comments', 'users', 'verification', 'qualifications', 'template', 'appeals', 'notifications', 'settings', 'email', 'agreement', 'roles', 'badges', 'schools', 'orgs'];
+  const ADMIN_TABS: AdminTab[] = ['overview', 'posts', 'moderation', 'comments', 'users', 'avatars', 'verification', 'qualifications', 'template', 'appeals', 'notifications', 'settings', 'email', 'agreement', 'roles', 'badges', 'schools', 'orgs'];
   const isAdminView = (v: View): v is AdminTab => ADMIN_TABS.includes(v as AdminTab);
 
   // ---- 管理后台视图 ----
@@ -402,6 +402,7 @@ function ProfilePageInner() {
       { key: 'moderation', label: '内容审核', perm: 'post.moderate' },
       { key: 'comments', label: '评论管理', perm: 'comment.view' },
       { key: 'users', label: '用户管理', perm: 'user.view' },
+      { key: 'avatars', label: '头像审核', perm: 'user.view' },
       { key: 'verification', label: '实名认证审核', perm: 'verification.review' },
       { key: 'qualifications', label: '资质/荣誉审核', perm: 'qualification.review' },
       { key: 'appeals', label: '申诉审核', perm: 'appeal.view' },

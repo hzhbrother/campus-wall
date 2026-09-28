@@ -84,28 +84,41 @@ export async function PATCH(req: NextRequest) {
     const { emailCode, ...rest } = dto;
     const data: any = { ...rest };
 
-    // 头像不直接更新正式 avatar 字段, 走 AI 初筛 + 人工审核流程
+    // 头像走 AI 三级审核: low 自动通过 / medium 人工审核 / high 自动驳回
     const newAvatar = dto.avatar;
     if (newAvatar !== undefined) {
       delete data.avatar; // 不直接更新 avatar
       const moderation = await moderateAvatar(newAvatar);
-      if (!moderation.passed) {
-        return NextResponse.json({ message: moderation.reason || '头像未通过安全检测' }, { status: 400 });
+
+      if (moderation.riskLevel === 'high') {
+        // AI 判定高风险: 自动驳回, 不存入数据库
+        return NextResponse.json({ message: moderation.reason || '头像包含不适宜内容, 已被自动驳回' }, { status: 400 });
       }
-      data.pendingAvatar = newAvatar;
-      data.avatarStatus = VerificationStatus.PENDING;
-      data.avatarRejectReason = null;
-      // 通知管理员审核
-      const admins = await prisma.user.findMany({
-        where: { role: { in: [UserRole.ADMIN, UserRole.SUPER_ADMIN] } },
-        select: { id: true },
-      });
-      await Promise.all(admins.map(a => createNotification({
-        userId: a.id,
-        type: NotificationType.SYSTEM,
-        title: '🟡 新头像待审核',
-        content: `用户 ${me.nickname} 提交了新头像，请及时审核`,
-      })));
+
+      if (moderation.riskLevel === 'low') {
+        // AI 判定低风险: 直接应用为正式头像, 无需人工审核
+        data.avatar = newAvatar;
+        data.pendingAvatar = null;
+        data.avatarStatus = VerificationStatus.APPROVED;
+        data.avatarReviewedAt = new Date();
+        data.avatarRejectReason = null;
+      } else {
+        // medium: 进入人工审核队列
+        data.pendingAvatar = newAvatar;
+        data.avatarStatus = VerificationStatus.PENDING;
+        data.avatarRejectReason = null;
+        // 通知管理员审核
+        const admins = await prisma.user.findMany({
+          where: { role: { in: [UserRole.ADMIN, UserRole.SUPER_ADMIN] } },
+          select: { id: true },
+        });
+        await Promise.all(admins.map(a => createNotification({
+          userId: a.id,
+          type: NotificationType.SYSTEM,
+          title: '🟡 新头像待审核',
+          content: `用户 ${me.nickname} 提交了新头像，请及时审核`,
+        })));
+      }
     }
 
     // 隐私开关 (默认公开)
