@@ -37,7 +37,6 @@ export async function GET(req: NextRequest) {
         verificationStatus: true,
         verificationRejectReason: true,
         verificationAiResult: true,
-        aiImageCheck: true,
         createdAt: true,
         updatedAt: true,
         verificationTemplate: { select: { id: true, name: true, type: true } },

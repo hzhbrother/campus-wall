@@ -7,7 +7,6 @@ import { prisma } from '@/lib/prisma';
 import { errorResponse } from '@/lib/api-response';
 import { VerificationStatus, UserRole, NotificationType } from '@prisma/client';
 import { isVisionEnabled, preliminaryReview, preliminaryFaceReview } from '@/lib/ai-vision';
-import { detectAiImage } from '@/lib/ai-image-detect';
 import { createNotification } from '@/lib/notification-service';
 
 // 照片上限 5MB (base64 后约 6.7MB)
@@ -75,15 +74,10 @@ export async function POST(req: NextRequest) {
       },
     });
 
-    // 异步触发 AI 初审 + AI 图片真实性检测 (不阻塞响应)
-    const isFace = dto.photoType === 'FACE';
+    // 异步触发 AI 初审 (不阻塞响应)
     if (isVisionEnabled()) {
-      runAiReview(me.id, dto.photo, isFace ? null : (dto.templateId || null), isFace, dto.faceName || null, dto.faceId || null).catch(e => console.error('[verification] AI review failed:', e));
-    } else {
-      // 未启用 AI 视觉初审时, 仍进行 AI 图片真实性检测
-      detectAiImage(dto.photo)
-        .then(check => prisma.user.update({ where: { id: me.id }, data: { aiImageCheck: check as any } }))
-        .catch(e => console.error('[verification] AI image check failed:', e));
+      const isFace = dto.photoType === 'FACE';
+      runAiReview(me.id, dto.photo, dto.photoType === 'FACE' ? null : (dto.templateId || null), isFace, dto.faceName || null, dto.faceId || null).catch(e => console.error('[verification] AI review failed:', e));
     }
 
     // 通知所有管理员: 有新的实名认证申请待审核
@@ -121,58 +115,48 @@ export async function POST(req: NextRequest) {
 
 // AI 初审: 判断是否校园卡 + 清晰度, 通过则进入人工复审, 不通过则直接驳回
 async function runAiReview(userId: string, photo: string, templateId: string | null, isFace: boolean, faceName: string | null, faceId: string | null) {
-  // 并行执行: AI 初审 + AI 图片真实性检测
-  const [result, aiImageCheck] = await Promise.all([
-    (async () => {
-      if (isFace) return null; // 人脸初审在下方单独处理
-      let template: any = null;
-      if (templateId) {
-        template = await prisma.verificationTemplate.findUnique({
-          where: { id: templateId },
-          select: { id: true, name: true, image: true, fields: true },
-        });
-      }
-      if (!template) {
-        template = await prisma.verificationTemplate.findFirst({
-          where: { isActive: true },
-          select: { id: true, name: true, image: true, fields: true },
-        });
-      }
-      return await preliminaryReview(photo, template as any);
-    })(),
-    detectAiImage(photo).catch(() => null),
-  ]);
-
-  let reviewResult = result;
+  let result;
   if (isFace) {
-    reviewResult = await preliminaryFaceReview(photo);
-    if (reviewResult) {
-      if (faceName) reviewResult.fields['姓名'] = faceName;
-      if (faceId) reviewResult.fields['工号/学号'] = faceId;
+    // 人脸照片: 检测人脸 + 清晰度
+    result = await preliminaryFaceReview(photo);
+    // 把用户填写的姓名和工号放入 fields, 供管理员复审时核对
+    if (result) {
+      if (faceName) result.fields['姓名'] = faceName;
+      if (faceId) result.fields['工号/学号'] = faceId;
     }
+  } else {
+    // 卡面照片: 加载模板 + OCR 文字提取
+    let template: any = null;
+    if (templateId) {
+      template = await prisma.verificationTemplate.findUnique({
+        where: { id: templateId },
+        select: { id: true, name: true, image: true, fields: true },
+      });
+    }
+    if (!template) {
+      template = await prisma.verificationTemplate.findFirst({
+        where: { isActive: true },
+        select: { id: true, name: true, image: true, fields: true },
+      });
+    }
+    result = await preliminaryReview(photo, template as any);
   }
 
-  const aiCheckData = aiImageCheck as any;
-
-  if (!reviewResult) {
-    // AI 调用失败, 转入人工复审 (仍保存 AI 图片检测结果)
+  if (!result) {
+    // AI 调用失败, 转入人工复审
     await prisma.user.update({
       where: { id: userId },
-      data: {
-        verificationStatus: VerificationStatus.PENDING,
-        aiImageCheck: aiCheckData,
-      },
+      data: { verificationStatus: VerificationStatus.PENDING },
     });
     return;
   }
-  if (reviewResult.isIdCard && reviewResult.isClear) {
+  if (result.isIdCard && result.isClear) {
     // AI 初审通过, 等待人工复审
     await prisma.user.update({
       where: { id: userId },
       data: {
         verificationStatus: VerificationStatus.PENDING,
-        verificationAiResult: reviewResult as any,
-        aiImageCheck: aiCheckData,
+        verificationAiResult: result as any,
       },
     });
   } else {
@@ -181,9 +165,8 @@ async function runAiReview(userId: string, photo: string, templateId: string | n
       where: { id: userId },
       data: {
         verificationStatus: VerificationStatus.REJECTED,
-        verificationRejectReason: reviewResult.rejectReason || (isFace ? '未检测到人脸或照片不清晰' : '照片不符合要求 (非校园卡或不清晰)'),
-        verificationAiResult: reviewResult as any,
-        aiImageCheck: aiCheckData,
+        verificationRejectReason: result.rejectReason || (isFace ? '未检测到人脸或照片不清晰' : '照片不符合要求 (非校园卡或不清晰)'),
+        verificationAiResult: result as any,
       },
     });
   }

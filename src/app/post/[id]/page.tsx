@@ -90,8 +90,8 @@ export default function PostDetailPage({ params }: { params: { id: string } }) {
           {post.status !== 'APPROVED' && <span className="tag bg-amber-50 text-amber-600">待审核</span>}
           <span className="text-slate-400 ml-auto">{new Date(post.createdAt).toLocaleString('zh-CN')}</span>
         </div>
-        {post.title ? <h1 className="text-xl font-bold mb-3">{post.title}</h1> : null}
-        {post.content ? <div className="text-slate-700 whitespace-pre-wrap leading-relaxed mb-4">{post.content}</div> : null}
+        <h1 className="text-xl font-bold mb-3">{post.title}</h1>
+        <div className="text-slate-700 whitespace-pre-wrap leading-relaxed mb-4">{post.content}</div>
         {post.images?.length > 0 && (
           <div className="grid grid-cols-3 gap-2 mb-4">
             {post.images.map((url, i) => (

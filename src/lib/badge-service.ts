@@ -19,15 +19,18 @@ export async function checkAndAwardBadges(userId: string): Promise<{ id: string;
   // 获赞数
   const likesReceived = await prisma.like.count({ where: { post: { authorId: userId } } });
 
-  // 连续签到天数
+  // 连续签到天数 (以北京时间 0 点切换)
   let streak = 0;
   const dates = new Set(user.checkIns.map(c => c.date));
+  const cnDateStr = (d: Date) => {
+    const ms = d.getTime() + 8 * 3600 * 1000;
+    return new Date(ms).toISOString().slice(0, 10);
+  };
   const today = new Date();
   for (let i = 0; i < 400; i++) {
     const d = new Date(today);
     d.setDate(today.getDate() - i);
-    const key = d.toISOString().slice(0, 10);
-    if (dates.has(key)) streak++;
+    if (dates.has(cnDateStr(d))) streak++;
     else break;
   }
 
@@ -50,7 +53,6 @@ export async function checkAndAwardBadges(userId: string): Promise<{ id: string;
       // 检查是否已获得
       const existing = await prisma.userBadge.findUnique({ where: { userId_badgeId: { userId, badgeId: badge.id } } });
       if (!existing) {
-        // 创建时不设 claimedAt (null), 等待用户主动点击领取
         await prisma.userBadge.create({ data: { userId, badgeId: badge.id } });
         newlyAwarded.push({ id: badge.id, name: badge.name, icon: badge.icon, description: badge.description });
       }

@@ -2,12 +2,12 @@
 // DELETE /api/admin/users/:id 删除用户 (ADMIN+)
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
-import bcrypt from 'bcryptjs';
 import { UserRole, UserStatus, VerificationStatus, NotificationType } from '@prisma/client';
 import { requireRole, requirePermission } from '@/lib/server-auth';
 import { updateUser, deleteUser } from '@/lib/admin-service';
 import { errorResponse } from '@/lib/api-response';
 import { createNotification } from '@/lib/notification-service';
+import { prisma } from '@/lib/prisma';
 
 const Schema = z.object({
   realName: z.string().max(32).optional().or(z.literal('')),
@@ -23,16 +23,19 @@ const Schema = z.object({
   status: z.enum(['NORMAL', 'GRADUATED', 'BANNED']).optional(),
   role: z.enum(['USER', 'STUDENT', 'TEACHER', 'ADMIN', 'SUPER_ADMIN']).optional(),
   verified: z.boolean().optional(),
-  // 认证审核: APPROVED 通过 / REJECTED 驳回 / PENDING 撤回 (回到审核中)
-  verificationStatus: z.enum(['APPROVED', 'REJECTED', 'NONE', 'PENDING']).optional(),
+  // 认证审核: APPROVED 通过 / REJECTED 驳回 (驳回时需传 rejectReason)
+  verificationStatus: z.enum(['APPROVED', 'REJECTED', 'NONE']).optional(),
   verificationRejectReason: z.string().max(200).optional().or(z.literal('')),
   // 资质认证 (学生会/广播站等)
   qualificationType: z.string().max(50).optional().or(z.literal('')),
   qualificationVerified: z.boolean().optional(),
-  qualificationStatus: z.enum(['APPROVED', 'REJECTED', 'NONE', 'PENDING']).optional(),
+  qualificationStatus: z.enum(['APPROVED', 'REJECTED', 'NONE']).optional(),
   qualificationRejectReason: z.string().max(200).optional().or(z.literal('')),
-  // 管理员重置密码 (留空不修改)
-  password: z.string().min(6).max(64).optional().or(z.literal('')),
+  // 管理员改封面 (不需要审核, 直接生效)
+  coverImage: z.string().optional(),
+  // 头像人工审核: APPROVED 通过 / REJECTED 驳回 (驳回时传 avatarRejectReason)
+  avatarStatus: z.enum(['APPROVED', 'REJECTED']).optional(),
+  avatarRejectReason: z.string().max(200).optional().or(z.literal('')),
 });
 
 export async function PATCH(req: NextRequest, { params }: { params: { id: string } }) {
@@ -46,6 +49,8 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
     if (dto.className !== undefined) data.className = dto.className || null;
     if (dto.remark !== undefined) data.remark = dto.remark || null;
     if (dto.avatar !== undefined) data.avatar = dto.avatar || null;
+    // 管理员改封面: 直接生效, 不走审核
+    if (dto.coverImage !== undefined) data.coverImage = dto.coverImage || null;
     if (dto.nickname !== undefined) data.nickname = dto.nickname;
     if (dto.email !== undefined) data.email = dto.email || null;
     if (dto.phoneNumber !== undefined) data.phoneNumber = dto.phoneNumber || null;
@@ -66,12 +71,6 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
       data.qualificationVerifiedAt = null;
       data.qualificationStatus = VerificationStatus.REJECTED;
       data.qualificationRejectReason = dto.qualificationRejectReason || null;
-    } else if (dto.qualificationStatus === 'PENDING') {
-      // 撤回: 已通过的资质认证回到审核中
-      data.qualificationVerified = false;
-      data.qualificationVerifiedAt = null;
-      data.qualificationStatus = VerificationStatus.PENDING;
-      data.qualificationRejectReason = null;
     } else if (dto.qualificationStatus === 'NONE') {
       data.qualificationVerified = false;
       data.qualificationVerifiedAt = null;
@@ -81,10 +80,6 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
     }
     if (dto.status) data.status = dto.status as UserStatus;
     if (dto.role) data.role = dto.role as UserRole;
-    // 密码重置: bcrypt hash 后写入 (留空则不修改)
-    if (dto.password) {
-      data.password = await bcrypt.hash(dto.password, 10);
-    }
     if (dto.verified !== undefined) {
       data.verified = dto.verified;
       data.verifiedAt = dto.verified ? new Date() : null;
@@ -100,12 +95,6 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
     data.verifiedAt = null;
     data.verificationStatus = VerificationStatus.REJECTED;
     data.verificationRejectReason = dto.verificationRejectReason || null;
-  } else if (dto.verificationStatus === 'PENDING') {
-    // 撤回: 已通过的身份认证回到审核中
-    data.verified = false;
-    data.verifiedAt = null;
-    data.verificationStatus = VerificationStatus.PENDING;
-    data.verificationRejectReason = null;
   } else if (dto.verificationStatus === 'NONE') {
     data.verified = false;
     data.verifiedAt = null;
@@ -113,17 +102,23 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
     data.verificationRejectReason = null;
     data.verificationPhoto = null;
   }
-    const updated = await updateUser(params.id, data, me.id);
-
-    // 密码被重置时通知用户 (不在通知里写明文密码, 由用户向管理员询问)
-    if (dto.password) {
-      await createNotification({
-        userId: params.id,
-        type: NotificationType.SYSTEM,
-        title: '🔑 密码已被管理员重置',
-        content: '您的账号密码已被管理员重置, 请使用新密码登录。如非本人操作请联系管理员。',
-      });
+    // 头像人工审核流转
+    if (dto.avatarStatus === 'APPROVED') {
+      // 通过: 把待审核头像设为正式头像, 清空待审核与驳回原因
+      const target = await prisma.user.findUnique({ where: { id: params.id }, select: { pendingAvatar: true } });
+      data.avatar = target?.pendingAvatar || null;
+      data.pendingAvatar = null;
+      data.avatarStatus = VerificationStatus.APPROVED;
+      data.avatarReviewedAt = new Date();
+      data.avatarRejectReason = null;
+    } else if (dto.avatarStatus === 'REJECTED') {
+      // 驳回: 清空待审核头像, 记录驳回原因
+      data.pendingAvatar = null;
+      data.avatarStatus = VerificationStatus.REJECTED;
+      data.avatarReviewedAt = new Date();
+      data.avatarRejectReason = dto.avatarRejectReason || null;
     }
+    const updated = await updateUser(params.id, data, me.id);
 
     // 认证通过/驳回后给用户发通知
     if (dto.verificationStatus === 'APPROVED') {
@@ -140,13 +135,6 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
         title: '❌ 身份认证被驳回',
         content: `您的身份认证未通过, 原因: ${dto.verificationRejectReason || '请重新提交'}`,
       });
-    } else if (dto.verificationStatus === 'PENDING') {
-      await createNotification({
-        userId: params.id,
-        type: NotificationType.SYSTEM,
-        title: '↩️ 身份认证已撤回',
-        content: '您的身份认证已被管理员撤回, 重新进入审核队列。',
-      });
     }
     if (dto.qualificationStatus === 'APPROVED') {
       await createNotification({
@@ -162,12 +150,22 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
         title: '❌ 资质认证被驳回',
         content: `您的资质认证未通过, 原因: ${dto.qualificationRejectReason || '请重新提交'}`,
       });
-    } else if (dto.qualificationStatus === 'PENDING') {
+    }
+    // 头像审核结果通知用户
+    if (dto.avatarStatus === 'APPROVED') {
       await createNotification({
         userId: params.id,
         type: NotificationType.SYSTEM,
-        title: '↩️ 资质认证已撤回',
-        content: '您的资质认证已被管理员撤回, 重新进入审核队列。',
+        title: '✅ 头像审核通过',
+        content: '您的新头像已通过审核！',
+      });
+    } else if (dto.avatarStatus === 'REJECTED') {
+      const rejectReason = dto.avatarRejectReason || '';
+      await createNotification({
+        userId: params.id,
+        type: NotificationType.SYSTEM,
+        title: '❌ 头像审核未通过',
+        content: `您提交的头像未通过审核，原因：${rejectReason || '请重新上传'}。请更换头像后重新提交。`,
       });
     }
 

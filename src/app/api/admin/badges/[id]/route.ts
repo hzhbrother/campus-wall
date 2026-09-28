@@ -10,7 +10,6 @@ const UpdateSchema = z.object({
   name: z.string().min(1).max(50).optional(),
   description: z.string().max(200).optional().or(z.literal('')),
   icon: z.string().optional(),
-  imageUrl: z.string().url().optional().or(z.literal('')),
   conditionType: z.enum(['POST_COUNT', 'LIKE_COUNT', 'COMMENT_COUNT', 'CHECKIN_DAYS', 'POINTS', 'MANUAL']).optional(),
   threshold: z.number().int().min(1).optional(),
   isActive: z.boolean().optional(),
@@ -24,7 +23,6 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
     if (dto.name !== undefined) data.name = dto.name;
     if (dto.description !== undefined) data.description = dto.description || null;
     if (dto.icon !== undefined) data.icon = dto.icon || null;
-    if (dto.imageUrl !== undefined) data.imageUrl = dto.imageUrl || null;
     if (dto.conditionType !== undefined) data.conditionType = dto.conditionType;
     if (dto.threshold !== undefined) data.threshold = dto.threshold;
     if (dto.isActive !== undefined) data.isActive = dto.isActive;

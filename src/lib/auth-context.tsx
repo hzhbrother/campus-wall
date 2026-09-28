@@ -40,6 +40,10 @@ export interface AuthUser {
   organization?: { id: string; name: string } | null;
   credibilityScore?: number;
   banReason?: string | null;
+  // 头像审核流程
+  pendingAvatar?: string | null;
+  avatarStatus?: string;
+  avatarRejectReason?: string | null;
   _count?: { posts: number; comments: number; likes: number; likesReceived: number };
 }
 

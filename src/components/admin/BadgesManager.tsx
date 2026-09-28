@@ -1,15 +1,13 @@
 'use client';
 
-import { useEffect, useState, useCallback, useRef } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { api } from '@/lib/api';
-import { compressImage } from '@/lib/image-compress';
 
 interface Badge {
   id: string;
   name: string;
   description: string | null;
   icon: string | null;
-  imageUrl: string | null;
   conditionType: string;
   threshold: number;
   isActive: boolean;
@@ -56,7 +54,7 @@ export function BadgesManager() {
   useEffect(() => { load(); }, [load]);
 
   const remove = async (id: string) => {
-    if (!confirm('确定删除该徽章?')) return;
+    if (!confirm('确定删除该勋章?')) return;
     try {
       await api.del(`/api/admin/badges/${id}`);
       load();
@@ -74,14 +72,14 @@ export function BadgesManager() {
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <div>
-          <h3 className="text-lg font-bold text-gray-900">徽章管理</h3>
-          <p className="text-xs text-gray-400 mt-0.5">配置徽章获得条件, 用户满足条件后自动授予 (发帖/评论/点赞时触发); 手动类型的徽章可在此直接授予用户</p>
+          <h3 className="text-lg font-bold text-gray-900">勋章管理</h3>
+          <p className="text-xs text-gray-400 mt-0.5">配置勋章获得条件, 用户满足条件后自动授予 (发帖/评论/点赞时触发); 手动类型的勋章可在此直接授予用户</p>
         </div>
         <button
           onClick={() => { setEditing(null); setShowForm(true); }}
           className="rounded-full bg-slate-900 px-4 py-1.5 text-sm text-white hover:bg-slate-800"
         >
-          + 新建徽章
+          + 新建勋章
         </button>
       </div>
 
@@ -90,14 +88,14 @@ export function BadgesManager() {
       ) : items.length === 0 ? (
         <div className="py-12 text-center text-gray-400">
           <div className="text-4xl mb-2">🏅</div>
-          <p className="text-sm">还没有徽章, 点击右上角新建</p>
+          <p className="text-sm">还没有勋章, 点击右上角新建</p>
         </div>
       ) : (
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-gray-100 text-left text-xs text-gray-400">
-                <th className="py-2 pr-3">徽章</th>
+                <th className="py-2 pr-3">勋章</th>
                 <th className="py-2 pr-3">描述</th>
                 <th className="py-2 pr-3">条件</th>
                 <th className="py-2 pr-3">阈值</th>
@@ -110,11 +108,7 @@ export function BadgesManager() {
                 <tr key={b.id} className="border-b border-gray-50">
                   <td className="py-3 pr-3">
                     <div className="flex items-center gap-2">
-                      {b.imageUrl ? (
-                        <img src={b.imageUrl} alt={b.name} className="h-8 w-8 rounded-full object-cover" />
-                      ) : (
-                        <span className="text-2xl">{b.icon || '🏅'}</span>
-                      )}
+                      <span className="text-2xl">{b.icon || '🏅'}</span>
                       <span className="font-medium text-gray-800">{b.name}</span>
                     </div>
                   </td>
@@ -205,7 +199,7 @@ function GrantBadgeModal({ badge, onClose }: { badge: Badge; onClose: () => void
   };
 
   const revoke = async (userId: string) => {
-    if (!confirm('确认撤销该用户的徽章?')) return;
+    if (!confirm('确认撤销该用户的勋章?')) return;
     setBusy(true); setMsg('');
     try {
       await api.del(`/api/admin/badges/${badge.id}/grant?userId=${userId}`);
@@ -222,11 +216,7 @@ function GrantBadgeModal({ badge, onClose }: { badge: Badge; onClose: () => void
       <div className="w-full max-w-lg rounded-2xl bg-white p-5 max-h-[85vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-2">
-            {badge.imageUrl ? (
-              <img src={badge.imageUrl} alt={badge.name} className="h-8 w-8 rounded-full object-cover" />
-            ) : (
-              <span className="text-2xl">{badge.icon || '🏅'}</span>
-            )}
+            <span className="text-2xl">{badge.icon || '🏅'}</span>
             <h3 className="text-lg font-bold text-gray-900">授予「{badge.name}」</h3>
           </div>
           <button onClick={onClose} className="text-gray-400 text-xl">✕</button>
@@ -271,12 +261,12 @@ function GrantBadgeModal({ badge, onClose }: { badge: Badge; onClose: () => void
         {/* 已有此勋章的用户 */}
         <div>
           <div className="flex items-center justify-between mb-2">
-            <label className="text-sm font-medium text-gray-700">已拥有此徽章 ({holders.length})</label>
+            <label className="text-sm font-medium text-gray-700">已拥有此勋章 ({holders.length})</label>
           </div>
           {holdersLoading ? (
             <p className="py-4 text-center text-xs text-gray-400">加载中…</p>
           ) : holders.length === 0 ? (
-            <p className="py-4 text-center text-xs text-gray-400">暂无用户拥有此徽章</p>
+            <p className="py-4 text-center text-xs text-gray-400">暂无用户拥有此勋章</p>
           ) : (
             <div className="space-y-1 max-h-60 overflow-y-auto">
               {holders.map(h => (
@@ -308,39 +298,18 @@ function GrantBadgeModal({ badge, onClose }: { badge: Badge; onClose: () => void
 function BadgeForm({ initial, onClose, onSaved }: { initial: Badge | null; onClose: () => void; onSaved: () => void }) {
   const [name, setName] = useState(initial?.name || '');
   const [description, setDescription] = useState(initial?.description || '');
-  // imageUrl 存 base64 data URL 或外链 URL; 上传图片后存 base64
-  const [imageUrl, setImageUrl] = useState(initial?.imageUrl || '');
-  // icon 字段保留作为没有图片时的兜底显示 (默认 🏅), 不再在表单中编辑
-  const [icon] = useState(initial?.icon || '🏅');
+  const [icon, setIcon] = useState(initial?.icon || '🏅');
   const [conditionType, setConditionType] = useState(initial?.conditionType || 'POST_COUNT');
   const [threshold, setThreshold] = useState(initial?.threshold || 1);
   const [isActive, setIsActive] = useState(initial?.isActive ?? true);
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState('');
-  const [uploading, setUploading] = useState(false);
-  const fileRef = useRef<HTMLInputElement>(null);
-
-  // 从相册/图库选择图片 (不调用摄像头)
-  const handlePick = () => fileRef.current?.click();
-
-  const handleFile = async (file: File | undefined) => {
-    if (!file) return;
-    if (!file.type.startsWith('image/')) { setMsg('请选择图片文件'); return; }
-    setUploading(true); setMsg('');
-    try {
-      // 压缩到 base64 (保留 PNG 透明背景, 用于徽章/奖牌)
-      const dataUrl = await compressImage(file, 512, 0.85, true);
-      setImageUrl(dataUrl);
-    } catch (e: any) { setMsg(e.message || '图片处理失败'); }
-    finally { setUploading(false); }
-  };
 
   const submit = async () => {
-    if (!name.trim()) { setMsg('请填写徽章名称'); return; }
-    if (!imageUrl) { setMsg('请上传徽章图片'); return; }
+    if (!name.trim()) { setMsg('请填写勋章名称'); return; }
     setBusy(true); setMsg('');
     try {
-      const payload = { name: name.trim(), description, icon, imageUrl, conditionType, threshold: Number(threshold), isActive };
+      const payload = { name: name.trim(), description, icon, conditionType, threshold: Number(threshold), isActive };
       if (initial) {
         await api.patch(`/api/admin/badges/${initial.id}`, payload);
       } else {
@@ -354,49 +323,17 @@ function BadgeForm({ initial, onClose, onSaved }: { initial: Badge | null; onClo
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" onClick={onClose}>
       <div className="w-full max-w-md rounded-2xl bg-white p-5" onClick={e => e.stopPropagation()}>
         <div className="mb-4 flex items-center justify-between">
-          <h3 className="text-lg font-bold text-gray-900">{initial ? '编辑徽章' : '新建徽章'}</h3>
+          <h3 className="text-lg font-bold text-gray-900">{initial ? '编辑勋章' : '新建勋章'}</h3>
           <button onClick={onClose} className="text-gray-400 text-xl">✕</button>
         </div>
         <div className="space-y-3">
-          {/* 徽章图片: 从相册/图库上传 (不调用摄像头) */}
           <div>
-            <label className="block text-sm text-gray-600 mb-1">徽章图片 <span className="text-red-500">*</span></label>
-            <p className="text-xs text-gray-400 mb-2">从相册/图库上传, 建议透明背景 PNG, 清晰可见即可</p>
-            <input
-              ref={fileRef}
-              type="file"
-              accept="image/*"
-              className="hidden"
-              onChange={e => handleFile(e.target.files?.[0])}
-            />
-            {imageUrl ? (
-              <div className="flex items-center gap-3">
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={imageUrl} alt="徽章预览" className="h-20 w-20 rounded-full object-cover border border-gray-200 bg-gray-50" />
-                <div className="flex flex-col gap-1">
-                  <button type="button" onClick={handlePick} disabled={uploading}
-                    className="rounded-lg bg-gray-100 px-3 py-1.5 text-xs text-gray-700 hover:bg-gray-200 disabled:opacity-50">
-                    {uploading ? '处理中…' : '重新上传'}
-                  </button>
-                  <button type="button" onClick={() => setImageUrl('')} disabled={uploading}
-                    className="rounded-lg bg-red-50 px-3 py-1.5 text-xs text-red-600 hover:bg-red-100 disabled:opacity-50">
-                    移除图片
-                  </button>
-                </div>
-              </div>
-            ) : (
-              <button type="button" onClick={handlePick} disabled={uploading}
-                className="flex h-20 w-20 items-center justify-center rounded-full border-2 border-dashed border-gray-300 text-gray-400 hover:border-blue-400 hover:text-blue-500 disabled:opacity-50">
-                {uploading ? (
-                  <span className="text-xs">处理中…</span>
-                ) : (
-                  <span className="text-2xl">+</span>
-                )}
-              </button>
-            )}
+            <label className="block text-sm text-gray-600 mb-1">勋章图标 (emoji)</label>
+            <input value={icon} onChange={e => setIcon(e.target.value)} maxLength={4}
+              className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm focus:border-blue-400 focus:outline-none" />
           </div>
           <div>
-            <label className="block text-sm text-gray-600 mb-1">徽章名称</label>
+            <label className="block text-sm text-gray-600 mb-1">勋章名称</label>
             <input value={name} onChange={e => setName(e.target.value)} maxLength={50}
               className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm focus:border-blue-400 focus:outline-none" />
           </div>
@@ -423,7 +360,7 @@ function BadgeForm({ initial, onClose, onSaved }: { initial: Badge | null; onClo
           </div>
           <label className="flex items-center gap-2 text-sm text-gray-600">
             <input type="checkbox" checked={isActive} onChange={e => setIsActive(e.target.checked)} className="rounded" />
-            启用此徽章
+            启用此勋章
           </label>
           {msg && <p className="text-sm text-red-500">{msg}</p>}
         </div>

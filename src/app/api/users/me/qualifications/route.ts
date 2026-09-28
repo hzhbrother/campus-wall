@@ -7,7 +7,6 @@ import { prisma } from '@/lib/prisma';
 import { errorResponse } from '@/lib/api-response';
 import { VerificationStatus, UserRole, NotificationType } from '@prisma/client';
 import { createNotification } from '@/lib/notification-service';
-import { detectAiImage } from '@/lib/ai-image-detect';
 
 const MAX_PHOTO_BYTES = 5 * 1024 * 1024;
 
@@ -69,13 +68,6 @@ export async function POST(req: NextRequest) {
         status: VerificationStatus.PENDING,
       },
     });
-
-    // 异步检测图片 AI 痕迹 (不阻塞响应, 检测第一张图)
-    if (photoData) {
-      detectAiImage(photoData)
-        .then(check => prisma.qualification.update({ where: { id: q.id }, data: { aiImageCheck: check as any } }))
-        .catch(e => console.error('[qualification] AI image check failed:', e));
-    }
 
     // 通知管理员审核
     const submitTime = new Date().toLocaleString('zh-CN');
