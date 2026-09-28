@@ -2,12 +2,14 @@
 
 import { useEffect, useState } from 'react';
 import { api } from '@/lib/api';
+import { BadgeCelebration } from './BadgeCelebration';
 
 interface UserBadge {
   id: string;
   badgeId: string;
   earnedAt: string;
-  badge: { id: string; name: string; description?: string | null; icon?: string | null; conditionType: string; threshold: number };
+  claimedAt: string | null; // null 表示待领取
+  badge: { id: string; name: string; description?: string | null; icon?: string | null; imageUrl?: string | null; conditionType: string; threshold: number };
 }
 
 interface Qualification {
@@ -28,7 +30,7 @@ export function BadgesView({ onBack }: { onBack: () => void }) {
   const [badges, setBadges] = useState<UserBadge[]>([]);
   const [quals, setQuals] = useState<Qualification[]>([]);
   const [loading, setLoading] = useState(true);
-  const [lightbox, setLightbox] = useState<{ icon: string | null; name: string; description: string | null; earnedAt: string } | null>(null);
+  const [lightbox, setLightbox] = useState<{ id: string; imageUrl: string | null; icon: string | null; name: string; description: string | null; earnedAt: string; claimedAt: string | null } | null>(null);
   // 证书/荣誉图片放大灯箱
   const [certLightbox, setCertLightbox] = useState<{ type: string; photo: string } | null>(null);
 
@@ -61,6 +63,33 @@ export function BadgesView({ onBack }: { onBack: () => void }) {
     };
     const label: Record<string, string> = { APPROVED: '已通过', PENDING: '审核中', REJECTED: '已驳回' };
     return <span className={`rounded-full px-1.5 py-0.5 text-[10px] font-medium ${map[s] || 'bg-gray-100 text-gray-500'}`}>{label[s] || s}</span>;
+  };
+
+  // 领取勋章: 调用 claim 接口, 成功后本地把 claimedAt 设为当前时间 + 播放礼花动效
+  const [claimingId, setClaimingId] = useState<string | null>(null);
+  const [celebration, setCelebration] = useState<{ imageUrl: string | null; icon: string | null; name: string; description: string | null } | null>(null);
+  const handleClaim = async (ubId: string) => {
+    if (claimingId) return;
+    const target = badges.find(b => b.id === ubId);
+    setClaimingId(ubId);
+    try {
+      await api.post('/api/users/me/badges/' + ubId + '/claim');
+      const nowIso = new Date().toISOString();
+      // 本地把 claimedAt 设为当前时间, 徽章从灰变金
+      setBadges(prev => prev.map(b => b.id === ubId ? { ...b, claimedAt: nowIso } : b));
+      // 灯箱里也同步更新
+      setLightbox(l => l && l.id === ubId ? { ...l, claimedAt: nowIso } : l);
+      // 关闭灯箱, 播放礼花动效 (3 秒后自动关闭)
+      setLightbox(null);
+      if (target) {
+        setCelebration({ imageUrl: target.badge.imageUrl || null, icon: target.badge.icon || null, name: target.badge.name, description: target.badge.description || null });
+        setTimeout(() => setCelebration(null), 3500);
+      }
+    } catch (e: any) {
+      alert(e.message || '领取失败');
+    } finally {
+      setClaimingId(null);
+    }
   };
 
   return (
@@ -184,31 +213,55 @@ export function BadgesView({ onBack }: { onBack: () => void }) {
           {/* ---- 勋章 ---- */}
           <div className="rounded-2xl bg-white p-5 shadow-sm">
             <div className="flex items-center justify-between mb-3">
-              <h3 className="text-lg font-bold text-gray-900">🎖️ 我的勋章</h3>
+              <h3 className="text-lg font-bold text-gray-900">🎖️ 我的徽章</h3>
               <span className="text-xs text-gray-400">{badges.length} 枚</span>
             </div>
-            <p className="text-xs text-gray-400 mb-4">点击勋章可放大查看, 完成任务即可获得勋章</p>
+            <p className="text-xs text-gray-400 mb-4">点击徽章可放大查看, 完成任务即可获得徽章</p>
             {badges.length === 0 ? (
               <div className="py-8 text-center text-gray-400">
                 <div className="text-4xl mb-2">🏅</div>
-                <p className="text-sm">还没有勋章, 快去发帖、签到获得吧~</p>
+                <p className="text-sm">还没有徽章, 快去发帖、签到获得吧~</p>
               </div>
             ) : (
               <div className="grid grid-cols-3 gap-4">
-                {badges.map(ub => (
-                  <button
-                    key={ub.id}
-                    onClick={() => setLightbox({ icon: ub.badge.icon || null, name: ub.badge.name, description: ub.badge.description || null, earnedAt: ub.earnedAt })}
-                    className="flex flex-col items-center text-center"
-                  >
-                    <div className="h-16 w-16 rounded-full bg-gradient-to-br from-yellow-400 to-amber-500 flex items-center justify-center text-3xl shadow-lg shadow-amber-200 hover:scale-110 transition-transform">
-                      {ub.badge.icon || '🏅'}
+                {badges.map(ub => {
+                  const claimed = !!ub.claimedAt;
+                  return (
+                    <div key={ub.id} className="flex flex-col items-center text-center">
+                      {/* 打开灯箱的按钮 (包裹徽章图片) */}
+                      <button
+                        onClick={() => setLightbox({ id: ub.id, imageUrl: ub.badge.imageUrl || null, icon: ub.badge.icon || null, name: ub.badge.name, description: ub.badge.description || null, earnedAt: ub.earnedAt, claimedAt: ub.claimedAt })}
+                        className="relative"
+                      >
+                        {ub.badge.imageUrl ? (
+                          /* eslint-disable-next-line @next/next/no-img-element */
+                          <img src={ub.badge.imageUrl} alt={ub.badge.name} className={`h-16 w-16 object-contain hover:scale-110 transition-transform ${!claimed ? 'grayscale opacity-60' : ''}`} />
+                        ) : (
+                          <div className={`flex h-16 w-16 items-center justify-center text-4xl hover:scale-110 transition-transform ${!claimed ? 'grayscale opacity-60' : ''}`}>
+                            {ub.badge.icon || '🏅'}
+                          </div>
+                        )}
+                        {/* 待领取角标 */}
+                        {!claimed && (
+                          <span className="absolute -top-1 -right-1 rounded-full bg-red-500 px-1.5 py-0.5 text-[10px] font-medium text-white shadow">待领取</span>
+                        )}
+                      </button>
+                      <div className="mt-2 text-sm font-medium text-gray-800">{ub.badge.name}</div>
+                      {ub.badge.description && <div className="text-[11px] text-gray-400 mt-0.5 line-clamp-2">{ub.badge.description}</div>}
+                      {claimed ? (
+                        <div className="text-[11px] text-amber-600 mt-1">{new Date(ub.claimedAt as string).getFullYear()} 年获得</div>
+                      ) : (
+                        <button
+                          onClick={() => handleClaim(ub.id)}
+                          disabled={claimingId === ub.id}
+                          className="mt-1 rounded-full bg-blue-500 px-3 py-0.5 text-[11px] font-medium text-white hover:bg-blue-600 disabled:opacity-50"
+                        >
+                          {claimingId === ub.id ? '领取中…' : '领取'}
+                        </button>
+                      )}
                     </div>
-                    <div className="mt-2 text-sm font-medium text-gray-800">{ub.badge.name}</div>
-                    {ub.badge.description && <div className="text-[11px] text-gray-400 mt-0.5 line-clamp-2">{ub.badge.description}</div>}
-                    <div className="text-[11px] text-amber-600 mt-1">{new Date(ub.earnedAt).getFullYear()} 年获得</div>
-                  </button>
-                ))}
+                  );
+                })}
               </div>
             )}
           </div>
@@ -219,14 +272,29 @@ export function BadgesView({ onBack }: { onBack: () => void }) {
       {lightbox && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80" onClick={() => setLightbox(null)}>
           <div className="flex flex-col items-center" onClick={e => e.stopPropagation()}>
-            <div className="h-32 w-32 rounded-full bg-gradient-to-br from-yellow-400 to-amber-500 flex items-center justify-center text-7xl shadow-2xl">
-              {lightbox.icon || '🏅'}
-            </div>
+            {lightbox.imageUrl ? (
+              /* eslint-disable-next-line @next/next/no-img-element */
+              <img src={lightbox.imageUrl} alt={lightbox.name} className={`h-32 w-32 object-contain drop-shadow-lg ${!lightbox.claimedAt ? 'grayscale opacity-60' : ''}`} />
+            ) : (
+              <div className={`flex h-32 w-32 items-center justify-center text-7xl ${!lightbox.claimedAt ? 'grayscale opacity-60' : ''}`}>
+                {lightbox.icon || '🏅'}
+              </div>
+            )}
             <div className="mt-4 text-xl font-bold text-white">{lightbox.name}</div>
             {lightbox.description && (
               <div className="mt-2 text-sm text-white/70 max-w-xs text-center">{lightbox.description}</div>
             )}
-            <div className="mt-2 text-xs text-white/50">{new Date(lightbox.earnedAt).toLocaleDateString('zh-CN')} 获得</div>
+            {lightbox.claimedAt ? (
+              <div className="mt-2 text-xs text-white/50">{new Date(lightbox.claimedAt).toLocaleDateString('zh-CN')} 获得</div>
+            ) : (
+              <button
+                onClick={() => handleClaim(lightbox.id)}
+                disabled={claimingId === lightbox.id}
+                className="mt-4 rounded-full bg-blue-500 px-8 py-2.5 text-base font-medium text-white hover:bg-blue-600 disabled:opacity-50"
+              >
+                {claimingId === lightbox.id ? '领取中…' : '🎁 领取勋章'}
+              </button>
+            )}
             <button onClick={() => setLightbox(null)} className="mt-6 rounded-full bg-white/20 px-5 py-2 text-sm text-white hover:bg-white/30">关闭</button>
           </div>
         </div>
@@ -242,6 +310,11 @@ export function BadgesView({ onBack }: { onBack: () => void }) {
             <button onClick={() => setCertLightbox(null)} className="mt-4 rounded-full bg-white/20 px-5 py-2 text-sm text-white hover:bg-white/30">关闭</button>
           </div>
         </div>
+      )}
+
+      {/* 徽章领取礼花动效 */}
+      {celebration && (
+        <BadgeCelebration badge={celebration} onClose={() => setCelebration(null)} />
       )}
     </div>
   );

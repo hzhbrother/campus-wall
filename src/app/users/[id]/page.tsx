@@ -3,18 +3,17 @@
 import { useEffect, useState, useCallback, useRef } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { api } from '@/lib/api';
-import { compressImage } from '@/lib/image-compress';
 import { useAuth } from '@/lib/auth-context';
 import Link from 'next/link';
 import { usePageRefresh } from '@/lib/use-page-refresh';
 import { VerifiedBadge } from '@/components/VerifiedBadge';
 import { formatUserCode } from '@/lib/user-number';
+import { compressImage } from '@/lib/image-compress';
 
 interface UserProfile {
   id: string;
   nickname: string;
   avatar: string | null;
-  avatarStatus?: string | null;
   coverImage: string | null;
   role: string;
   verified: boolean;
@@ -26,7 +25,10 @@ interface UserProfile {
   organization: { id: string; name: string } | null;
   createdAt: string;
   qualifications: { id: string; type: string; category: string; verifiedAt: string | null; photo: string | null; photo2: string | null; displayPhoto: string | null }[];
-  _count: { posts: number; comments: number; favorites: number; likesReceived: number };
+  followsPublic?: boolean; // 仅本人可见
+  // 头像审核状态: PENDING / APPROVED / REJECTED
+  avatarStatus?: string | null;
+  _count: { posts: number; comments: number; favorites: number; likesReceived: number; follows: number; followers: number };
 }
 
 interface Post {
@@ -58,15 +60,17 @@ export default function UserProfilePage() {
   const [err, setErr] = useState('');
   const [tab, setTab] = useState<'posts' | 'likes' | 'favorites' | 'comments'>('posts');
   const [savingCover, setSavingCover] = useState(false);
-  // 正在更新个人资料 (封面等): 期间阻止 onFocus 触发的 loadAll, 避免旧数据竞态覆盖
-  const updatingRef = useRef(false);
-  // 封面浮窗菜单 (删除/更换)
+  // 封面浮窗菜单开关 + 隐藏文件选择器
   const [coverMenuOpen, setCoverMenuOpen] = useState(false);
   const coverFileRef = useRef<HTMLInputElement>(null);
+  // 正在更新个人资料 (封面等): 期间阻止 onFocus 触发的 loadAll, 避免旧数据竞态覆盖
+  const updatingRef = useRef(false);
   const [showAvatarLightbox, setShowAvatarLightbox] = useState(false);
-  const [lightboxBadge, setLightboxBadge] = useState<{ icon: string | null; name: string; description: string | null } | null>(null);
-  const [lightboxCert, setLightboxCert] = useState<{ type: string; photo: string } | null>(null);
-  const [badges, setBadges] = useState<{ badge: { id: string; name: string; icon: string | null; description: string | null }; earnedAt: string }[]>([]);
+  const [lightboxBadge, setLightboxBadge] = useState<{ imageUrl: string | null; icon: string | null; name: string; description: string | null } | null>(null);
+  const [badges, setBadges] = useState<{ badge: { id: string; name: string; icon: string | null; description: string | null; imageUrl: string | null }; earnedAt: string }[]>([]);
+  const [following, setFollowing] = useState(false);
+  const [followBusy, setFollowBusy] = useState(false);
+  const [followsPublicBusy, setFollowsPublicBusy] = useState(false);
   // 墙龄自动刷新: 每天 0 点更新一次 now, 触发重新计算天数
   const [now, setNow] = useState(Date.now());
   useEffect(() => {
@@ -88,6 +92,8 @@ export default function UserProfilePage() {
 
   const loadAll = useCallback(() => {
     if (!userId) return;
+    // 正在更新资料时, 跳过刷新 (避免 onFocus 触发的旧数据覆盖刚更新的数据)
+    if (updatingRef.current) return;
     setLoading(true); setErr('');
     Promise.all([
       api.get<UserProfile>(`/api/users/${userId}`).catch(e => { setErr(e.message); return null; }),
@@ -108,15 +114,82 @@ export default function UserProfilePage() {
   usePageRefresh(loadAll, [loadAll]);
   useEffect(() => { loadAll(); }, [loadAll]);
 
+  // 非本人主页: 加载自己关注列表, 判断是否已关注该用户
+  useEffect(() => {
+    if (!me?.id || isOwn || !userId) return;
+    let cancelled = false;
+    api.get<{ items: { id: string }[] }>(`/api/users/me/follow?page=1&pageSize=200`)
+      .then(d => {
+        if (cancelled) return;
+        const list = d.items || [];
+        setFollowing(list.some(it => it.id === userId));
+      })
+      .catch(() => {});
+    return () => { cancelled = true; };
+  }, [me?.id, isOwn, userId]);
+
+  // 关注/取消关注
+  const toggleFollow = async () => {
+    if (followBusy || !userId) return;
+    setFollowBusy(true);
+    try {
+      if (following) {
+        await api.del(`/api/users/me/follow/${userId}`);
+        setFollowing(false);
+      } else {
+        await api.post('/api/users/me/follow', { userId });
+        setFollowing(true);
+      }
+    } catch (e: any) {
+      alert(e.message || '操作失败');
+    } finally {
+      setFollowBusy(false);
+    }
+  };
+
+  // 切换关注列表公开/隐藏 (乐观更新)
+  const toggleFollowsPublic = async () => {
+    if (followsPublicBusy || !profile) return;
+    const prev = profile.followsPublic;
+    setProfile(p => p ? { ...p, followsPublic: !prev } : p);
+    setFollowsPublicBusy(true);
+    try {
+      await api.patch('/api/users/me', { followsPublic: !prev });
+    } catch (e: any) {
+      // 回滚
+      setProfile(p => p ? { ...p, followsPublic: prev } : p);
+      alert(e.message || '更新失败');
+    } finally {
+      setFollowsPublicBusy(false);
+    }
+  };
+
   // 墙龄: 从注册日到今天的天数 (now 每日 0 点自动刷新)
   const wallDays = profile
     ? Math.max(1, Math.floor((now - new Date(profile.createdAt).getTime()) / (24 * 60 * 60 * 1000)) + 1)
     : 0;
 
+  // 删除封面
+  const handleCoverDelete = async () => {
+    updatingRef.current = true;
+    setSavingCover(true);
+    setCoverMenuOpen(false);
+    try {
+      await api.patch('/api/users/me', { coverImage: null });
+      await loadAll();
+    } catch (e: any) {
+      alert(e.message || '封面删除失败');
+    } finally {
+      setSavingCover(false);
+      updatingRef.current = false;
+    }
+  };
+
   // 更换封面 (压缩后上传, 避免大图超出请求体限制)
   const handleCoverFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
+    // 关闭浮窗菜单
     setCoverMenuOpen(false);
     // 标记正在更新, 阻止 onFocus 触发的 loadAll 竞态
     updatingRef.current = true;
@@ -124,29 +197,14 @@ export default function UserProfilePage() {
     try {
       const dataUrl = await compressImage(file, 1280, 0.75);
       await api.patch('/api/users/me', { coverImage: dataUrl });
-      setProfile(p => p ? { ...p, coverImage: dataUrl } : p);
+      // 上传成功后手动刷新, 拿到最新数据 (包括封面)
+      await loadAll();
     } catch (e: any) {
       alert(e.message || '封面更新失败');
     } finally {
       setSavingCover(false);
       updatingRef.current = false;
       e.target.value = ''; // 重置, 允许重复选同一张
-    }
-  };
-
-  // 删除封面
-  const handleCoverDelete = async () => {
-    setCoverMenuOpen(false);
-    updatingRef.current = true;
-    setSavingCover(true);
-    try {
-      await api.patch('/api/users/me', { coverImage: null });
-      setProfile(p => p ? { ...p, coverImage: null } : p);
-    } catch (e: any) {
-      alert(e.message || '封面删除失败');
-    } finally {
-      setSavingCover(false);
-      updatingRef.current = false;
     }
   };
 
@@ -169,80 +227,75 @@ export default function UserProfilePage() {
         ) : (
           <div className="h-full w-full bg-gradient-to-b from-blue-500 to-blue-400" />
         )}
+        {/* 上传中遮罩 */}
+        {savingCover && (
+          <div className="absolute inset-0 z-20 flex items-center justify-center bg-black/50 text-white text-sm">
+            上传中…
+          </div>
+        )}
         {isOwn && (
-          <>
-            {savingCover ? (
-              <div className="absolute inset-0 flex items-center justify-center bg-black/40 text-white">
-                <span className="text-sm">上传中…</span>
-              </div>
-            ) : profile.coverImage ? (
-              // 已有封面: 点击弹出浮窗菜单 (更换/删除)
+          profile.coverImage ? (
+            /* 已有封面: 点击弹出浮窗菜单 (更换封面 / 删除封面), 右上角小铅笔图标 */
+            <>
               <button
                 type="button"
-                onClick={() => setCoverMenuOpen(v => !v)}
-                className="absolute inset-0 cursor-pointer bg-black/0 transition hover:bg-black/20"
+                onClick={() => setCoverMenuOpen(true)}
+                className="absolute right-3 top-3 z-10 flex h-8 w-8 items-center justify-center rounded-full bg-black/40 text-white backdrop-blur-sm hover:bg-black/60"
               >
-                <span className="absolute right-3 top-3 flex h-8 w-8 items-center justify-center rounded-full bg-black/40 text-white">
-                  <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                    <path d="M12 20h9M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z" strokeLinecap="round" strokeLinejoin="round"/>
-                  </svg>
-                </span>
-              </button>
-            ) : (
-              // 无封面: 点击直接打开文件选择器
-              <label className="absolute inset-0 flex cursor-pointer flex-col items-center justify-center gap-1 bg-black/20 text-white/90 transition hover:bg-black/30">
-                <svg className="h-7 w-7" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                  <path d="M12 5v14M5 12h14" strokeLinecap="round" strokeLinejoin="round"/>
+                <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <path d="M12 20h9M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z" strokeLinecap="round" strokeLinejoin="round"/>
                 </svg>
-                <span className="text-sm">点击添加封面</span>
-                <input type="file" accept="image/*" className="hidden" onChange={handleCoverFile} />
-              </label>
-            )}
-            {/* 浮窗菜单 */}
-            {coverMenuOpen && (
-              <>
-                {/* 点击空白关闭 */}
-                <div className="absolute inset-0 z-10" onClick={() => setCoverMenuOpen(false)} />
-                <div className="absolute right-3 top-12 z-20 w-32 overflow-hidden rounded-xl bg-white shadow-lg ring-1 ring-black/5">
-                  <button
-                    type="button"
-                    onClick={() => { setCoverMenuOpen(false); coverFileRef.current?.click(); }}
-                    className="flex w-full items-center gap-2 px-4 py-3 text-sm text-gray-700 transition hover:bg-gray-50"
-                  >
-                    <svg className="h-4 w-4 text-blue-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                      <path d="M4 16l4.586-4.586a2 2 0 0 1 2.828 0L16 16m-2-2l1.586-1.586a2 2 0 0 1 2.828 0L20 14m-6-6h.01M6 20h12a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2z" strokeLinecap="round" strokeLinejoin="round"/>
-                    </svg>
-                    更换封面
-                  </button>
-                  <button
-                    type="button"
-                    onClick={handleCoverDelete}
-                    className="flex w-full items-center gap-2 border-t border-gray-100 px-4 py-3 text-sm text-red-500 transition hover:bg-red-50"
-                  >
-                    <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                      <path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2M10 11v6M14 11v6" strokeLinecap="round" strokeLinejoin="round"/>
-                    </svg>
-                    删除封面
-                  </button>
-                </div>
-              </>
-            )}
-            {/* 隐藏的文件选择器 (更换封面用) */}
-            <input ref={coverFileRef} type="file" accept="image/*" className="hidden" onChange={handleCoverFile} />
-          </>
+              </button>
+              {/* 浮窗菜单 */}
+              {coverMenuOpen && (
+                <>
+                  <div className="fixed inset-0 z-30" onClick={() => setCoverMenuOpen(false)} />
+                  <div className="absolute right-3 top-12 z-40 w-36 overflow-hidden rounded-xl bg-white shadow-lg ring-1 ring-gray-200">
+                    <button
+                      type="button"
+                      onClick={() => coverFileRef.current?.click()}
+                      className="flex w-full items-center gap-2 px-3 py-2.5 text-sm text-gray-700 hover:bg-gray-50"
+                    >
+                      <svg className="h-4 w-4 text-blue-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 5v14M5 12h14" strokeLinecap="round" strokeLinejoin="round"/></svg>
+                      更换封面
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleCoverDelete}
+                      className="flex w-full items-center gap-2 border-t border-gray-100 px-3 py-2.5 text-sm text-red-500 hover:bg-red-50"
+                    >
+                      <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2m3 0v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6" strokeLinecap="round" strokeLinejoin="round"/></svg>
+                      删除封面
+                    </button>
+                  </div>
+                </>
+              )}
+            </>
+          ) : (
+            /* 无封面: 点击直接打开文件选择器, 显示"点击添加封面" */
+            <label className="absolute inset-0 flex cursor-pointer flex-col items-center justify-center gap-1 bg-black/20 text-white/90 transition hover:bg-black/30">
+              <svg className="h-7 w-7" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <path d="M12 5v14M5 12h14" strokeLinecap="round" strokeLinejoin="round"/>
+              </svg>
+              <span className="text-sm">点击添加封面</span>
+            </label>
+          )
         )}
+        {/* 隐藏的文件选择器 (供更换封面菜单调用) */}
+        <input ref={coverFileRef} type="file" accept="image/*" className="hidden" onChange={handleCoverFile} />
       </div>
 
       {/* 用户信息卡片 (上移覆盖封面) */}
       <div className="relative -mt-10 rounded-t-3xl bg-white px-4 pt-4 pb-5 shadow-sm">
         <div className="flex items-end gap-3">
           {/* 头像 (点击放大) */}
-          <div className="relative shrink-0">
-            <button onClick={() => profile.avatar && setShowAvatarLightbox(true)} className="h-16 w-16 overflow-hidden rounded-full bg-gradient-to-br from-indigo-400 to-purple-500 ring-4 ring-white flex items-center justify-center text-white text-xl font-bold">
+          <div className="flex flex-col items-center">
+            <button onClick={() => profile.avatar && setShowAvatarLightbox(true)} className="h-16 w-16 shrink-0 overflow-hidden rounded-full bg-gradient-to-br from-indigo-400 to-purple-500 ring-4 ring-white flex items-center justify-center text-white text-xl font-bold">
               {profile.avatar ? <img src={profile.avatar} alt="" className="h-full w-full object-cover" /> : (profile.nickname || 'U')[0].toUpperCase()}
             </button>
+            {/* 头像审核中: 显示橙色"头像审核中"小标签 */}
             {profile.avatarStatus === 'PENDING' && (
-              <span className="absolute left-1/2 top-full z-10 mt-1 -translate-x-1/2 whitespace-nowrap rounded-full bg-orange-50 px-2 py-0.5 text-[10px] font-medium text-orange-600 shadow-sm">头像审核中</span>
+              <span className="mt-1 rounded-full bg-orange-100 px-2 py-0.5 text-[10px] font-medium text-orange-600">头像审核中</span>
             )}
           </div>
           {/* 昵称 + 编辑按钮 */}
@@ -276,10 +329,15 @@ export default function UserProfilePage() {
             </Link>
           ) : (
             <button
-              onClick={() => router.back()}
-              className="mb-1 rounded-full border border-gray-200 px-3.5 py-1 text-sm text-gray-600 hover:bg-gray-50"
+              onClick={toggleFollow}
+              disabled={followBusy}
+              className={`mb-1 rounded-full border px-3.5 py-1 text-sm transition disabled:opacity-50 ${
+                following
+                  ? 'border-gray-200 bg-gray-50 text-gray-500 hover:bg-gray-100'
+                  : 'border-blue-500 bg-blue-500 text-white hover:bg-blue-600'
+              }`}
             >
-              返回
+              {following ? '✓ 已关注' : '+ 关注'}
             </button>
           )}
         </div>
@@ -327,6 +385,43 @@ export default function UserProfilePage() {
             </button>
           ))}
         </div>
+
+        {/* 关注 / 粉丝 统计 — 可点击跳转列表 */}
+        <div className="mt-3 flex items-center justify-center gap-3 text-xs">
+          <Link
+            href={`/users/${userId}/follows?type=following`}
+            className="flex items-center gap-1 text-gray-600 hover:text-blue-500"
+          >
+            <span className="font-bold text-gray-900">{counts.follows ?? 0}</span>
+            <span>关注</span>
+          </Link>
+          <span className="text-gray-200">|</span>
+          <Link
+            href={`/users/${userId}/follows?type=followers`}
+            className="flex items-center gap-1 text-gray-600 hover:text-blue-500"
+          >
+            <span className="font-bold text-gray-900">{counts.followers ?? 0}</span>
+            <span>粉丝</span>
+          </Link>
+        </div>
+
+        {/* 关注列表隐私开关 (仅本人可见) */}
+        {isOwn && (
+          <div className="mt-3 flex items-center justify-center gap-2 text-xs text-gray-500">
+            <span>我的关注列表：</span>
+            <button
+              onClick={toggleFollowsPublic}
+              disabled={followsPublicBusy}
+              className={`rounded-full border px-2.5 py-0.5 transition disabled:opacity-50 ${
+                profile.followsPublic
+                  ? 'border-blue-300 bg-blue-50 text-blue-600'
+                  : 'border-gray-200 bg-gray-50 text-gray-500'
+              }`}
+            >
+              {profile.followsPublic ? '公开' : '仅自己可见'}
+            </button>
+          </div>
+        )}
       </div>
 
       {/* 头像放大灯箱 */}
@@ -343,28 +438,36 @@ export default function UserProfilePage() {
           {(profile.qualifications?.filter((q: any) => q.category === 'HONOR').length ?? 0) > 0 && (
             <div>
               <h3 className="text-sm font-bold text-gray-900 mb-2">📜 荣誉证书</h3>
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-3 gap-2">
                 {profile.qualifications!.filter((q: any) => q.category === 'HONOR').map((q: any) => {
                   const displayPhoto = q.displayPhoto === 'photo2' ? q.photo2 : (q.photo || q.photo2);
                   return (
-                    <div key={q.id} className="rounded-xl border border-gray-100 overflow-hidden">
+                    <Link
+                      key={q.id}
+                      href={`/users/${userId}/qualifications/${q.id}`}
+                      className="relative block rounded-xl border border-gray-100 overflow-hidden no-underline transition hover:border-amber-200 hover:shadow-sm"
+                    >
+                      {/* 右上角: 点击查看详情 */}
+                      <span className="absolute right-2 top-2 z-10 inline-flex items-center gap-0.5 rounded-full bg-black/40 px-1.5 py-0.5 text-[10px] text-white backdrop-blur-sm">
+                        <svg className="h-3 w-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                          <circle cx="11" cy="11" r="7" />
+                          <path d="m21 21-4.3-4.3" strokeLinecap="round" />
+                        </svg>
+                        详情
+                      </span>
                       <div className="flex items-center gap-1 px-2 py-1.5 bg-amber-50">
                         <span className="text-amber-600 text-xs">🏆</span>
                         <span className="text-xs font-medium text-gray-800 truncate">{q.type}</span>
                       </div>
                       {displayPhoto ? (
-                        <button
-                          onClick={() => setLightboxCert({ type: q.type, photo: displayPhoto })}
-                          className="block w-full bg-gray-50 hover:bg-gray-100 transition-colors"
-                        >
+                        <div className="block w-full bg-gray-50 transition-colors hover:bg-gray-100">
                           {/* eslint-disable-next-line @next/next/no-img-element */}
-                          <img src={displayPhoto} alt={q.type} className="w-full max-h-48 object-contain" />
-                          <div className="py-1 text-center text-[10px] text-gray-400">点击放大</div>
-                        </button>
+                          <img src={displayPhoto} alt={q.type} className="w-full aspect-[3/4] object-cover" />
+                        </div>
                       ) : (
                         <div className="py-6 text-center text-xs text-gray-400">暂无证书图片</div>
                       )}
-                    </div>
+                    </Link>
                   );
                 })}
               </div>
@@ -374,17 +477,22 @@ export default function UserProfilePage() {
           {/* 证书/勋章 (badges) */}
           {badges.length > 0 && (
             <div>
-              <h3 className="text-sm font-bold text-gray-900 mb-2">🎖️ 证书/勋章</h3>
+              <h3 className="text-sm font-bold text-gray-900 mb-2">🎖️ 证书/徽章</h3>
               <div className="grid grid-cols-4 gap-3">
                 {badges.map(ub => (
                   <button
                     key={ub.badge.id}
-                    onClick={() => setLightboxBadge({ icon: ub.badge.icon, name: ub.badge.name, description: ub.badge.description })}
+                    onClick={() => setLightboxBadge({ imageUrl: ub.badge.imageUrl || null, icon: ub.badge.icon, name: ub.badge.name, description: ub.badge.description })}
                     className="flex flex-col items-center text-center"
                   >
-                    <div className="h-12 w-12 rounded-full bg-gradient-to-br from-yellow-400 to-amber-500 flex items-center justify-center text-2xl shadow-sm hover:scale-110 transition-transform">
-                      {ub.badge.icon || '🏅'}
-                    </div>
+                    {ub.badge.imageUrl ? (
+                      /* eslint-disable-next-line @next/next/no-img-element */
+                      <img src={ub.badge.imageUrl} alt={ub.badge.name} className="h-12 w-12 object-contain hover:scale-110 transition-transform" />
+                    ) : (
+                      <div className="flex h-12 w-12 items-center justify-center text-2xl hover:scale-110 transition-transform">
+                        {ub.badge.icon || '🏅'}
+                      </div>
+                    )}
                     <div className="mt-1 text-[11px] text-gray-600 line-clamp-1">{ub.badge.name}</div>
                   </button>
                 ))}
@@ -398,26 +506,19 @@ export default function UserProfilePage() {
       {lightboxBadge && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80" onClick={() => setLightboxBadge(null)}>
           <div className="flex flex-col items-center" onClick={e => e.stopPropagation()}>
-            <div className="h-32 w-32 rounded-full bg-gradient-to-br from-yellow-400 to-amber-500 flex items-center justify-center text-7xl shadow-2xl">
-              {lightboxBadge.icon || '🏅'}
-            </div>
+            {lightboxBadge.imageUrl ? (
+              /* eslint-disable-next-line @next/next/no-img-element */
+              <img src={lightboxBadge.imageUrl} alt={lightboxBadge.name} className="h-32 w-32 object-contain drop-shadow-lg" />
+            ) : (
+              <div className="flex h-32 w-32 items-center justify-center text-7xl">
+                {lightboxBadge.icon || '🏅'}
+              </div>
+            )}
             <div className="mt-4 text-xl font-bold text-white">{lightboxBadge.name}</div>
             {lightboxBadge.description && (
               <div className="mt-2 text-sm text-white/70 max-w-xs text-center">{lightboxBadge.description}</div>
             )}
             <button onClick={() => setLightboxBadge(null)} className="mt-6 rounded-full bg-white/20 px-5 py-2 text-sm text-white hover:bg-white/30">关闭</button>
-          </div>
-        </div>
-      )}
-
-      {/* 荣誉证书放大灯箱 */}
-      {lightboxCert && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4" onClick={() => setLightboxCert(null)}>
-          <div className="flex flex-col items-center max-w-3xl w-full" onClick={e => e.stopPropagation()}>
-            <div className="mb-3 text-lg font-bold text-white">{lightboxCert.type}</div>
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={lightboxCert.photo} alt={lightboxCert.type} className="max-h-[75vh] max-w-full rounded-lg shadow-2xl" />
-            <button onClick={() => setLightboxCert(null)} className="mt-4 rounded-full bg-white/20 px-5 py-2 text-sm text-white hover:bg-white/30">关闭</button>
           </div>
         </div>
       )}

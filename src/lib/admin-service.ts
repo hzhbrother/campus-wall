@@ -151,7 +151,7 @@ export async function listUsers(page: number, pageSize: number, role?: UserRole,
       orderBy: { createdAt: 'desc' },
       skip: (page - 1) * pageSize,
       take: pageSize,
-      select: { id: true, email: true, nickname: true, realName: true, avatar: true, role: true, roleId: true, customRole: { select: { id: true, name: true } }, status: true, grade: true, className: true, remark: true, bannedUntil: true, banReason: true, credibilityScore: true, verified: true, verifiedAt: true, verificationStatus: true, verificationPhoto: true, verificationRejectReason: true, userNumber: true, schoolId: true, organizationId: true, createdAt: true, coverImage: true, pendingAvatar: true, avatarStatus: true, avatarRejectReason: true, _count: { select: { posts: true } } },
+      select: { id: true, email: true, nickname: true, realName: true, avatar: true, coverImage: true, pendingAvatar: true, avatarStatus: true, avatarRejectReason: true, role: true, roleId: true, customRole: { select: { id: true, name: true } }, status: true, grade: true, className: true, remark: true, bannedUntil: true, banReason: true, credibilityScore: true, verified: true, verifiedAt: true, verificationStatus: true, verificationPhoto: true, verificationRejectReason: true, userNumber: true, schoolId: true, organizationId: true, createdAt: true, _count: { select: { posts: true } } },
     }),
     prisma.user.count({ where }),
   ]);
@@ -180,7 +180,12 @@ export async function updateUser(userId: string, data: {
   grade?: string;
   className?: string;
   remark?: string;
-  avatar?: string;
+  avatar?: string | null;
+  coverImage?: string | null;
+  pendingAvatar?: string | null;
+  avatarStatus?: VerificationStatus;
+  avatarReviewedAt?: Date | null;
+  avatarRejectReason?: string | null;
   status?: UserStatus;
   role?: UserRole;
   bannedUntil?: Date | null;

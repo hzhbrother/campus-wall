@@ -10,6 +10,12 @@ export interface AuthUser {
   email: string | null;
   nickname: string;
   avatar?: string | null;
+  // 待审核的新头像 (审核通过后才会替换 avatar)
+  pendingAvatar?: string | null;
+  // 头像审核状态: PENDING / APPROVED / REJECTED
+  avatarStatus?: string;
+  // 头像驳回原因
+  avatarRejectReason?: string | null;
   coverImage?: string | null;
   realName?: string | null;
   countryCode?: string | null;
@@ -40,10 +46,6 @@ export interface AuthUser {
   organization?: { id: string; name: string } | null;
   credibilityScore?: number;
   banReason?: string | null;
-  // 头像审核流程
-  pendingAvatar?: string | null;
-  avatarStatus?: string;
-  avatarRejectReason?: string | null;
   _count?: { posts: number; comments: number; likes: number; likesReceived: number };
 }
 

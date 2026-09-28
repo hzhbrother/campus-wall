@@ -9,9 +9,11 @@ import { VerificationStatus, NotificationType } from '@prisma/client';
 import { createNotification } from '@/lib/notification-service';
 
 const ReviewSchema = z.object({
-  status: z.enum(['APPROVED', 'REJECTED', 'NONE']),
+  status: z.enum(['APPROVED', 'REJECTED', 'NONE', 'PENDING']).optional(),
   rejectReason: z.string().max(200).optional().or(z.literal('')),
   displayPhoto: z.enum(['photo', 'photo2']).optional(),
+  type: z.string().max(50).optional(),        // 管理员可修改资质/荣誉名称
+  category: z.enum(['QUALIFICATION', 'HONOR']).optional(), // 管理员可调整类别
 });
 
 export async function PATCH(req: NextRequest, { params }: { params: { id: string } }) {
@@ -23,6 +25,9 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
     if (!q) return NextResponse.json({ message: '资质认证记录不存在' }, { status: 404 });
 
     const data: any = {};
+    // 管理员可修改资质/荣誉名称和类别 (不依赖审核状态)
+    if (dto.type !== undefined) data.type = dto.type.trim();
+    if (dto.category) data.category = dto.category;
     if (dto.status === 'APPROVED') {
       data.status = VerificationStatus.APPROVED;
       data.verified = true;
@@ -39,7 +44,13 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
       data.verified = false;
       data.verifiedAt = null;
       data.rejectReason = dto.rejectReason || null;
-    } else {
+    } else if (dto.status === 'PENDING') {
+      // 撤回: 已通过的认证回到审核中 (仅超级管理员可操作)
+      data.status = VerificationStatus.PENDING;
+      data.verified = false;
+      data.verifiedAt = null;
+      data.rejectReason = null;
+    } else if (dto.status === 'NONE') {
       data.status = VerificationStatus.NONE;
       data.verified = false;
       data.verifiedAt = null;
@@ -67,6 +78,13 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
         type: NotificationType.SYSTEM,
         title: `❌ ${catLabel}认证被驳回`,
         content: `您的「${q.type}」${catLabel}认证未通过, 原因: ${dto.rejectReason || '请重新提交'}`,
+      });
+    } else if (dto.status === 'PENDING') {
+      await createNotification({
+        userId: q.userId,
+        type: NotificationType.SYSTEM,
+        title: `↩️ ${catLabel}认证已撤回`,
+        content: `您的「${q.type}」${catLabel}认证已被管理员撤回, 重新进入审核队列。`,
       });
     }
 

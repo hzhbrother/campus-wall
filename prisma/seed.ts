@@ -19,7 +19,11 @@ const DEFAULT_BADGES = [
   { name: '积分富翁',   description: '累计获得 1000 积分',     icon: '💰', conditionType: 'POINTS',         threshold: 1000 },
 ] as const;
 
-const prisma = new PrismaClient();
+// 显式使用 DIRECT_URL (Supabase Session Pooler, 5432 端口), 支持 prepared statements
+// 避免 Transaction Pooler (PgBouncer, 6543) 在构建期报 "prepared statement already exists"
+const prisma = new PrismaClient({
+  datasourceUrl: process.env.DIRECT_URL || process.env.DATABASE_URL,
+});
 
 async function main() {
   const adminEmail = process.env.SEED_SUPER_ADMIN_EMAIL || 'admin@campus.edu';

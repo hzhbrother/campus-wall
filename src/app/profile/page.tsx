@@ -37,16 +37,14 @@ const Arrow = () => (
 );
 
 // ---------- 个人资料编辑 ----------
-function EditProfile({ user, onSaved, forcePhone = false }: { user: any; onSaved: () => void; forcePhone?: boolean }) {
+function EditProfile({ user, onSaved, forcePhone = false, refreshUser }: { user: any; onSaved: () => void; forcePhone?: boolean; refreshUser?: () => void }) {
   const router = useRouter();
-  const { refreshUser } = useAuth();
   const [nickname, setNickname] = useState(user?.nickname || '');
   const [realName, setRealName] = useState(user?.realName || '');
   const [countryCode, setCountryCode] = useState(user?.countryCode || '+86');
   const [phoneNumber, setPhoneNumber] = useState(user?.phoneNumber || '');
   const [email, setEmail] = useState(user?.email || '');
   const [remark, setRemark] = useState(user?.remark || '');
-  // 头像不再随统一保存提交, 选图后单独上传走审核流程
   const [avatarUploading, setAvatarUploading] = useState(false);
   const [avatarMsg, setAvatarMsg] = useState('');
   const [schoolId, setSchoolId] = useState(user?.school?.id || '');
@@ -80,22 +78,22 @@ function EditProfile({ user, onSaved, forcePhone = false }: { user: any; onSaved
     api.get<{ items: { id: string; name: string }[] }>('/api/orgs').then(d => setOrganizations(d.items || [])).catch(() => {});
   }, []);
 
-  // 头像单独上传: 选图后立即压缩并提交, 走审核流程 (不再随统一保存提交)
+  // 头像更换需审核: 压缩后提交到 pendingAvatar, 等待管理员审核通过
   const handleAvatarFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    e.target.value = '';
-    setAvatarMsg(''); setAvatarUploading(true);
+    setAvatarUploading(true);
+    setAvatarMsg('');
     try {
       const compressed = await compressImage(file, 256, 0.8);
       await api.patch('/api/users/me', { avatar: compressed });
-      // 刷新用户信息, 让后端返回的 pendingAvatar / avatarStatus 即时反映到 UI
       await refreshUser?.();
-      setAvatarMsg('头像已提交，等待审核');
+      setAvatarMsg('头像已提交, 等待审核');
     } catch (err: any) {
-      setAvatarMsg(err?.message || '头像上传失败');
+      setAvatarMsg(err.message || '头像上传失败');
     } finally {
       setAvatarUploading(false);
+      e.target.value = '';
     }
   };
 
@@ -155,44 +153,45 @@ function EditProfile({ user, onSaved, forcePhone = false }: { user: any; onSaved
 
   const country = getCountryByCode(countryCode);
 
+  // 头像展示: 优先显示待审核的新头像 (pendingAvatar), 否则显示已通过的头像
+  const displayAvatar = user?.pendingAvatar || user?.avatar || '';
+  const avatarStatus = user?.avatarStatus;
+  const isAvatarPending = avatarStatus === 'PENDING';
+  const isAvatarRejected = avatarStatus === 'REJECTED';
+
   return (
     <div>
-      <div className="flex items-start justify-between gap-3 border-b border-gray-100 py-4">
-        <span className="pt-5 text-[15px] text-gray-800">头像</span>
-        <div className="flex flex-col items-end gap-1">
+      <div className="py-4 border-b border-gray-100">
+        <div className="flex items-center justify-between">
+          <span className="text-[15px] text-gray-800">头像</span>
           <div className="relative">
             <div className="h-14 w-14 overflow-hidden rounded-full bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center text-white text-xl font-bold">
-              {(user?.pendingAvatar || user?.avatar) ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img src={(user?.pendingAvatar || user?.avatar) as string} alt="" className="h-full w-full object-cover" />
-              ) : (nickname[0] || 'U').toUpperCase()}
+              {displayAvatar ? <img src={displayAvatar} alt="" className="h-full w-full object-cover" /> : (nickname[0] || 'U').toUpperCase()}
             </div>
-            {user?.avatarStatus === 'PENDING' && (
-              <span className="absolute -right-0.5 top-0.5 h-3 w-3 rounded-full bg-orange-500 ring-2 ring-white" title="审核中" />
+            {/* 头像审核状态: PENDING 橙色小圆点 + "审核中"; REJECTED 红色 "!" */}
+            {isAvatarPending && (
+              <span className="absolute -top-1 -right-1 flex items-center gap-1 rounded-full bg-orange-500 px-1.5 py-0.5 text-[10px] font-medium text-white shadow">
+                <span className="h-1.5 w-1.5 rounded-full bg-white" />
+                审核中
+              </span>
             )}
-            {user?.avatarStatus === 'REJECTED' && (
-              <span className="absolute -right-1 -top-1 flex h-5 w-5 items-center justify-center rounded-full bg-red-500 text-[11px] font-bold text-white ring-2 ring-white" title="头像被驳回">!</span>
+            {isAvatarRejected && (
+              <span className="absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-red-500 text-[11px] font-bold text-white shadow">!</span>
             )}
-            {avatarUploading && (
-              <span className="absolute inset-0 flex items-center justify-center rounded-full bg-black/40 text-[9px] text-white">…</span>
-            )}
-            <label className={`absolute -bottom-1 -right-1 cursor-pointer rounded-full bg-blue-500 p-1 text-white shadow ${avatarUploading ? 'pointer-events-none opacity-60' : ''}`}>
+            <label className={`absolute -bottom-1 -right-1 cursor-pointer rounded-full bg-blue-500 p-1 text-white shadow ${avatarUploading ? 'opacity-50' : ''}`}>
               <svg className="h-3 w-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M12 20h9M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z" strokeLinecap="round" strokeLinejoin="round"/></svg>
               <input type="file" accept="image/*" className="hidden" onChange={handleAvatarFile} disabled={avatarUploading} />
             </label>
           </div>
-          {user?.avatarStatus === 'PENDING' && (
-            <span className="text-[11px] text-orange-500">审核中</span>
-          )}
-          {user?.avatarStatus === 'REJECTED' && user?.avatarRejectReason && (
-            <span className="max-w-[11rem] text-right text-[11px] leading-tight text-red-500">{user.avatarRejectReason}</span>
-          )}
-          {avatarMsg && (
-            <span className={`text-[11px] ${avatarMsg.includes('失败') ? 'text-red-500' : 'text-green-600'}`}>{avatarMsg}</span>
-          )}
         </div>
+        {/* 头像审核说明 / 状态提示 */}
+        <div className="mt-2 text-xs text-gray-400">头像更换需审核, 1-2 个工作日内完成, 上学期间 5-7 个工作日</div>
+        {avatarMsg && <p className={`mt-1 text-xs ${avatarMsg.includes('已提交') ? 'text-green-600' : 'text-red-500'}`}>{avatarMsg}</p>}
+        {avatarUploading && <p className="mt-1 text-xs text-gray-400">头像上传中…</p>}
+        {isAvatarRejected && user?.avatarRejectReason && (
+          <p className="mt-1 text-xs text-red-500">上次驳回原因: {user.avatarRejectReason}</p>
+        )}
       </div>
-      <p className="pb-3 text-[11px] leading-relaxed text-gray-400">头像更换需审核，1-2 个工作日内完成，上学期间 5-7 个工作日</p>
 
       {forcePhone && (
         <p className="mt-3 text-xs text-orange-500">为保障账号安全, 请先完善真实姓名和邮箱 (邮箱为必填)</p>
@@ -327,6 +326,7 @@ function ProfilePageInner() {
   const [adminTab, setAdminTab] = useState<AdminTab>('overview');
   const [showPwdModal, setShowPwdModal] = useState(false);
   const [showNotifModal, setShowNotifModal] = useState(false);
+  const [showPrivacyModal, setShowPrivacyModal] = useState(false);
   const [showVerifyModal, setShowVerifyModal] = useState(false);
   const [showJoinOrg, setShowJoinOrg] = useState(false);
   const [joinOrgDismissed, setJoinOrgDismissed] = useState(false);
@@ -382,7 +382,7 @@ function ProfilePageInner() {
 
   if (loading) return <div className="min-h-screen flex items-center justify-center text-gray-400">加载中…</div>;
 
-  const counts = (user as any)?._count || { posts: 0, comments: 0, likes: 0, favorites: 0 };
+  const counts = (user as any)?._count || { posts: 0, comments: 0, likes: 0, favorites: 0, likesReceived: 0 };
 
   // 判断是否为管理后台标签
   const ADMIN_TABS: AdminTab[] = ['overview', 'posts', 'moderation', 'comments', 'users', 'verification', 'qualifications', 'template', 'appeals', 'notifications', 'settings', 'email', 'agreement', 'roles', 'badges', 'schools', 'orgs'];
@@ -403,7 +403,7 @@ function ProfilePageInner() {
       { key: 'notifications', label: '通知发布', perm: 'notification.send' },
       { key: 'schools', label: '学校管理', perm: 'school.manage' },
       { key: 'orgs', label: '团体管理', perm: 'org.manage' },
-      { key: 'badges', label: '勋章管理', perm: 'badge.manage' },
+      { key: 'badges', label: '徽章管理', perm: 'badge.manage' },
       { key: 'template', label: '识别模板', perm: 'template.manage' },
       // 站点配置类 + 角色管理 仅超级管理员可见 (role.manage / settings.* 为超管专属权限)
       ...(isSuper ? [
@@ -452,7 +452,7 @@ function ProfilePageInner() {
           </button>
         )}
         <div className="rounded-2xl bg-white p-5 shadow-sm">
-          <EditProfile user={user} forcePhone={forcePhone} onSaved={() => { refreshUser?.(); if (!forcePhone) setView('home'); else router.push('/'); }} />
+          <EditProfile user={user} forcePhone={forcePhone} refreshUser={refreshUser} onSaved={() => { refreshUser?.(); if (!forcePhone) setView('home'); else router.push('/'); }} />
         </div>
       </div>
     );
@@ -460,9 +460,10 @@ function ProfilePageInner() {
 
   // ---- 首页视图 ----
   const menuItems = [
+    { key: 'homepage', label: '我的主页', icon: '🏠' },
     { key: 'verification', label: '认证', icon: '✅' },
     { key: 'violations', label: '违规与信用', icon: '📋' },
-    { key: 'badges', label: '证书/勋章', icon: '🎖️' },
+    { key: 'badges', label: '证书/徽章', icon: '🎖️' },
     { key: 'checkin', label: '签到积分', icon: '🪙' },
     { key: 'security', label: '账户与安全', icon: '🔒' },
     ...(isAdmin ? [{ key: 'admin', label: '管理后台', icon: '⚙️' }] : []),
@@ -471,6 +472,7 @@ function ProfilePageInner() {
   ];
 
   const handleMenu = (key: string) => {
+    if (key === 'homepage' && user) { router.push(`/users/${user.id}`); return; }
     if (key === 'admin') { setView('overview'); return; }
     if (key === 'verification') { setShowVerifyModal(true); return; }
     if (key === 'violations') { setView('violations'); return; }
@@ -517,8 +519,9 @@ function ProfilePageInner() {
     const securityItems = [
       { key: 'password', label: '修改密码', icon: '🔑', onClick: () => setShowPwdModal(true) },
       { key: 'notif', label: '通知设置', icon: '🔔', onClick: () => setShowNotifModal(true) },
+      { key: 'privacy', label: '隐私设置', icon: '⚙️', onClick: () => setShowPrivacyModal(true) },
       { key: 'agreement', label: '用户协议', icon: '📄', onClick: () => router.push('/agreement') },
-      { key: 'privacy', label: '隐私政策', icon: '🛡️', onClick: () => router.push('/privacy') },
+      { key: 'privacyPolicy', label: '隐私政策', icon: '🛡️', onClick: () => router.push('/privacy') },
     ];
     return (
       <div className="space-y-4">
@@ -541,6 +544,9 @@ function ProfilePageInner() {
 
         {/* 通知设置弹窗 */}
         {showNotifModal && <NotificationSettingsModal onClose={() => setShowNotifModal(false)} />}
+
+        {/* 隐私设置弹窗 */}
+        {showPrivacyModal && <PrivacySettingsModal onClose={() => setShowPrivacyModal(false)} onSaved={() => refreshUser?.()} />}
       </div>
     );
   }
@@ -640,16 +646,20 @@ function ProfilePageInner() {
       <div className="-mt-8 rounded-2xl bg-white p-4 shadow-sm">
         <div className="grid grid-cols-4 gap-2">
           {[
-            { label: '帖子', value: counts.posts, color: 'text-purple-500' },
-            { label: '获赞', value: counts.likesReceived || 0, color: 'text-red-500' },
-            { label: '收藏', value: counts.favorites || 0, color: 'text-amber-500' },
-            { label: '评论', value: counts.comments, color: 'text-blue-500' },
-          ].map(s => (
-            <div key={s.label} className="flex flex-col items-center py-2">
-              <div className={`text-xl font-bold ${s.color}`}>{s.value}</div>
-              <div className="text-xs text-gray-500 mt-0.5">{s.label}</div>
-            </div>
-          ))}
+            { label: '帖子', value: counts.posts ?? 0, color: 'text-purple-500' },
+            { label: '获赞', value: counts.likesReceived ?? 0, color: 'text-red-500' },
+            { label: '收藏', value: counts.favorites ?? 0, color: 'text-amber-500' },
+            { label: '评论', value: counts.comments ?? 0, color: 'text-blue-500' },
+          ].map(s => {
+            // 值为 0 时用淡灰色, 避免出现"突兀的彩色 0"
+            const dim = (s.value as number) === 0;
+            return (
+              <div key={s.label} className="flex flex-col items-center py-2">
+                <div className={`text-xl font-bold ${dim ? 'text-gray-300' : s.color}`}>{s.value}</div>
+                <div className="text-xs text-gray-500 mt-0.5">{s.label}</div>
+              </div>
+            );
+          })}
         </div>
       </div>
 
@@ -688,6 +698,9 @@ function ProfilePageInner() {
 
       {/* 通知设置弹窗 */}
       {showNotifModal && <NotificationSettingsModal onClose={() => setShowNotifModal(false)} />}
+
+      {/* 隐私设置弹窗 */}
+      {showPrivacyModal && <PrivacySettingsModal onClose={() => setShowPrivacyModal(false)} onSaved={() => refreshUser?.()} />}
 
       {/* 加入学校/团体引导弹窗 */}
       {showJoinOrg && (
@@ -809,6 +822,85 @@ function NotificationSettingsModal({ onClose }: { onClose: () => void }) {
           </div>
         )}
         <button onClick={save} disabled={saving} className="mt-4 w-full rounded-lg bg-blue-600 py-2.5 text-sm font-medium text-white disabled:opacity-50">{saving ? '保存中…' : '保存'}</button>
+      </div>
+    </div>
+  );
+}
+
+// ---------- 隐私设置弹窗 ----------
+function PrivacySettingsModal({ onClose, onSaved }: { onClose: () => void; onSaved?: () => void }) {
+  const [settings, setSettings] = useState<{ followsPublic: boolean; fansPublic: boolean; badgesPublic: boolean; honorsPublic: boolean; favoritesPublic: boolean; likesPublic: boolean } | null>(null);
+  const [saving, setSaving] = useState(false);
+  const [msg, setMsg] = useState('');
+
+  // 加载时读取当前隐私设置
+  useEffect(() => {
+    api.get('/api/users/me')
+      .then((u: any) => {
+        setSettings({
+          followsPublic: !!u.followsPublic,
+          fansPublic: !!u.fansPublic,
+          badgesPublic: !!u.badgesPublic,
+          honorsPublic: !!u.honorsPublic,
+          favoritesPublic: !!u.favoritesPublic,
+          likesPublic: !!u.likesPublic,
+        });
+      })
+      .catch(console.error);
+  }, []);
+
+  const toggle = (k: keyof NonNullable<typeof settings>) => {
+    if (!settings) return;
+    setSettings({ ...settings, [k]: !settings[k] });
+  };
+
+  const save = async () => {
+    if (!settings) return;
+    setSaving(true); setMsg('');
+    try {
+      await api.patch('/api/users/me', settings);
+      setMsg('保存成功');
+      onSaved?.();
+      // 800ms 后关闭弹窗
+      setTimeout(() => onClose(), 800);
+    } catch (e: any) {
+      setMsg(e.message || '保存失败');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const items: { key: keyof NonNullable<typeof settings>; label: string; desc: string }[] = [
+    { key: 'followsPublic', label: '我的关注列表', desc: '别人能否看到我关注了谁' },
+    { key: 'fansPublic', label: '我的粉丝列表', desc: '别人能否看到我的粉丝' },
+    { key: 'badgesPublic', label: '我的勋章展示', desc: '主页是否对外展示我的勋章' },
+    { key: 'honorsPublic', label: '荣誉证书展示', desc: '主页是否对外展示我的证书' },
+    { key: 'favoritesPublic', label: '我的收藏数', desc: '主页是否显示收藏总数' },
+    { key: 'likesPublic', label: '我的获赞数', desc: '主页是否显示获赞总数' },
+  ];
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" onClick={onClose}>
+      <div className="w-full max-w-sm rounded-2xl bg-white p-5" onClick={e => e.stopPropagation()}>
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="text-lg font-bold text-gray-900">隐私设置</h3>
+          <button onClick={onClose} className="text-gray-400">✕</button>
+        </div>
+        {msg && <p className={`mb-3 text-sm ${msg.includes('成功') ? 'text-green-600' : 'text-red-500'}`}>{msg}</p>}
+        {!settings ? <p className="py-4 text-center text-sm text-gray-400">加载中…</p> : (
+          <div className="space-y-2">
+            {items.map(it => (
+              <label key={it.key} className="flex items-center justify-between rounded-lg border border-gray-100 p-3">
+                <div>
+                  <div className="text-sm font-medium text-gray-900">{it.label}</div>
+                  <div className="text-xs text-gray-400">{it.desc}</div>
+                </div>
+                <input type="checkbox" checked={settings[it.key]} onChange={() => toggle(it.key)} className="h-5 w-5" />
+              </label>
+            ))}
+          </div>
+        )}
+        <button onClick={save} disabled={saving || !settings} className="mt-4 w-full rounded-lg bg-blue-600 py-2.5 text-sm font-medium text-white disabled:opacity-50">{saving ? '保存中…' : '保存'}</button>
       </div>
     </div>
   );
@@ -1360,38 +1452,22 @@ function VerificationModal({ user, onClose, onVerified, onSubmitted }: { user: a
                   </div>
                 ) : (
                   <div className="mb-3">
-                    <div className="grid grid-cols-2 gap-2">
-                      <label className="flex flex-col items-center justify-center rounded-xl border-2 border-dashed border-gray-300 py-6 cursor-pointer hover:border-blue-400 hover:bg-blue-50/50 transition">
-                        <svg className="h-8 w-8 text-gray-400 mb-1" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
-                          <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z" strokeLinecap="round" strokeLinejoin="round"/>
-                          <circle cx="12" cy="13" r="4"/>
-                        </svg>
-                        <span className="text-xs text-blue-600 font-medium">拍照</span>
-                        <input
-                          type="file"
-                          accept="image/*"
-                          capture="environment"
-                          className="hidden"
-                          onChange={onCapture}
-                        />
-                      </label>
-                      <label className="flex flex-col items-center justify-center rounded-xl border-2 border-dashed border-gray-300 py-6 cursor-pointer hover:border-blue-400 hover:bg-blue-50/50 transition">
-                        <svg className="h-8 w-8 text-gray-400 mb-1" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
-                          <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" strokeLinecap="round" strokeLinejoin="round"/>
-                          <polyline points="17 8 12 3 7 8" strokeLinecap="round" strokeLinejoin="round"/>
-                          <line x1="12" y1="3" x2="12" y2="15" strokeLinecap="round" strokeLinejoin="round"/>
-                        </svg>
-                        <span className="text-xs text-blue-600 font-medium">从相册上传</span>
-                        <input
-                          ref={inputRef}
-                          type="file"
-                          accept="image/*"
-                          className="hidden"
-                          onChange={onCapture}
-                        />
-                      </label>
-                    </div>
-                    <p className="mt-2 text-center text-xs text-gray-400">支持拍照或从相册选择, 上传后将自动压缩</p>
+                    {/* 身份认证 (人脸/卡面): 仅支持现场拍照, 不允许从相册选择 */}
+                    <label className="flex flex-col items-center justify-center rounded-xl border-2 border-dashed border-gray-300 py-8 cursor-pointer hover:border-blue-400 hover:bg-blue-50/50 transition">
+                      <svg className="h-10 w-10 text-gray-400 mb-1.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+                        <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z" strokeLinecap="round" strokeLinejoin="round"/>
+                        <circle cx="12" cy="13" r="4"/>
+                      </svg>
+                      <span className="text-sm text-blue-600 font-medium">{isFace ? '拍摄人脸照片' : '拍摄卡面照片'}</span>
+                      <input
+                        type="file"
+                        accept="image/*"
+                        capture={isFace ? 'user' : 'environment'}
+                        className="hidden"
+                        onChange={onCapture}
+                      />
+                    </label>
+                    <p className="mt-2 text-center text-xs text-gray-400">身份认证仅支持现场拍照, 不支持从相册选择</p>
                   </div>
                 )}
 

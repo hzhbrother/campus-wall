@@ -1,9 +1,9 @@
 'use client';
 
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
 import { api } from '@/lib/api';
-import { compressImage } from '@/lib/image-compress';
 import { PERMISSIONS, PERMISSIONS_BY_GROUP, SUPER_ADMIN_ONLY_PERMISSIONS } from '@/lib/permissions';
+import { compressImage } from '@/lib/image-compress';
 import TemplateManager from './TemplateManager';
 import { BadgesManager } from './BadgesManager';
 
@@ -27,6 +27,24 @@ function StatusBadge({ status }: { status: string }) {
   };
   const label: Record<string, string> = { APPROVED: '已通过', PENDING: '待审核', REJECTED: '已拒绝' };
   return <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${map[status] || 'bg-gray-100 text-gray-600'}`}>{label[status] || status}</span>;
+}
+
+// 图片真实性检测结果: 无异常不显示; 有异常显示"AI检测结果：原因"
+function AiCheckBadge({ check }: { check: any }) {
+  if (!check) return null;
+  const { isAiGenerated, confidence, note } = check;
+  // 无异常 → 完全不显示
+  if (!isAiGenerated) return null;
+  const color =
+    confidence === 'high' ? 'bg-red-100 text-red-700'
+      : confidence === 'medium' ? 'bg-orange-100 text-orange-700'
+      : 'bg-amber-100 text-amber-700';
+  // 格式: AI检测结果：[具体原因]
+  return (
+    <div className={`mt-2 inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-medium ${color}`}>
+      <span>AI检测结果：{note || '图片存疑, 请重点核对'}</span>
+    </div>
+  );
 }
 
 function fmtDate(iso: string) {
@@ -443,6 +461,7 @@ function UsersTab({ isSuper }: { isSuper: boolean }) {
                   <button onClick={() => api.del(`/api/admin/users/${u.id}/ban`).then(() => load()).catch(e => setErr(e.message))} className="rounded-lg bg-green-50 px-3 py-1.5 text-xs text-green-600 hover:bg-green-100">解封</button>
                 )}
                 <button onClick={() => setBanUser(u)} className="rounded-lg bg-orange-50 px-3 py-1.5 text-xs text-orange-600 hover:bg-orange-100">封禁</button>
+                <a href={`/users/${u.id}`} target="_blank" rel="noreferrer" className="rounded-lg bg-slate-50 px-3 py-1.5 text-xs text-slate-600 hover:bg-slate-100">查看主页</a>
                 {isSuper && <button onClick={() => setDeleteTarget(u)} className="rounded-lg bg-red-50 px-3 py-1.5 text-xs text-red-600 hover:bg-red-100">删除</button>}
                 <button onClick={() => setEditUser(u)} className="rounded-lg bg-blue-50 px-4 py-1.5 text-xs text-blue-600 hover:bg-blue-100">编辑</button>
               </div>
@@ -483,17 +502,23 @@ function EditUserModal({ user, onClose, onSaved, isSuper }: { user: any; onClose
   const [verified, setVerified] = useState(!!user.verified);
   const [rejectReason, setRejectReason] = useState('');
   const [avatar, setAvatar] = useState(user.avatar || '');
+  // 封面编辑
+  const [coverImage, setCoverImage] = useState(user.coverImage || '');
+  const [coverUrl, setCoverUrl] = useState(user.coverImage || '');
+  const [coverUploading, setCoverUploading] = useState(false);
+  const coverFileRef = useRef<HTMLInputElement>(null);
+  // 头像审核驳回原因
+  const [avatarRejectReason, setAvatarRejectReason] = useState('');
+  const [showAvatarReject, setShowAvatarReject] = useState(false);
+  const [avatarAuditing, setAvatarAuditing] = useState(false);
+  const [newPassword, setNewPassword] = useState('');          // 管理员重置密码
   const [saving, setSaving] = useState(false);
   const [err, setErr] = useState('');
-  // 头像审核 + 封面编辑 (管理员)
-  const [coverImage, setCoverImage] = useState(user.coverImage || '');
-  const [coverUploading, setCoverUploading] = useState(false);
-  const [avatarReviewing, setAvatarReviewing] = useState(false);
-  const [showAvatarReject, setShowAvatarReject] = useState(false);
-  const [avatarRejReason, setAvatarRejReason] = useState('');
 
   const vStatus = user.verificationStatus || 'NONE';
   const isPending = vStatus === 'PENDING';
+  // 头像是否待审核
+  const avatarPending = user.avatarStatus === 'PENDING' && !!user.pendingAvatar;
 
   useEffect(() => {
     api.get<{ roles: { id: string; name: string; isSystem: boolean }[] }>('/api/admin/roles')
@@ -501,59 +526,64 @@ function EditUserModal({ user, onClose, onSaved, isSuper }: { user: any; onClose
       .catch(() => {});
   }, []);
 
-  const handleAvatarFile = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleAvatarFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    // 压缩/缩放头像, 避免手机拍照产生的超大 base64 拖慢保存
-    const img = new Image();
-    img.onload = () => {
-      const max = 256;
-      let { width, height } = img;
-      if (width > height && width > max) { height = Math.round(height * max / width); width = max; }
-      else if (height > max) { width = Math.round(width * max / height); height = max; }
-      const canvas = document.createElement('canvas');
-      canvas.width = width; canvas.height = height;
-      const ctx = canvas.getContext('2d');
-      if (!ctx) return;
-      ctx.drawImage(img, 0, 0, width, height);
-      setAvatar(canvas.toDataURL('image/jpeg', 0.8));
-      URL.revokeObjectURL(img.src);
-    };
-    img.src = URL.createObjectURL(file);
-  };
-
-  // 头像人工审核: 通过 / 驳回 (PATCH 管理员接口, 通过则把待审核头像转正)
-  const reviewAvatar = async (action: 'APPROVED' | 'REJECTED') => {
-    setAvatarReviewing(true); setErr('');
     try {
-      const payload: any = { avatarStatus: action };
-      if (action === 'REJECTED') payload.avatarRejectReason = avatarRejReason.trim() || '头像不合规';
-      await api.patch(`/api/admin/users/${user.id}`, payload);
-      onSaved();
-      onClose();
-    } catch (e: any) { setErr(e.message); } finally { setAvatarReviewing(false); }
+      // 压缩到 256px, 避免大图拖慢保存
+      const dataUrl = await compressImage(file, 256, 0.8);
+      setAvatar(dataUrl);
+    } catch { /* 忽略压缩失败 */ }
+    e.target.value = '';
   };
 
-  // 管理员改封面: 上传压缩后直接生效 (不走审核)
+  // 封面: 上传图片 (压缩到 1280px)
   const handleCoverFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    e.target.value = '';
-    setCoverUploading(true); setErr('');
+    setCoverUploading(true);
     try {
       const dataUrl = await compressImage(file, 1280, 0.75);
-      await api.patch(`/api/admin/users/${user.id}`, { coverImage: dataUrl });
       setCoverImage(dataUrl);
-    } catch (e: any) { setErr(e.message); } finally { setCoverUploading(false); }
+      setCoverUrl(dataUrl);
+    } finally {
+      setCoverUploading(false);
+      e.target.value = '';
+    }
   };
 
-  // 管理员改封面: 填写 URL 直接生效 (不走审核)
-  const saveCover = async (val: string) => {
-    setCoverUploading(true); setErr('');
+  // 封面: 通过 URL 设置
+  const handleCoverUrlSave = () => {
+    setCoverImage(coverUrl.trim());
+  };
+
+  // 封面: 移除
+  const handleCoverRemove = () => {
+    setCoverImage('');
+    setCoverUrl('');
+  };
+
+  // 头像审核: 通过 (将 pendingAvatar 应用为正式头像)
+  const handleAvatarApprove = async () => {
+    if (!confirm('确认通过该用户的头像审核?')) return;
+    setAvatarAuditing(true); setErr('');
     try {
-      await api.patch(`/api/admin/users/${user.id}`, { coverImage: val || null });
-      setCoverImage(val);
-    } catch (e: any) { setErr(e.message); } finally { setCoverUploading(false); }
+      await api.patch(`/api/admin/users/${user.id}`, { avatarStatus: 'APPROVED' });
+      onSaved();
+      onClose();
+    } catch (e: any) { setErr(e.message); } finally { setAvatarAuditing(false); }
+  };
+
+  // 头像审核: 驳回
+  const handleAvatarReject = async () => {
+    const reason = avatarRejectReason.trim();
+    if (!reason) { setErr('请填写驳回原因'); return; }
+    setAvatarAuditing(true); setErr('');
+    try {
+      await api.patch(`/api/admin/users/${user.id}`, { avatarStatus: 'REJECTED', avatarRejectReason: reason });
+      onSaved();
+      onClose();
+    } catch (e: any) { setErr(e.message); } finally { setAvatarAuditing(false); }
   };
 
   const save = async () => {
@@ -583,6 +613,13 @@ function EditUserModal({ user, onClose, onSaved, isSuper }: { user: any; onClose
         // 非待审核状态下的手动操作 (跳过照片审核)
         payload.verificationStatus = verified ? 'APPROVED' : 'NONE';
       }
+      // 密码重置: 非空时一并提交 (后端做 hash + 长度校验)
+      if (newPassword.trim()) {
+        if (newPassword.length < 6) { setErr('密码至少 6 位'); setSaving(false); return; }
+        payload.password = newPassword;
+      }
+      // 封面: 有变更时提交 (空字符串表示移除)
+      if (coverImage !== (user.coverImage || '')) payload.coverImage = coverImage || null;
       await api.patch(`/api/admin/users/${user.id}`, payload);
       onSaved();
       onClose();
@@ -632,68 +669,61 @@ function EditUserModal({ user, onClose, onSaved, isSuper }: { user: any; onClose
             </div>
           </div>
 
-          {/* 待审核头像: 旧 vs 新对比 + 通过/驳回 */}
-          {user.avatarStatus === 'PENDING' && user.pendingAvatar && (
+          {/* 待审核头像: 旧头像 vs 新头像对比 + 通过/驳回 */}
+          {avatarPending && (
             <div className="rounded-lg border border-orange-200 bg-orange-50/50 p-3">
-              <div className="mb-2 text-sm font-medium text-orange-700">🛡 待审核头像</div>
-              <div className="flex items-center justify-center gap-4">
-                <div className="text-center">
-                  <div className="mb-1 text-[10px] text-gray-400">旧头像</div>
-                  <div className="h-14 w-14 overflow-hidden rounded-full bg-gradient-to-br from-indigo-400 to-purple-500 flex items-center justify-center text-white text-xl font-bold">
-                    {user.avatar ? <img src={user.avatar} alt="" className="h-full w-full object-cover" /> : (user.nickname || 'U')[0]}
+              <div className="mb-2 flex items-center justify-between">
+                <span className="text-sm font-medium text-orange-700">🟠 有新头像待审核</span>
+                <span className="rounded-full bg-orange-100 px-2 py-0.5 text-[11px] text-orange-600">待审核</span>
+              </div>
+              <div className="flex items-center justify-around gap-2">
+                {/* 旧头像 */}
+                <div className="flex flex-col items-center">
+                  <div className="h-16 w-16 overflow-hidden rounded-full bg-gray-200">
+                    {user.avatar ? <img src={user.avatar} alt="旧头像" className="h-full w-full object-cover" /> : <div className="flex h-full w-full items-center justify-center text-gray-400">无</div>}
                   </div>
+                  <span className="mt-1 text-[11px] text-gray-500">当前头像</span>
                 </div>
-                <svg className="h-5 w-5 text-gray-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="m15 18-6-6 6-6" strokeLinecap="round" strokeLinejoin="round"/></svg>
-                <div className="text-center">
-                  <div className="mb-1 text-[10px] text-gray-400">新头像</div>
-                  <div className="h-14 w-14 overflow-hidden rounded-full ring-2 ring-orange-400">
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img src={user.pendingAvatar} alt="待审核" className="h-full w-full object-cover" />
+                <svg className="h-5 w-5 text-gray-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M5 12h14M13 6l6 6-6 6" strokeLinecap="round" strokeLinejoin="round"/></svg>
+                {/* 新头像 (待审核) */}
+                <div className="flex flex-col items-center">
+                  <div className="h-16 w-16 overflow-hidden rounded-full ring-2 ring-orange-400">
+                    <img src={user.pendingAvatar} alt="新头像" className="h-full w-full object-cover" />
                   </div>
+                  <span className="mt-1 text-[11px] text-orange-600">新头像</span>
                 </div>
               </div>
-              {!showAvatarReject ? (
-                <div className="mt-3 flex gap-2">
-                  <button type="button" onClick={() => reviewAvatar('APPROVED')} disabled={avatarReviewing} className="flex-1 rounded-lg bg-green-500 py-2 text-sm font-medium text-white hover:bg-green-600 disabled:opacity-50">✅ 通过</button>
-                  <button type="button" onClick={() => setShowAvatarReject(true)} disabled={avatarReviewing} className="flex-1 rounded-lg bg-red-50 py-2 text-sm font-medium text-red-600 hover:bg-red-100 disabled:opacity-50">❌ 驳回</button>
-                </div>
-              ) : (
+              <div className="mt-3 flex gap-2">
+                <button onClick={handleAvatarApprove} disabled={avatarAuditing} className="flex-1 rounded-lg bg-green-500 py-2 text-sm font-medium text-white hover:bg-green-600 disabled:opacity-50">
+                  ✅ 通过
+                </button>
+                <button onClick={() => setShowAvatarReject(true)} disabled={avatarAuditing} className="flex-1 rounded-lg bg-red-500 py-2 text-sm font-medium text-white hover:bg-red-600 disabled:opacity-50">
+                  ❌ 驳回
+                </button>
+              </div>
+              {/* 驳回原因输入 */}
+              {showAvatarReject && (
                 <div className="mt-3 space-y-2">
-                  <label className="block text-xs font-medium text-gray-500">驳回原因 (将通知用户)</label>
-                  <input value={avatarRejReason} onChange={e => setAvatarRejReason(e.target.value)} className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm" placeholder="如: 头像不合规或不清晰" />
+                  <input value={avatarRejectReason} onChange={e => setAvatarRejectReason(e.target.value)} className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm" placeholder="请填写驳回原因 (将通知用户)" />
                   <div className="flex gap-2">
-                    <button type="button" onClick={() => reviewAvatar('REJECTED')} disabled={avatarReviewing} className="flex-1 rounded-lg bg-red-500 py-2 text-sm font-medium text-white hover:bg-red-600 disabled:opacity-50">{avatarReviewing ? '处理中…' : '确认驳回'}</button>
-                    <button type="button" onClick={() => { setShowAvatarReject(false); setAvatarRejReason(''); }} className="rounded-lg bg-gray-100 px-4 py-2 text-sm text-gray-600 hover:bg-gray-200">取消</button>
+                    <button onClick={handleAvatarReject} disabled={avatarAuditing} className="flex-1 rounded-lg bg-red-500 py-1.5 text-xs font-medium text-white disabled:opacity-50">
+                      {avatarAuditing ? '处理中…' : '确认驳回'}
+                    </button>
+                    <button onClick={() => { setShowAvatarReject(false); setAvatarRejectReason(''); }} className="flex-1 rounded-lg bg-gray-100 py-1.5 text-xs text-gray-600">
+                      取消
+                    </button>
                   </div>
                 </div>
               )}
             </div>
           )}
 
-          {/* 封面图 (管理员直接修改, 不走审核) */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">封面图</label>
-            {coverImage ? (
-              <div className="relative mb-2 h-20 w-full overflow-hidden rounded-lg bg-gray-100">
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={coverImage} alt="" className="h-full w-full object-cover" />
-                <button type="button" onClick={() => saveCover('')} disabled={coverUploading} className="absolute right-1 top-1 rounded-full bg-black/50 p-1 text-white hover:bg-black/70 disabled:opacity-50" title="移除封面">
-                  <svg className="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M18 6 6 18M6 6l12 12" strokeLinecap="round" strokeLinejoin="round"/></svg>
-                </button>
-              </div>
-            ) : (
-              <div className="mb-2 flex h-20 w-full items-center justify-center rounded-lg bg-gray-100 text-xs text-gray-400">暂无封面</div>
-            )}
-            <div className="flex gap-2">
-              <input value={coverImage} onChange={e => setCoverImage(e.target.value)} placeholder="粘贴封面图片 URL" className="flex-1 rounded-lg border border-gray-300 px-3 py-2 text-sm" />
-              <button type="button" onClick={() => saveCover(coverImage)} disabled={coverUploading} className="shrink-0 rounded-lg bg-blue-50 px-3 py-2 text-xs text-blue-600 hover:bg-blue-100 disabled:opacity-50">{coverUploading ? '…' : '应用'}</button>
-              <label className={`shrink-0 cursor-pointer rounded-lg bg-purple-50 px-3 py-2 text-xs text-purple-600 hover:bg-purple-100 ${coverUploading ? 'pointer-events-none opacity-50' : ''}`}>
-                上传
-                <input type="file" accept="image/*" className="hidden" onChange={handleCoverFile} disabled={coverUploading} />
-              </label>
+          {/* 上次头像驳回原因 */}
+          {user.avatarStatus === 'REJECTED' && user.avatarRejectReason && (
+            <div className="rounded-lg bg-red-50 px-3 py-2 text-xs text-red-600">
+              上次头像驳回原因: {user.avatarRejectReason}
             </div>
-            <p className="mt-1 text-xs text-gray-400">封面无需审核, 保存后立即生效</p>
-          </div>
+          )}
 
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">账号名</label>
@@ -810,6 +840,54 @@ function EditUserModal({ user, onClose, onSaved, isSuper }: { user: any; onClose
           {/* 资质/荣誉认证已移至独立的「资质/荣誉审核」标签页 */}
           <div className="rounded-lg border border-purple-100 bg-purple-50/50 px-3 py-2.5">
             <div className="text-xs text-purple-600">🏅 资质/荣誉认证请前往「资质/荣誉审核」标签页管理</div>
+          </div>
+
+          {/* 密码重置 (留空则不修改) */}
+          <div className="rounded-lg border border-amber-200 bg-amber-50/50 px-3 py-2.5">
+            <label className="block text-sm font-medium text-gray-700 mb-1">🔑 重置密码</label>
+            <input
+              type="text"
+              value={newPassword}
+              onChange={e => setNewPassword(e.target.value)}
+              className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/40"
+              placeholder="留空不修改; 填写后保存即重置 (至少 6 位)"
+              autoComplete="new-password"
+            />
+            <p className="mt-1 text-xs text-amber-700/80">管理员可强制重置用户密码, 保存后用户需用新密码登录。</p>
+          </div>
+
+          {/* 封面编辑: URL 输入 + 上传按钮 + 移除按钮 */}
+          <div className="rounded-lg border border-gray-200 p-3">
+            <div className="mb-2 flex items-center justify-between">
+              <label className="text-sm font-medium text-gray-700">封面图</label>
+              {coverImage && (
+                <button onClick={handleCoverRemove} className="text-xs text-red-500 hover:underline">移除封面</button>
+              )}
+            </div>
+            {/* 封面预览 */}
+            {coverImage ? (
+              <div className="mb-2 h-24 w-full overflow-hidden rounded-lg border border-gray-200">
+                <img src={coverImage} alt="封面预览" className="h-full w-full object-cover" />
+              </div>
+            ) : (
+              <div className="mb-2 flex h-24 w-full items-center justify-center rounded-lg border border-dashed border-gray-300 bg-gray-50 text-xs text-gray-400">
+                暂无封面
+              </div>
+            )}
+            <div className="flex gap-2">
+              <input
+                value={coverUrl}
+                onChange={e => setCoverUrl(e.target.value)}
+                onBlur={handleCoverUrlSave}
+                className="flex-1 rounded-lg border border-gray-300 px-3 py-2 text-sm"
+                placeholder="粘贴封面图片 URL, 失焦后生效"
+              />
+              <label className={`cursor-pointer rounded-lg bg-blue-50 px-3 py-2 text-xs text-blue-600 hover:bg-blue-100 ${coverUploading ? 'opacity-50' : ''}`}>
+                {coverUploading ? '上传中…' : '上传图片'}
+                <input ref={coverFileRef} type="file" accept="image/*" className="hidden" onChange={handleCoverFile} />
+              </label>
+            </div>
+            <p className="mt-1 text-xs text-gray-400">上传图片会自动压缩到 1280px, 移除后保存即清空封面</p>
           </div>
 
           <div>
@@ -2073,7 +2151,7 @@ function mapFieldsToUser(fields: Record<string, string>) {
   return out;
 }
 
-function VerificationReviewTab() {
+function VerificationReviewTab({ isSuper }: { isSuper: boolean }) {
   const [items, setItems] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState('');
@@ -2215,6 +2293,17 @@ function VerificationReviewTab() {
     finally { setBusy(false); }
   };
 
+  // 撤回已通过的身份认证 (仅超级管理员)
+  const revokeVerification = async (id: string) => {
+    if (!confirm('确认撤回该用户的身份认证? 撤回后将重新进入审核队列。')) return;
+    setBusy(true);
+    try {
+      await api.patch(`/api/admin/users/${id}`, { verificationStatus: 'PENDING' });
+      load();
+    } catch (e: any) { alert(e.message); }
+    finally { setBusy(false); }
+  };
+
   const statusBadge = (s: string) => {
     const map: Record<string, string> = {
       APPROVED: 'bg-green-100 text-green-700',
@@ -2291,12 +2380,24 @@ function VerificationReviewTab() {
                   <div className="mt-2 text-xs text-red-500">驳回原因: {u.verificationRejectReason}</div>
                 )}
 
+                {u.aiImageCheck && (
+                  <AiCheckBadge check={u.aiImageCheck} />
+                )}
+
                 {isReviewable && (
                   <button
                     onClick={() => openReview(u)}
                     className="mt-3 w-full rounded-lg bg-blue-50 py-2 text-sm text-blue-600 hover:bg-blue-100"
                   >
                     进入人工复审
+                  </button>
+                )}
+                {u.verificationStatus === 'APPROVED' && isSuper && (
+                  <button
+                    onClick={() => revokeVerification(u.id)}
+                    className="mt-3 w-full rounded-lg bg-amber-50 py-2 text-sm text-amber-600 hover:bg-amber-100"
+                  >
+                    ↩️ 撤回到审核中
                   </button>
                 )}
               </div>
@@ -3069,7 +3170,7 @@ function OrgsManager() {
 }
 
 // ---------- 资质/荣誉认证审核 ----------
-function QualificationReviewTab() {
+function QualificationReviewTab({ isSuper }: { isSuper: boolean }) {
   const [items, setItems] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState('');
@@ -3078,6 +3179,9 @@ function QualificationReviewTab() {
   const [reviewTarget, setReviewTarget] = useState<any>(null);
   const [rejectReason, setRejectReason] = useState('');
   const [displayPhoto, setDisplayPhoto] = useState<'photo' | 'photo2'>('photo');
+  const [editType, setEditType] = useState('');          // 管理员可修改资质名称
+  const [editCategory, setEditCategory] = useState<'QUALIFICATION' | 'HONOR'>('QUALIFICATION');
+  const [previewImg, setPreviewImg] = useState<string | null>(null); // 图片放大预览
   const [busy, setBusy] = useState(false);
 
   const load = useCallback(() => {
@@ -3097,6 +3201,24 @@ function QualificationReviewTab() {
     setBusy(true);
     try {
       const payload: any = { status: 'APPROVED', displayPhoto };
+      // 若管理员修改了名称/类别, 一并提交
+      if (editType.trim() && editType.trim() !== reviewTarget.type) payload.type = editType.trim();
+      if (editCategory !== reviewTarget.category) payload.category = editCategory;
+      await api.patch(`/api/admin/qualifications/${id}`, payload);
+      setReviewTarget(null);
+      load();
+    } catch (e: any) { alert(e.message); }
+    finally { setBusy(false); }
+  };
+
+  // 单独保存名称/类别修改 (不改变审核状态, 适用于已通过/已驳回的记录也要改名)
+  const saveEdit = async (id: string) => {
+    setBusy(true);
+    try {
+      const payload: any = {};
+      if (editType.trim() && editType.trim() !== reviewTarget.type) payload.type = editType.trim();
+      if (editCategory !== reviewTarget.category) payload.category = editCategory;
+      if (Object.keys(payload).length === 0) { alert('未做修改'); return; }
       await api.patch(`/api/admin/qualifications/${id}`, payload);
       setReviewTarget(null);
       load();
@@ -3111,6 +3233,17 @@ function QualificationReviewTab() {
       await api.patch(`/api/admin/qualifications/${id}`, { status: 'REJECTED', rejectReason: rejectReason.trim() });
       setReviewTarget(null);
       setRejectReason('');
+      load();
+    } catch (e: any) { alert(e.message); }
+    finally { setBusy(false); }
+  };
+
+  // 撤回已通过的资质/荣誉认证 (仅超级管理员)
+  const revoke = async (id: string) => {
+    if (!confirm('确认撤回该资质/荣誉认证? 撤回后将重新进入审核队列。')) return;
+    setBusy(true);
+    try {
+      await api.patch(`/api/admin/qualifications/${id}`, { status: 'PENDING' });
       load();
     } catch (e: any) { alert(e.message); }
     finally { setBusy(false); }
@@ -3179,28 +3312,36 @@ function QualificationReviewTab() {
                     </p>
                   </div>
                 </div>
-                {q.status === 'PENDING' && (
-                  <div className="flex shrink-0 gap-2">
-                    <button onClick={() => { setReviewTarget(q); setRejectReason(''); setDisplayPhoto(q.displayPhoto === 'photo2' ? 'photo2' : 'photo'); }} className="rounded-lg bg-blue-50 px-3 py-1.5 text-xs text-blue-600 hover:bg-blue-100">审核</button>
-                  </div>
-                )}
+                <div className="flex shrink-0 gap-2">
+                  <button
+                    onClick={() => { setReviewTarget(q); setRejectReason(''); setDisplayPhoto(q.displayPhoto === 'photo2' ? 'photo2' : 'photo'); setEditType(q.type || ''); setEditCategory(q.category || 'QUALIFICATION'); }}
+                    className={`rounded-lg px-3 py-1.5 text-xs ${q.status === 'PENDING' ? 'bg-blue-50 text-blue-600 hover:bg-blue-100' : 'bg-gray-50 text-gray-600 hover:bg-gray-100'}`}
+                  >
+                    {q.status === 'PENDING' ? '审核' : '✏️ 编辑'}
+                  </button>
+                  {q.status === 'APPROVED' && isSuper && (
+                    <button onClick={() => revoke(q.id)} className="rounded-lg bg-amber-50 px-3 py-1.5 text-xs text-amber-600 hover:bg-amber-100">↩️ 撤回</button>
+                  )}
+                </div>
               </div>
               {(q.photo || q.photo2) && (
                 <div className="mt-3">
-                  <div className="text-xs text-gray-500 mb-1">证明材料 {q.displayPhoto && <span className="text-blue-500">(公开展示: {q.displayPhoto === 'photo2' ? '反面' : '正面'})</span>}</div>
+                  <div className="text-xs text-gray-500 mb-1">证明材料 (点击图片放大) {q.displayPhoto && <span className="text-blue-500">(公开展示: {q.displayPhoto === 'photo2' ? '反面' : '正面'})</span>}</div>
                   <div className="flex gap-2 flex-wrap">
                     {q.photo && (
-                      <div className="relative">
+                      <div className="relative cursor-zoom-in" onClick={() => setPreviewImg(q.photo)}>
                         {/* eslint-disable-next-line @next/next/no-img-element */}
-                        <img src={q.photo} alt="证明材料正面" className="max-h-40 rounded-lg border border-gray-200" />
+                        <img src={q.photo} alt="证明材料正面" className="max-h-40 rounded-lg border border-gray-200 object-contain" />
                         <span className="absolute top-1 left-1 rounded bg-black/60 px-1.5 py-0.5 text-[10px] text-white">正面</span>
+                        <span className="absolute bottom-1 right-1 rounded bg-black/60 px-1.5 py-0.5 text-[10px] text-white">🔍 放大</span>
                       </div>
                     )}
                     {q.photo2 && (
-                      <div className="relative">
+                      <div className="relative cursor-zoom-in" onClick={() => setPreviewImg(q.photo2)}>
                         {/* eslint-disable-next-line @next/next/no-img-element */}
-                        <img src={q.photo2} alt="证明材料反面" className="max-h-40 rounded-lg border border-gray-200" />
+                        <img src={q.photo2} alt="证明材料反面" className="max-h-40 rounded-lg border border-gray-200 object-contain" />
                         <span className="absolute top-1 left-1 rounded bg-black/60 px-1.5 py-0.5 text-[10px] text-white">反面</span>
+                        <span className="absolute bottom-1 right-1 rounded bg-black/60 px-1.5 py-0.5 text-[10px] text-white">🔍 放大</span>
                       </div>
                     )}
                   </div>
@@ -3209,6 +3350,7 @@ function QualificationReviewTab() {
               {q.rejectReason && (
                 <div className="mt-2 rounded-lg bg-red-50 px-3 py-2 text-xs text-red-600">驳回原因: {q.rejectReason}</div>
               )}
+              {q.aiImageCheck && <AiCheckBadge check={q.aiImageCheck} />}
             </div>
           ))}
         </div>
@@ -3219,7 +3361,7 @@ function QualificationReviewTab() {
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" onClick={() => setReviewTarget(null)}>
           <div className="w-full max-w-md rounded-2xl bg-white p-5" onClick={e => e.stopPropagation()}>
             <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-bold text-gray-900">审核{reviewTarget.category === 'HONOR' ? '荣誉' : '资质'}认证</h3>
+              <h3 className="text-lg font-bold text-gray-900">{reviewTarget.status === 'PENDING' ? '审核' : '编辑'}{reviewTarget.category === 'HONOR' ? '荣誉' : '资质'}认证</h3>
               <button onClick={() => setReviewTarget(null)} className="text-gray-400 text-xl">✕</button>
             </div>
             <div className="space-y-3">
@@ -3232,39 +3374,56 @@ function QualificationReviewTab() {
                   <div className="text-xs text-gray-400">{reviewTarget.user?.realName || ''}</div>
                 </div>
               </div>
-              <div className="rounded-lg bg-gray-50 p-3">
-                <div className="text-xs text-gray-500">认证类型</div>
-                <div className="text-sm font-medium text-gray-900">{reviewTarget.type}</div>
+              {/* 管理员可修改资质/荣誉名称和类别 */}
+              <div className="rounded-lg bg-amber-50/60 border border-amber-200 p-3 space-y-2">
+                <div className="text-xs font-medium text-amber-700">✏️ 可修改认证信息 (改名后用户主页同步更新)</div>
+                <div className="grid grid-cols-3 gap-2">
+                  <div className="col-span-2">
+                    <label className="block text-xs text-gray-500 mb-1">认证名称</label>
+                    <input value={editType} onChange={e => setEditType(e.target.value)} placeholder="如: 学生会主席"
+                      className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/40" />
+                  </div>
+                  <div>
+                    <label className="block text-xs text-gray-500 mb-1">类别</label>
+                    <select value={editCategory} onChange={e => setEditCategory(e.target.value as 'QUALIFICATION' | 'HONOR')}
+                      className="w-full rounded-lg border border-gray-300 px-2 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/40">
+                      <option value="QUALIFICATION">资质</option>
+                      <option value="HONOR">荣誉</option>
+                    </select>
+                  </div>
+                </div>
               </div>
               {(reviewTarget.photo || reviewTarget.photo2) && (
                 <div>
-                  <div className="text-xs text-gray-500 mb-1">证明材料 (点击选择公开展示面)</div>
+                  <div className="text-xs text-gray-500 mb-1">证明材料 (点图选公开展示面, 点🔍放大)</div>
                   <div className="grid grid-cols-2 gap-2">
                     {reviewTarget.photo ? (
-                      <button
-                        type="button"
-                        onClick={() => setDisplayPhoto('photo')}
+                      <div
                         className={`relative rounded-lg border-2 overflow-hidden transition ${displayPhoto === 'photo' ? 'border-blue-500 ring-2 ring-blue-200' : 'border-gray-200'}`}
                       >
-                        {/* eslint-disable-next-line @next/next/no-img-element */}
-                        <img src={reviewTarget.photo} alt="正面" className="w-full max-h-56 object-contain bg-gray-50" />
+                        <button type="button" onClick={() => setDisplayPhoto('photo')} className="block w-full">
+                          {/* eslint-disable-next-line @next/next/no-img-element */}
+                          <img src={reviewTarget.photo} alt="正面" className="w-full max-h-56 object-contain bg-gray-50" />
+                        </button>
                         <span className="absolute top-1 left-1 rounded bg-black/60 px-1.5 py-0.5 text-[10px] text-white">正面</span>
                         {displayPhoto === 'photo' && <span className="absolute top-1 right-1 rounded bg-blue-500 px-1.5 py-0.5 text-[10px] text-white">展示中</span>}
-                      </button>
+                        <button type="button" onClick={() => setPreviewImg(reviewTarget.photo)} className="absolute bottom-1 right-1 rounded bg-black/60 px-1.5 py-0.5 text-[10px] text-white hover:bg-black/80">🔍 放大</button>
+                      </div>
                     ) : (
                       <div className="flex items-center justify-center rounded-lg border border-dashed border-gray-200 bg-gray-50 py-8 text-xs text-gray-400">无正面</div>
                     )}
                     {reviewTarget.photo2 ? (
-                      <button
-                        type="button"
-                        onClick={() => setDisplayPhoto('photo2')}
+                      <div
                         className={`relative rounded-lg border-2 overflow-hidden transition ${displayPhoto === 'photo2' ? 'border-blue-500 ring-2 ring-blue-200' : 'border-gray-200'}`}
                       >
-                        {/* eslint-disable-next-line @next/next/no-img-element */}
-                        <img src={reviewTarget.photo2} alt="反面" className="w-full max-h-56 object-contain bg-gray-50" />
+                        <button type="button" onClick={() => setDisplayPhoto('photo2')} className="block w-full">
+                          {/* eslint-disable-next-line @next/next/no-img-element */}
+                          <img src={reviewTarget.photo2} alt="反面" className="w-full max-h-56 object-contain bg-gray-50" />
+                        </button>
                         <span className="absolute top-1 left-1 rounded bg-black/60 px-1.5 py-0.5 text-[10px] text-white">反面</span>
                         {displayPhoto === 'photo2' && <span className="absolute top-1 right-1 rounded bg-blue-500 px-1.5 py-0.5 text-[10px] text-white">展示中</span>}
-                      </button>
+                        <button type="button" onClick={() => setPreviewImg(reviewTarget.photo2)} className="absolute bottom-1 right-1 rounded bg-black/60 px-1.5 py-0.5 text-[10px] text-white hover:bg-black/80">🔍 放大</button>
+                      </div>
                     ) : (
                       <div className="flex items-center justify-center rounded-lg border border-dashed border-gray-200 bg-gray-50 py-8 text-xs text-gray-400">无反面</div>
                     )}
@@ -3272,17 +3431,40 @@ function QualificationReviewTab() {
                   <p className="mt-1 text-xs text-gray-400">通过后将以所选面展示在用户个人主页</p>
                 </div>
               )}
-              <div>
-                <label className="block text-sm text-gray-600 mb-1">驳回原因 (驳回时填写)</label>
-                <input value={rejectReason} onChange={e => setRejectReason(e.target.value)} placeholder="如: 证明材料不清晰或信息不符"
-                  className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/40" />
-              </div>
+              {reviewTarget.status === 'PENDING' && (
+                <div>
+                  <label className="block text-sm text-gray-600 mb-1">驳回原因 (驳回时填写)</label>
+                  <input value={rejectReason} onChange={e => setRejectReason(e.target.value)} placeholder="如: 证明材料不清晰或信息不符"
+                    className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/40" />
+                </div>
+              )}
+              {reviewTarget.aiImageCheck && (
+                <div className="rounded-lg bg-gray-50 p-2"><AiCheckBadge check={reviewTarget.aiImageCheck} /></div>
+              )}
             </div>
             <div className="mt-5 flex gap-2">
-              <button onClick={() => reject(reviewTarget.id)} disabled={busy} className="flex-1 rounded-lg bg-red-500 py-2.5 text-sm font-medium text-white hover:bg-red-600 disabled:opacity-50">{busy ? '处理中…' : '驳回'}</button>
-              <button onClick={() => approve(reviewTarget.id)} disabled={busy} className="flex-1 rounded-lg bg-green-600 py-2.5 text-sm font-medium text-white hover:bg-green-700 disabled:opacity-50">{busy ? '处理中…' : '通过'}</button>
+              {reviewTarget.status === 'PENDING' ? (
+                <>
+                  <button onClick={() => reject(reviewTarget.id)} disabled={busy} className="flex-1 rounded-lg bg-red-500 py-2.5 text-sm font-medium text-white hover:bg-red-600 disabled:opacity-50">{busy ? '处理中…' : '驳回'}</button>
+                  <button onClick={() => approve(reviewTarget.id)} disabled={busy} className="flex-1 rounded-lg bg-green-600 py-2.5 text-sm font-medium text-white hover:bg-green-700 disabled:opacity-50">{busy ? '处理中…' : '通过'}</button>
+                </>
+              ) : (
+                <>
+                  <button onClick={() => setReviewTarget(null)} className="flex-1 rounded-lg bg-gray-100 py-2.5 text-sm font-medium text-gray-600 hover:bg-gray-200">取消</button>
+                  <button onClick={() => saveEdit(reviewTarget.id)} disabled={busy} className="flex-1 rounded-lg bg-blue-500 py-2.5 text-sm font-medium text-white hover:bg-blue-600 disabled:opacity-50">{busy ? '处理中…' : '保存修改'}</button>
+                </>
+              )}
             </div>
           </div>
+        </div>
+      )}
+
+      {/* 图片放大预览 (lightbox) */}
+      {previewImg && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/90 p-4" onClick={() => setPreviewImg(null)}>
+          <button className="absolute top-4 right-4 text-white text-3xl leading-none hover:opacity-70" onClick={() => setPreviewImg(null)}>✕</button>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src={previewImg} alt="放大预览" className="max-h-[92vh] max-w-[95vw] object-contain rounded-lg" onClick={e => e.stopPropagation()} />
         </div>
       )}
     </div>
@@ -3297,8 +3479,8 @@ export function AdminPanel({ tab, isSuper }: { tab: AdminTab; isSuper: boolean }
     case 'moderation': return <ModerationTab />;
     case 'comments': return <CommentsTab />;
     case 'users': return <UsersTab isSuper={isSuper} />;
-    case 'verification': return <VerificationReviewTab />;
-    case 'qualifications': return <QualificationReviewTab />;
+    case 'verification': return <VerificationReviewTab isSuper={isSuper} />;
+    case 'qualifications': return <QualificationReviewTab isSuper={isSuper} />;
     case 'template': return <TemplateManager />;
     case 'appeals': return <BanAppealsTab />;
     case 'notifications': return <NotificationSender />;

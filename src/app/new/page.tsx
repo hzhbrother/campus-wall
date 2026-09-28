@@ -100,7 +100,8 @@ export default function NewPostPage() {
   const removeImage = (i: number) => setImages(prev => prev.filter((_, idx) => idx !== i));
 
   const onSubmit = async () => {
-    if (!content.trim()) { setErr('请输入内容'); return; }
+    // 内容和图片至少填一项 (允许纯图片发帖)
+    if (!content.trim() && images.length === 0) { setErr('请输入内容或上传图片'); return; }
     if (!category) { setErr('请选择主题分类'); return; }
     setErr(''); setBusy(true);
     try {
@@ -168,7 +169,7 @@ export default function NewPostPage() {
         <input
           value={title}
           onChange={e => setTitle(e.target.value.slice(0, 50))}
-          placeholder="标题（可选，不填将自动从正文截取）"
+          placeholder="标题（可选）"
           className="w-full rounded-lg bg-slate-50 px-3 py-2.5 text-base text-slate-800 placeholder:text-slate-300 focus:outline-none focus:ring-1 focus:ring-blue-300"
         />
       </div>
@@ -178,7 +179,7 @@ export default function NewPostPage() {
         <textarea
           value={content}
           onChange={e => setContent(e.target.value.slice(0, MAX_LEN))}
-          placeholder="说点什么吧~（请输入投稿内容）"
+          placeholder="说点什么吧~（也可以只发图片）"
           className="w-full min-h-[180px] resize-none bg-transparent text-base text-slate-800 placeholder:text-slate-300 focus:outline-none"
         />
         <div className="absolute bottom-1 right-4 text-xs text-slate-300">{content.length}/{MAX_LEN}</div>

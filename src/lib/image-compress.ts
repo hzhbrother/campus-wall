@@ -1,5 +1,6 @@
 // 图片压缩工具: 使用 canvas 压缩后返回 base64 data URL
-export function compressImage(file: File, maxWidth = 1024, quality = 0.7): Promise<string> {
+// preserveTransparency=true 时, 对 PNG 保留透明背景 (输出 PNG), 其他类型仍用 JPEG
+export function compressImage(file: File, maxWidth = 1024, quality = 0.7, preserveTransparency = false): Promise<string> {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
     reader.onload = (e) => {
@@ -16,7 +17,13 @@ export function compressImage(file: File, maxWidth = 1024, quality = 0.7): Promi
         const ctx = canvas.getContext('2d');
         if (!ctx) { reject(new Error('canvas 不可用')); return; }
         ctx.drawImage(img, 0, 0, width, height);
-        resolve(canvas.toDataURL('image/jpeg', quality));
+        // PNG 保留透明背景 (徽章/奖牌等透明图), 其他用 JPEG
+        const isPng = file.type === 'image/png' || file.name.toLowerCase().endsWith('.png');
+        if (preserveTransparency && isPng) {
+          resolve(canvas.toDataURL('image/png'));
+        } else {
+          resolve(canvas.toDataURL('image/jpeg', quality));
+        }
       };
       img.onerror = () => reject(new Error('图片加载失败'));
       img.src = e.target?.result as string;
