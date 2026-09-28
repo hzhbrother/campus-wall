@@ -278,10 +278,12 @@ export default function UserProfilePage() {
                 <path d="M12 5v14M5 12h14" strokeLinecap="round" strokeLinejoin="round"/>
               </svg>
               <span className="text-sm">点击添加封面</span>
+              {/* 无封面时: 直接在 label 内放 input, 点击即触发 */}
+              <input type="file" accept="image/*" className="hidden" onChange={handleCoverFile} />
             </label>
           )
         )}
-        {/* 隐藏的文件选择器 (供更换封面菜单调用) */}
+        {/* 隐藏的文件选择器 (供"更换封面"菜单调用) */}
         <input ref={coverFileRef} type="file" accept="image/*" className="hidden" onChange={handleCoverFile} />
       </div>
 
