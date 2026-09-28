@@ -26,6 +26,13 @@ const UpdateSchema = z.object({
   organizationId: z.string().max(100).optional().or(z.literal('')),
   // 邮箱变更时需携带的验证码
   emailCode: z.string().length(6, '验证码为6位数字').optional(),
+  // 隐私开关
+  followsPublic: z.boolean().optional(),
+  fansPublic: z.boolean().optional(),
+  badgesPublic: z.boolean().optional(),
+  honorsPublic: z.boolean().optional(),
+  favoritesPublic: z.boolean().optional(),
+  likesPublic: z.boolean().optional(),
 });
 
 export async function GET(req: NextRequest) {
