@@ -59,9 +59,12 @@ export default function UserProfilePage() {
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState('');
   const [tab, setTab] = useState<'posts' | 'likes' | 'favorites' | 'comments'>('posts');
-  const [savingCover, setSavingCover] = useState(false);
-  // 封面浮窗菜单开关 + 隐藏文件选择器
-  const [coverMenuOpen, setCoverMenuOpen] = useState(false);
+  // 封面上传弹窗
+  const [showCoverModal, setShowCoverModal] = useState(false);
+  const [coverPreview, setCoverPreview] = useState<string>('');
+  const [coverUrl, setCoverUrl] = useState<string>('');
+  const [coverUploading, setCoverUploading] = useState(false);
+  const [coverSubmitting, setCoverSubmitting] = useState(false);
   const coverFileRef = useRef<HTMLInputElement>(null);
   // 正在更新个人资料 (封面等): 期间阻止 onFocus 触发的 loadAll, 避免旧数据竞态覆盖
   const updatingRef = useRef(false);
@@ -169,44 +172,54 @@ export default function UserProfilePage() {
     ? Math.max(1, Math.floor((now - new Date(profile.createdAt).getTime()) / (24 * 60 * 60 * 1000)) + 1)
     : 0;
 
-  // 删除封面
-  const handleCoverDelete = async () => {
-    updatingRef.current = true;
-    setSavingCover(true);
-    setCoverMenuOpen(false);
-    try {
-      await api.patch('/api/users/me', { coverImage: null });
-      updatingRef.current = false;
-      await loadAll();
-    } catch (e: any) {
-      alert(e.message || '封面删除失败');
-    } finally {
-      setSavingCover(false);
-      updatingRef.current = false;
-    }
+  // 打开封面上传弹窗
+  const openCoverModal = () => {
+    setCoverPreview(profile?.coverImage || '');
+    setCoverUrl(profile?.coverImage || '');
+    setShowCoverModal(true);
   };
 
-  // 更换封面 (压缩后上传, 避免大图超出请求体限制)
+  // 弹窗内: 选择本地图片 (压缩到 1280px, 仅预览, 不立即上传)
   const handleCoverFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    // 关闭浮窗菜单
-    setCoverMenuOpen(false);
-    // 标记正在更新, 阻止 onFocus 触发的 loadAll 竞态
-    updatingRef.current = true;
-    setSavingCover(true);
+    setCoverUploading(true);
     try {
       const dataUrl = await compressImage(file, 1280, 0.75);
-      await api.patch('/api/users/me', { coverImage: dataUrl });
-      // 上传成功: 先解除竞态锁, 再手动刷新拿到最新封面
+      setCoverPreview(dataUrl);
+      setCoverUrl(dataUrl);
+    } finally {
+      setCoverUploading(false);
+      e.target.value = '';
+    }
+  };
+
+  // 弹窗内: 粘贴 URL 后失焦生效
+  const handleCoverUrlSave = () => {
+    setCoverPreview(coverUrl.trim());
+  };
+
+  // 弹窗内: 移除封面
+  const handleCoverRemove = () => {
+    setCoverPreview('');
+    setCoverUrl('');
+  };
+
+  // 弹窗内: 提交封面 (直接上传, 无需审核)
+  const handleCoverSubmit = async () => {
+    setCoverSubmitting(true);
+    updatingRef.current = true;
+    try {
+      // 空字符串表示移除封面
+      await api.patch('/api/users/me', { coverImage: coverPreview || null });
+      setShowCoverModal(false);
       updatingRef.current = false;
       await loadAll();
     } catch (e: any) {
       alert(e.message || '封面更新失败');
     } finally {
-      setSavingCover(false);
+      setCoverSubmitting(false);
       updatingRef.current = false;
-      e.target.value = ''; // 重置, 允许重复选同一张
     }
   };
 
@@ -229,64 +242,29 @@ export default function UserProfilePage() {
         ) : (
           <div className="h-full w-full bg-gradient-to-b from-blue-500 to-blue-400" />
         )}
-        {/* 上传中遮罩 */}
-        {savingCover && (
-          <div className="absolute inset-0 z-20 flex items-center justify-center bg-black/50 text-white text-sm">
-            上传中…
-          </div>
-        )}
         {isOwn && (
-          profile.coverImage ? (
-            /* 已有封面: 点击弹出浮窗菜单 (更换封面 / 删除封面), 右上角小铅笔图标 */
-            <>
-              <button
-                type="button"
-                onClick={() => setCoverMenuOpen(true)}
-                className="absolute right-3 top-3 z-10 flex h-8 w-8 items-center justify-center rounded-full bg-black/40 text-white backdrop-blur-sm hover:bg-black/60"
-              >
-                <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+          <button
+            type="button"
+            onClick={openCoverModal}
+            className="absolute inset-0 flex cursor-pointer flex-col items-center justify-center gap-1 bg-black/0 text-white/0 transition hover:bg-black/30 hover:text-white/90"
+          >
+            {profile.coverImage ? (
+              <>
+                <svg className="h-7 w-7" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                   <path d="M12 20h9M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z" strokeLinecap="round" strokeLinejoin="round"/>
                 </svg>
-              </button>
-              {/* 浮窗菜单 */}
-              {coverMenuOpen && (
-                <>
-                  <div className="fixed inset-0 z-30" onClick={() => setCoverMenuOpen(false)} />
-                  <div className="absolute right-3 top-12 z-40 w-36 overflow-hidden rounded-xl bg-white shadow-lg ring-1 ring-gray-200">
-                    <button
-                      type="button"
-                      onClick={() => coverFileRef.current?.click()}
-                      className="flex w-full items-center gap-2 px-3 py-2.5 text-sm text-gray-700 hover:bg-gray-50"
-                    >
-                      <svg className="h-4 w-4 text-blue-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 5v14M5 12h14" strokeLinecap="round" strokeLinejoin="round"/></svg>
-                      更换封面
-                    </button>
-                    <button
-                      type="button"
-                      onClick={handleCoverDelete}
-                      className="flex w-full items-center gap-2 border-t border-gray-100 px-3 py-2.5 text-sm text-red-500 hover:bg-red-50"
-                    >
-                      <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2m3 0v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6" strokeLinecap="round" strokeLinejoin="round"/></svg>
-                      删除封面
-                    </button>
-                  </div>
-                </>
-              )}
-            </>
-          ) : (
-            /* 无封面: 点击直接打开文件选择器, 显示"点击添加封面" */
-            <label className="absolute inset-0 flex cursor-pointer flex-col items-center justify-center gap-1 bg-black/20 text-white/90 transition hover:bg-black/30">
-              <svg className="h-7 w-7" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <path d="M12 5v14M5 12h14" strokeLinecap="round" strokeLinejoin="round"/>
-              </svg>
-              <span className="text-sm">点击添加封面</span>
-              {/* 无封面时: 直接在 label 内放 input, 点击即触发 */}
-              <input type="file" accept="image/*" className="hidden" onChange={handleCoverFile} />
-            </label>
-          )
+                <span className="text-sm">更换封面</span>
+              </>
+            ) : (
+              <>
+                <svg className="h-7 w-7" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <path d="M12 5v14M5 12h14" strokeLinecap="round" strokeLinejoin="round"/>
+                </svg>
+                <span className="text-sm">点击添加封面</span>
+              </>
+            )}
+          </button>
         )}
-        {/* 隐藏的文件选择器 (供"更换封面"菜单调用) */}
-        <input ref={coverFileRef} type="file" accept="image/*" className="hidden" onChange={handleCoverFile} />
       </div>
 
       {/* 用户信息卡片 (上移覆盖封面) */}
@@ -588,6 +566,61 @@ export default function UserProfilePage() {
           </div>
         )}
       </div>
+
+      {/* 封面上传弹窗 */}
+      {showCoverModal && (
+        <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/50 sm:items-center" onClick={() => setShowCoverModal(false)}>
+          <div className="w-full max-w-md rounded-t-3xl bg-white p-5 sm:rounded-2xl" onClick={e => e.stopPropagation()}>
+            <div className="mb-4 flex items-center justify-between">
+              <h3 className="text-lg font-bold text-gray-900">封面图</h3>
+              {coverPreview && (
+                <button onClick={handleCoverRemove} className="text-xs text-red-500 hover:underline">移除封面</button>
+              )}
+            </div>
+            {/* 预览 */}
+            {coverPreview ? (
+              <div className="mb-3 h-32 w-full overflow-hidden rounded-xl border border-gray-200">
+                <img src={coverPreview} alt="封面预览" className="h-full w-full object-cover" />
+              </div>
+            ) : (
+              <div className="mb-3 flex h-32 w-full items-center justify-center rounded-xl border border-dashed border-gray-300 bg-gray-50 text-sm text-gray-400">
+                暂无封面
+              </div>
+            )}
+            {/* URL 输入 + 上传按钮 */}
+            <div className="flex gap-2">
+              <input
+                value={coverUrl}
+                onChange={e => setCoverUrl(e.target.value)}
+                onBlur={handleCoverUrlSave}
+                className="flex-1 rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/40"
+                placeholder="粘贴封面图片 URL, 失焦后生效"
+              />
+              <label className={`cursor-pointer rounded-lg bg-blue-50 px-3 py-2 text-sm text-blue-600 hover:bg-blue-100 ${coverUploading ? 'opacity-50' : ''}`}>
+                {coverUploading ? '上传中…' : '上传图片'}
+                <input ref={coverFileRef} type="file" accept="image/*" className="hidden" onChange={handleCoverFile} />
+              </label>
+            </div>
+            <p className="mt-1.5 text-xs text-gray-400">上传图片会自动压缩到 1280px, 提交后直接生效</p>
+            {/* 提交 / 取消 */}
+            <div className="mt-5 flex gap-3">
+              <button
+                onClick={handleCoverSubmit}
+                disabled={coverSubmitting}
+                className="flex-1 rounded-full bg-blue-500 py-2.5 text-sm font-medium text-white hover:bg-blue-600 disabled:opacity-50"
+              >
+                {coverSubmitting ? '提交中…' : '提交'}
+              </button>
+              <button
+                onClick={() => setShowCoverModal(false)}
+                className="flex-1 rounded-full border border-gray-200 py-2.5 text-sm text-gray-600 hover:bg-gray-50"
+              >
+                取消
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
