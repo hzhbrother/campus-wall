@@ -45,7 +45,8 @@ function EditProfile({ user, onSaved, forcePhone = false, refreshUser }: { user:
   const [phoneNumber, setPhoneNumber] = useState(user?.phoneNumber || '');
   const [email, setEmail] = useState(user?.email || '');
   const [remark, setRemark] = useState(user?.remark || '');
-  const [avatarUploading, setAvatarUploading] = useState(false);
+  const [avatarDraft, setAvatarDraft] = useState<string>(''); // 本地预览的新头像, 保存时才上传
+  const [avatarCompressing, setAvatarCompressing] = useState(false);
   const [avatarMsg, setAvatarMsg] = useState('');
   const [schoolId, setSchoolId] = useState(user?.school?.id || '');
   const [organizationId, setOrganizationId] = useState(user?.organization?.id || '');
@@ -78,21 +79,20 @@ function EditProfile({ user, onSaved, forcePhone = false, refreshUser }: { user:
     api.get<{ items: { id: string; name: string }[] }>('/api/orgs').then(d => setOrganizations(d.items || [])).catch(() => {});
   }, []);
 
-  // 头像更换需审核: 压缩后提交到 pendingAvatar, 等待管理员审核通过
+  // 头像选择: 只压缩并本地预览, 不立即上传 (点"保存"时随资料一起提交)
   const handleAvatarFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    setAvatarUploading(true);
+    setAvatarCompressing(true);
     setAvatarMsg('');
     try {
       const compressed = await compressImage(file, 256, 0.8);
-      await api.patch('/api/users/me', { avatar: compressed });
-      await refreshUser?.();
-      setAvatarMsg('头像已提交, 等待审核');
-    } catch (err: any) {
-      setAvatarMsg(err.message || '头像上传失败');
+      setAvatarDraft(compressed);
+      setAvatarMsg('已选择, 点击下方"保存"提交审核');
+    } catch {
+      setAvatarMsg('图片处理失败');
     } finally {
-      setAvatarUploading(false);
+      setAvatarCompressing(false);
       e.target.value = '';
     }
   };
@@ -144,7 +144,12 @@ function EditProfile({ user, onSaved, forcePhone = false, refreshUser }: { user:
         schoolId, organizationId,
       };
       if (emailChanged) payload.emailCode = emailCode.trim();
+      // 头像: 如果有本地预览的新头像, 一并提交 (走审核流程)
+      if (avatarDraft) payload.avatar = avatarDraft;
       await api.patch('/api/users/me', payload);
+      await refreshUser?.();
+      setAvatarDraft('');
+      setAvatarMsg('头像已提交, 等待审核');
       setMsg('已保存');
       setEmailCode(''); setCodeSent(false);
       onSaved();
@@ -153,11 +158,11 @@ function EditProfile({ user, onSaved, forcePhone = false, refreshUser }: { user:
 
   const country = getCountryByCode(countryCode);
 
-  // 头像展示: 优先显示待审核的新头像 (pendingAvatar), 否则显示已通过的头像
-  const displayAvatar = user?.pendingAvatar || user?.avatar || '';
+  // 头像展示: 优先显示本地预览的新头像 (avatarDraft), 其次待审核头像, 最后已通过的头像
+  const displayAvatar = avatarDraft || user?.pendingAvatar || user?.avatar || '';
   const avatarStatus = user?.avatarStatus;
-  const isAvatarPending = avatarStatus === 'PENDING';
-  const isAvatarRejected = avatarStatus === 'REJECTED';
+  const isAvatarPending = avatarStatus === 'PENDING' && !avatarDraft;
+  const isAvatarRejected = avatarStatus === 'REJECTED' && !avatarDraft;
 
   return (
     <div>
@@ -178,16 +183,16 @@ function EditProfile({ user, onSaved, forcePhone = false, refreshUser }: { user:
             {isAvatarRejected && (
               <span className="absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-red-500 text-[11px] font-bold text-white shadow">!</span>
             )}
-            <label className={`absolute -bottom-1 -right-1 cursor-pointer rounded-full bg-blue-500 p-1 text-white shadow ${avatarUploading ? 'opacity-50' : ''}`}>
+            <label className={`absolute -bottom-1 -right-1 cursor-pointer rounded-full bg-blue-500 p-1 text-white shadow ${avatarCompressing ? 'opacity-50' : ''}`}>
               <svg className="h-3 w-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M12 20h9M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z" strokeLinecap="round" strokeLinejoin="round"/></svg>
-              <input type="file" accept="image/*" className="hidden" onChange={handleAvatarFile} disabled={avatarUploading} />
+              <input type="file" accept="image/*" className="hidden" onChange={handleAvatarFile} disabled={avatarCompressing} />
             </label>
           </div>
         </div>
         {/* 头像审核说明 / 状态提示 */}
         <div className="mt-2 text-xs text-gray-400">头像更换需审核, 1-2 个工作日内完成, 上学期间 5-7 个工作日</div>
-        {avatarMsg && <p className={`mt-1 text-xs ${avatarMsg.includes('已提交') ? 'text-green-600' : 'text-red-500'}`}>{avatarMsg}</p>}
-        {avatarUploading && <p className="mt-1 text-xs text-gray-400">头像上传中…</p>}
+        {avatarMsg && <p className={`mt-1 text-xs ${avatarMsg.includes('已提交') || avatarMsg.includes('已选择') ? 'text-green-600' : 'text-red-500'}`}>{avatarMsg}</p>}
+        {avatarCompressing && <p className="mt-1 text-xs text-gray-400">图片处理中…</p>}
         {isAvatarRejected && user?.avatarRejectReason && (
           <p className="mt-1 text-xs text-red-500">上次驳回原因: {user.avatarRejectReason}</p>
         )}
