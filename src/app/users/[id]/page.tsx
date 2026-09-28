@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { api } from '@/lib/api';
 import { useAuth } from '@/lib/auth-context';
@@ -58,6 +58,8 @@ export default function UserProfilePage() {
   const [err, setErr] = useState('');
   const [tab, setTab] = useState<'posts' | 'likes' | 'favorites' | 'comments'>('posts');
   const [savingCover, setSavingCover] = useState(false);
+  // 正在更新个人资料 (封面等): 期间阻止 onFocus 触发的 loadAll, 避免旧数据竞态覆盖
+  const updatingRef = useRef(false);
   const [showAvatarLightbox, setShowAvatarLightbox] = useState(false);
   const [lightboxBadge, setLightboxBadge] = useState<{ imageUrl: string | null; icon: string | null; name: string; description: string | null } | null>(null);
   const [badges, setBadges] = useState<{ badge: { id: string; name: string; icon: string | null; description: string | null; imageUrl: string | null }; earnedAt: string }[]>([]);
@@ -85,6 +87,8 @@ export default function UserProfilePage() {
 
   const loadAll = useCallback(() => {
     if (!userId) return;
+    // 正在更新资料时, 跳过刷新 (避免 onFocus 触发的旧数据覆盖刚更新的数据)
+    if (updatingRef.current) return;
     setLoading(true); setErr('');
     Promise.all([
       api.get<UserProfile>(`/api/users/${userId}`).catch(e => { setErr(e.message); return null; }),
@@ -164,15 +168,19 @@ export default function UserProfilePage() {
   const handleCoverFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
+    // 标记正在更新, 阻止 onFocus 触发的 loadAll 竞态
+    updatingRef.current = true;
     setSavingCover(true);
     try {
       const dataUrl = await compressImage(file, 1280, 0.75);
       await api.patch('/api/users/me', { coverImage: dataUrl });
-      setProfile(p => p ? { ...p, coverImage: dataUrl } : p);
+      // 上传成功后手动刷新, 拿到最新数据 (包括封面)
+      await loadAll();
     } catch (e: any) {
       alert(e.message || '封面更新失败');
     } finally {
       setSavingCover(false);
+      updatingRef.current = false;
       e.target.value = ''; // 重置, 允许重复选同一张
     }
   };
