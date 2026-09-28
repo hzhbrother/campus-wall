@@ -1,7 +1,8 @@
 'use client';
 
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
 import { api } from '@/lib/api';
+import { compressImage } from '@/lib/image-compress';
 
 interface Badge {
   id: string;
@@ -307,19 +308,39 @@ function GrantBadgeModal({ badge, onClose }: { badge: Badge; onClose: () => void
 function BadgeForm({ initial, onClose, onSaved }: { initial: Badge | null; onClose: () => void; onSaved: () => void }) {
   const [name, setName] = useState(initial?.name || '');
   const [description, setDescription] = useState(initial?.description || '');
-  const [icon, setIcon] = useState(initial?.icon || '🏅');
+  // imageUrl 存 base64 data URL 或外链 URL; 上传图片后存 base64
   const [imageUrl, setImageUrl] = useState(initial?.imageUrl || '');
+  // icon 字段保留作为没有图片时的兜底显示 (默认 🏅), 不再在表单中编辑
+  const [icon] = useState(initial?.icon || '🏅');
   const [conditionType, setConditionType] = useState(initial?.conditionType || 'POST_COUNT');
   const [threshold, setThreshold] = useState(initial?.threshold || 1);
   const [isActive, setIsActive] = useState(initial?.isActive ?? true);
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState('');
+  const [uploading, setUploading] = useState(false);
+  const fileRef = useRef<HTMLInputElement>(null);
+
+  // 从相册/图库选择图片 (不调用摄像头)
+  const handlePick = () => fileRef.current?.click();
+
+  const handleFile = async (file: File | undefined) => {
+    if (!file) return;
+    if (!file.type.startsWith('image/')) { setMsg('请选择图片文件'); return; }
+    setUploading(true); setMsg('');
+    try {
+      // 压缩到 base64 (保留 PNG 透明背景, 用于徽章/奖牌)
+      const dataUrl = await compressImage(file, 512, 0.85, true);
+      setImageUrl(dataUrl);
+    } catch (e: any) { setMsg(e.message || '图片处理失败'); }
+    finally { setUploading(false); }
+  };
 
   const submit = async () => {
     if (!name.trim()) { setMsg('请填写徽章名称'); return; }
+    if (!imageUrl) { setMsg('请上传徽章图片'); return; }
     setBusy(true); setMsg('');
     try {
-      const payload = { name: name.trim(), description, icon, imageUrl: imageUrl.trim() || '', conditionType, threshold: Number(threshold), isActive };
+      const payload = { name: name.trim(), description, icon, imageUrl, conditionType, threshold: Number(threshold), isActive };
       if (initial) {
         await api.patch(`/api/admin/badges/${initial.id}`, payload);
       } else {
@@ -337,15 +358,42 @@ function BadgeForm({ initial, onClose, onSaved }: { initial: Badge | null; onClo
           <button onClick={onClose} className="text-gray-400 text-xl">✕</button>
         </div>
         <div className="space-y-3">
+          {/* 徽章图片: 从相册/图库上传 (不调用摄像头) */}
           <div>
-            <label className="block text-sm text-gray-600 mb-1">徽章图标 (emoji)</label>
-            <input value={icon} onChange={e => setIcon(e.target.value)} maxLength={4}
-              className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm focus:border-blue-400 focus:outline-none" />
-          </div>
-          <div>
-            <label className="block text-sm text-gray-600 mb-1">徽章图片 URL</label>
-            <input value={imageUrl} onChange={e => setImageUrl(e.target.value)} placeholder="透明背景 PNG/SVG，留空则用 emoji 图标"
-              className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm focus:border-blue-400 focus:outline-none" />
+            <label className="block text-sm text-gray-600 mb-1">徽章图片 <span className="text-red-500">*</span></label>
+            <p className="text-xs text-gray-400 mb-2">从相册/图库上传, 建议透明背景 PNG, 清晰可见即可</p>
+            <input
+              ref={fileRef}
+              type="file"
+              accept="image/*"
+              className="hidden"
+              onChange={e => handleFile(e.target.files?.[0])}
+            />
+            {imageUrl ? (
+              <div className="flex items-center gap-3">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={imageUrl} alt="徽章预览" className="h-20 w-20 rounded-full object-cover border border-gray-200 bg-gray-50" />
+                <div className="flex flex-col gap-1">
+                  <button type="button" onClick={handlePick} disabled={uploading}
+                    className="rounded-lg bg-gray-100 px-3 py-1.5 text-xs text-gray-700 hover:bg-gray-200 disabled:opacity-50">
+                    {uploading ? '处理中…' : '重新上传'}
+                  </button>
+                  <button type="button" onClick={() => setImageUrl('')} disabled={uploading}
+                    className="rounded-lg bg-red-50 px-3 py-1.5 text-xs text-red-600 hover:bg-red-100 disabled:opacity-50">
+                    移除图片
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <button type="button" onClick={handlePick} disabled={uploading}
+                className="flex h-20 w-20 items-center justify-center rounded-full border-2 border-dashed border-gray-300 text-gray-400 hover:border-blue-400 hover:text-blue-500 disabled:opacity-50">
+                {uploading ? (
+                  <span className="text-xs">处理中…</span>
+                ) : (
+                  <span className="text-2xl">+</span>
+                )}
+              </button>
+            )}
           </div>
           <div>
             <label className="block text-sm text-gray-600 mb-1">徽章名称</label>
