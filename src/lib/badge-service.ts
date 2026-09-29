@@ -50,13 +50,13 @@ export async function checkAndAwardBadges(userId: string): Promise<{ id: string;
   });
   const maxSinglePostLikes = topPost?._count?.likes || 0;
 
-  // 吃瓜一线: 被点赞最多的评论的获赞数
+  // 吃瓜一线: 收到回复最多的评论的回复数 (评论无独立点赞, 用楼中楼回复数衡量热门程度)
   const topComment = await prisma.comment.findFirst({
     where: { authorId: userId },
-    orderBy: { likes: { _count: 'desc' } },
-    select: { id: true, _count: { select: { likes: true } } },
+    orderBy: { replies: { _count: 'desc' } },
+    select: { id: true, _count: { select: { replies: true } } },
   });
-  const maxCommentLikes = topComment?._count?.likes || 0;
+  const maxCommentReplies = topComment?._count?.replies || 0;
 
   // 暖心学姐: 求助问答板块帖子获赞数
   const helperLikes = await prisma.like.count({
@@ -72,7 +72,7 @@ export async function checkAndAwardBadges(userId: string): Promise<{ id: string;
     MANUAL: 0,
     NIGHT_OWL: nightOwlStreak,
     HOT_POST: maxSinglePostLikes,
-    TOP_COMMENT: maxCommentLikes,
+    TOP_COMMENT: maxCommentReplies,
     HELPER: helperLikes,
   };
 

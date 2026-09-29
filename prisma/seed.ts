@@ -21,7 +21,7 @@ const DEFAULT_BADGES = [
   // 行为类
   { name: '守夜冠军',   description: '连续3天在凌晨2:00-4:00发帖或评论。全校都睡了，你还在冲浪？',  icon: '🌙', conditionType: 'NIGHT_OWL',   threshold: 3 },
   { name: '爆款制造机', description: '单条帖子点赞数突破100。你就是校园热点！',                    icon: '🔥', conditionType: 'HOT_POST',    threshold: 100 },
-  { name: '吃瓜一线',   description: '评论被点赞超过20次。神评论诞生！',                            icon: '🕵️', conditionType: 'TOP_COMMENT', threshold: 20 },
+  { name: '吃瓜一线',   description: '单条评论收到超过10条回复。神评论诞生！',                       icon: '🕵️', conditionType: 'TOP_COMMENT', threshold: 10 },
   { name: '暖心学姐',   description: '在求助问答板块被点赞3次以上。',                                icon: '❤️', conditionType: 'HELPER',      threshold: 3 },
 ] as const;
 

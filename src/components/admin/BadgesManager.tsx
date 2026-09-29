@@ -38,7 +38,7 @@ const CONDITION_LABELS: Record<string, string> = {
   MANUAL: '手动授予',
   NIGHT_OWL: '连续凌晨活跃天数',
   HOT_POST: '单帖最高获赞',
-  TOP_COMMENT: '评论最高获赞',
+  TOP_COMMENT: '单条评论最高回复数',
   HELPER: '求助问答获赞',
 };
 
