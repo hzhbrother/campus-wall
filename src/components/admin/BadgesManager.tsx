@@ -36,6 +36,10 @@ const CONDITION_LABELS: Record<string, string> = {
   CHECKIN_DAYS: '连续签到天数',
   POINTS: '积分',
   MANUAL: '手动授予',
+  NIGHT_OWL: '连续凌晨活跃天数',
+  HOT_POST: '单帖最高获赞',
+  TOP_COMMENT: '评论最高获赞',
+  HELPER: '求助问答获赞',
 };
 
 export function BadgesManager() {

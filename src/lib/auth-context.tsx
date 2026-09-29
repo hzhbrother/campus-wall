@@ -10,11 +10,8 @@ export interface AuthUser {
   email: string | null;
   nickname: string;
   avatar?: string | null;
-  // 待审核的新头像 (审核通过后才会替换 avatar)
   pendingAvatar?: string | null;
-  // 头像审核状态: PENDING / APPROVED / REJECTED
   avatarStatus?: string;
-  // 头像驳回原因
   avatarRejectReason?: string | null;
   coverImage?: string | null;
   realName?: string | null;
@@ -31,7 +28,6 @@ export interface AuthUser {
   verifiedAt?: string | null;
   verificationStatus?: string;
   verificationRejectReason?: string | null;
-  // 资质认证 (组织身份)
   qualificationType?: string | null;
   qualificationVerified?: boolean;
   qualificationVerifiedAt?: string | null;
@@ -75,17 +71,23 @@ function saveAccounts(list: SavedAccount[]) {
   localStorage.setItem(ACCOUNTS_KEY, JSON.stringify(list));
 }
 
+// 只在 login/register 时调用, 不在 fetchMe 里调 (避免竞态+不必要截断)
 function upsertAccount(user: AuthUser, token: string, max = 3) {
   const list = getSavedAccounts().filter(a => a.userId !== user.id);
-  list.unshift({
-    token,
-    userId: user.id,
-    nickname: user.nickname,
-    avatar: user.avatar,
-    role: user.role,
-  });
-  // 超过上限: 保留最新的 max 个 (最旧的会被丢弃)
+  list.unshift({ token, userId: user.id, nickname: user.nickname, avatar: user.avatar, role: user.role });
   saveAccounts(list.slice(0, max));
+}
+
+// 更新已有账号信息 (不改变顺序, 不截断)
+function updateAccountInfo(user: AuthUser) {
+  const list = getSavedAccounts();
+  const idx = list.findIndex(a => a.userId === user.id);
+  if (idx >= 0) {
+    list[idx].nickname = user.nickname;
+    list[idx].avatar = user.avatar;
+    list[idx].role = user.role;
+    saveAccounts(list);
+  }
 }
 
 function removeAccount(userId: string) {
@@ -100,7 +102,6 @@ interface AuthCtx {
   applyToken: (token: string) => Promise<AuthUser | null>;
   logout: () => void;
   refreshUser: () => Promise<AuthUser | null>;
-  // 多账号
   savedAccounts: SavedAccount[];
   switchAccount: (userId: string) => Promise<AuthUser | null>;
   removeSavedAccount: (userId: string) => void;
@@ -114,6 +115,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [loading, setLoading] = useState(true);
   const [savedAccounts, setSavedAccounts] = useState<SavedAccount[]>([]);
   const [maxAccounts, setMaxAccounts] = useState(3);
+  const [configLoaded, setConfigLoaded] = useState(false);
 
   // 加载 maxAccounts 配置
   useEffect(() => {
@@ -122,16 +124,26 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         const v = parseInt(d.max_accounts || '3', 10);
         if (!isNaN(v) && v >= 1) setMaxAccounts(v);
       })
-      .catch(() => {});
+      .catch(() => {})
+      .finally(() => setConfigLoaded(true));
   }, []);
 
+  // Bug2 修复: maxAccounts 加载后, 对已存的 accounts 做一次截断清理
+  useEffect(() => {
+    if (!configLoaded) return;
+    const list = getSavedAccounts();
+    if (list.length > maxAccounts) {
+      saveAccounts(list.slice(0, maxAccounts));
+      setSavedAccounts(getSavedAccounts());
+    }
+  }, [configLoaded, maxAccounts]);
+
+  // Bug1 修复: fetchMe 不调 upsertAccount, 只更新已有账号的显示信息
   const fetchMe = useCallback(async (): Promise<AuthUser | null> => {
     try {
       const me = await api.get<AuthUser>('/api/auth/me');
       setUser(me);
-      // 更新 savedAccounts 中的信息 (头像/昵称可能变了)
-      const token = localStorage.getItem(TOKEN_KEY);
-      if (token) upsertAccount(me, token, maxAccounts);
+      updateAccountInfo(me);
       setSavedAccounts(getSavedAccounts());
       return me;
     } catch {
@@ -140,7 +152,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     } finally {
       setLoading(false);
     }
-  }, [maxAccounts]);
+  }, []);
 
   useEffect(() => {
     if (typeof window !== 'undefined' && localStorage.getItem(TOKEN_KEY)) {
@@ -181,12 +193,28 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setUser(null);
   }, [user]);
 
-  // 切换账号: 直接用已保存的 token, 无需重新输入密码
+  // Bug3 修复: 切换失败时移除过期账号, 尝试回退到之前的 token
   const switchAccount = useCallback(async (userId: string): Promise<AuthUser | null> => {
     const acc = getSavedAccounts().find(a => a.userId === userId);
     if (!acc) return null;
+    const prevToken = localStorage.getItem(TOKEN_KEY);
     localStorage.setItem(TOKEN_KEY, acc.token);
-    return fetchMe();
+    const me = await fetchMe();
+    if (!me) {
+      // 切换失败: token 可能过期, 移除该账号
+      removeAccount(userId);
+      setSavedAccounts(getSavedAccounts());
+      // 回退到之前的 token (如果有)
+      if (prevToken) {
+        localStorage.setItem(TOKEN_KEY, prevToken);
+        await fetchMe();
+      } else {
+        localStorage.removeItem(TOKEN_KEY);
+        setUser(null);
+      }
+      throw new Error('该账号登录已过期, 请重新登录');
+    }
+    return me;
   }, [fetchMe]);
 
   const removeSavedAccount = useCallback((userId: string) => {
@@ -194,8 +222,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setSavedAccounts(getSavedAccounts());
   }, []);
 
-  // 监听 api.ts 派发的 401 事件: 清除用户态让 UI 自然降级
-  // 不删除 token, 保留以便下次刷新时重新验证 (避免瞬时 401 导致误登出)
   useEffect(() => {
     const onUnauthorized = () => setUser(null);
     window.addEventListener('auth:unauthorized', onUnauthorized);

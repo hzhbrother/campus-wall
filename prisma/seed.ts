@@ -18,6 +18,11 @@ const DEFAULT_BADGES = [
   // 积分类
   { name: '积分新星',   description: '累计获得 100 积分',      icon: '⭐', conditionType: 'POINTS',         threshold: 100 },
   { name: '积分富翁',   description: '累计获得 1000 积分',     icon: '💰', conditionType: 'POINTS',         threshold: 1000 },
+  // 行为类
+  { name: '守夜冠军',   description: '连续3天在凌晨2:00-4:00发帖或评论。全校都睡了，你还在冲浪？',  icon: '🌙', conditionType: 'NIGHT_OWL',   threshold: 3 },
+  { name: '爆款制造机', description: '单条帖子点赞数突破100。你就是校园热点！',                    icon: '🔥', conditionType: 'HOT_POST',    threshold: 100 },
+  { name: '吃瓜一线',   description: '评论被点赞超过20次。神评论诞生！',                            icon: '🕵️', conditionType: 'TOP_COMMENT', threshold: 20 },
+  { name: '暖心学姐',   description: '在求助问答板块被点赞3次以上。',                                icon: '❤️', conditionType: 'HELPER',      threshold: 3 },
 ] as const;
 
 // 显式使用 DIRECT_URL (Supabase Session Pooler, 5432 端口), 支持 prepared statements
