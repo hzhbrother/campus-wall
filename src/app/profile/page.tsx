@@ -338,6 +338,7 @@ function ProfilePageInner() {
 
   // 未认证每日提醒 (localStorage 存上次提醒日期)
   const [showAuthReminder, setShowAuthReminder] = useState(false);
+  const [verifyModalInitial, setVerifyModalInitial] = useState<'IDENTITY' | 'QUALIFICATION' | null>(null);
   const [showAvatarLightbox, setShowAvatarLightbox] = useState(false);
   const [profileBg, setProfileBg] = useState('');
 
@@ -500,7 +501,7 @@ function ProfilePageInner() {
   const handleMenu = (key: string) => {
     if (key === 'homepage' && user) { router.push(`/users/${user.id}`); return; }
     if (key === 'admin') { setView('overview'); return; }
-    if (key === 'verification') { setShowVerifyModal(true); return; }
+    if (key === 'verification') { setVerifyModalInitial(null); setShowVerifyModal(true); return; }
     if (key === 'violations') { setView('violations'); return; }
     if (key === 'badges') { setView('my-badges'); return; }
     if (key === 'checkin') { setView('checkin'); return; }
@@ -604,7 +605,7 @@ function ProfilePageInner() {
               </div>
               {/* 底部更改入口 */}
               <button
-                onClick={() => { if (confirm('申请更改实名信息需重新提交认证, 原认证将被重置。确定继续?')) setShowVerifyModal(true); }}
+                onClick={() => { if (confirm('申请更改实名信息需重新提交认证, 原认证将被重置。确定继续?')) { setVerifyModalInitial('IDENTITY'); setShowVerifyModal(true); } }}
                 className="mt-4 text-xs text-gray-400"
               >
                 不是我的实名, 需要<span className="text-blue-500">更改</span>
@@ -820,6 +821,7 @@ function ProfilePageInner() {
                 onClick={() => {
                   localStorage.setItem('auth_reminder_date', new Date().toISOString().slice(0, 10));
                   setShowAuthReminder(false);
+                  setVerifyModalInitial('IDENTITY');
                   setShowVerifyModal(true);
                 }}
                 className="w-full rounded-xl bg-gradient-to-r from-blue-500 to-indigo-500 py-3 text-sm font-medium text-white shadow-sm hover:opacity-90"
@@ -844,12 +846,13 @@ function ProfilePageInner() {
       {showVerifyModal && user && (
         <VerificationModal
           user={user}
-          onClose={() => setShowVerifyModal(false)}
-          onVerified={() => { refreshUser(); setShowVerifyModal(false); }}
+          initialType={verifyModalInitial}
+          onClose={() => { setShowVerifyModal(false); setVerifyModalInitial(null); }}
+          onVerified={() => { refreshUser(); setShowVerifyModal(false); setVerifyModalInitial(null); }}
           onSubmitted={() => refreshUser()}
           onLater={() => {
             // 用户点了「我再想想」: 关闭弹窗并在"认证"菜单入口提示
-            setShowVerifyModal(false);
+            setShowVerifyModal(false); setVerifyModalInitial(null);
           }}
         />
       )}
@@ -1048,7 +1051,7 @@ const VERIFY_TYPE_OPTIONS: { value: VerifyType; label: string; icon: string; des
   { value: 'QUALIFICATION', label: '资质/荣誉认证', icon: '🏅', desc: '学生会/广播站/证书等, 可重复认证' },
 ];
 
-function VerificationModal({ user, onClose, onVerified, onSubmitted, onLater }: { user: any; onClose: () => void; onVerified: () => void; onSubmitted?: () => void; onLater?: () => void }) {
+function VerificationModal({ user, initialType, onClose, onVerified, onSubmitted, onLater }: { user: any; initialType?: 'IDENTITY' | 'QUALIFICATION' | null; onClose: () => void; onVerified: () => void; onSubmitted?: () => void; onLater?: () => void }) {
   const [photo, setPhoto] = useState<string>('');
   const [photo2, setPhoto2] = useState<string>(''); // 第二张照片 (卡面反面/证书内页)
   const [templateId, setTemplateId] = useState<string>('');
@@ -1114,12 +1117,13 @@ function VerificationModal({ user, onClose, onVerified, onSubmitted, onLater }: 
     if (isQual) refreshQualStatus();
   }, [isQual, refreshQualStatus]);
 
-  // 身份认证已通过 → 打开弹窗默认切到资质/荣誉认证
+  // 初始类型: initialType 强制优先; 否则管理员/已通过身份自动切资质认证
   useEffect(() => {
     if (verifyType) return; // 用户已手动选了类型就不覆盖
+    if (initialType) { setVerifyType(initialType); return; }
     const idApproved = isSuperAdmin || !!user.verified || (user.verificationStatus === 'APPROVED');
     if (isAdmin || idApproved) setVerifyType('QUALIFICATION');
-  }, [isAdmin, isSuperAdmin, verifyType, user.verified, user.verificationStatus]);
+  }, [initialType, isAdmin, isSuperAdmin, verifyType, user.verified, user.verificationStatus]);
 
   // 身份认证 vs 资质认证 使用各自独立的状态字段, 互不污染
   const idStatus = localStatus || user.verificationStatus || 'NONE';
