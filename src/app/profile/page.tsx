@@ -113,7 +113,8 @@ function EditProfile({ user, onSaved, forcePhone = false, refreshUser }: { user:
 
   const save = async () => {
     setMsg(''); setPhoneError('');
-    if (!realName.trim()) { setMsg('请输入真实姓名'); return; }
+    const isVerified = user?.verified || user?.verificationStatus === 'APPROVED';
+    if (!isVerified && !realName.trim()) { setMsg('请输入真实姓名'); return; }
 
     const hasPhone = phoneNumber.trim().length > 0;
     const hasEmail = email.trim().length > 0;
@@ -135,8 +136,11 @@ function EditProfile({ user, onSaved, forcePhone = false, refreshUser }: { user:
 
     setSaving(true);
     try {
+      const isVerified = user?.verified || user?.verificationStatus === 'APPROVED';
       const payload: any = {
-        nickname, realName: realName.trim(),
+        nickname,
+        // 已认证用户真实姓名锁定, 不提交
+        ...(isVerified ? {} : { realName: realName.trim() }),
         countryCode: hasPhone ? countryCode : '',
         phoneNumber: hasPhone ? phoneNumber : '',
         email: email.trim(),
@@ -239,8 +243,12 @@ function EditProfile({ user, onSaved, forcePhone = false, refreshUser }: { user:
         )}
       </div>
 
-      <Row label={<>真实姓名<span className="ml-1 text-red-500">*</span></>}>
-        <input value={realName} onChange={e => setRealName(e.target.value)} className="w-32 text-right text-[15px] text-gray-900 outline-none" placeholder="请输入真实姓名" />
+      <Row label={<>真实姓名{user?.verified || user?.verificationStatus === 'APPROVED' ? <span className="ml-1 text-green-500 text-xs">✓已认证</span> : <span className="ml-1 text-red-500">*</span>}</>}>
+        {user?.verified || user?.verificationStatus === 'APPROVED' ? (
+          <span className="text-[15px] text-gray-900">{realName || '-'}</span>
+        ) : (
+          <input value={realName} onChange={e => setRealName(e.target.value)} className="w-32 text-right text-[15px] text-gray-900 outline-none" placeholder="请输入真实姓名" />
+        )}
       </Row>
 
       {/* 所属学校 / 团体 (互斥) */}
