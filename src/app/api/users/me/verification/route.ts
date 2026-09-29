@@ -63,6 +63,7 @@ export async function POST(req: NextRequest) {
     // 初始状态: 若配置了 AI 视觉则进入 AI 初审, 否则直接进入人工复审队列
     const initStatus = isVisionEnabled() ? VerificationStatus.AI_REVIEWING : VerificationStatus.PENDING;
 
+    // 重置旧认证状态 (verified 布尔 + verifiedAt + 可能被手动认证覆盖的实名字段保留)
     await prisma.user.update({
       where: { id: me.id },
       data: {
@@ -72,6 +73,8 @@ export async function POST(req: NextRequest) {
         verificationStatus: initStatus,
         verificationRejectReason: null,
         verificationAiResult: null,
+        verified: false,
+        verifiedAt: null,
       },
     });
 
