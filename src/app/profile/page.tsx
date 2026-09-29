@@ -405,6 +405,14 @@ function ProfilePageInner() {
   // 标签页激活时刷新用户信息 (跳过挂载时首次刷新, 由 auth context 负责)
   usePageRefresh(() => { refreshUser(); }, [refreshUser], true);
 
+  // 切换视图时自动刷新用户数据, 保证每个界面信息最新
+  // (子组件 BadgesView/CheckInView 重挂载时自带数据获取; 封面上传弹窗有 modalOpenRef 保护)
+  useEffect(() => {
+    if (loading || !user) return;
+    refreshUser();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [view]);
+
   if (loading) return <div className="min-h-screen flex items-center justify-center text-gray-400">加载中…</div>;
   if (!user) { router.push('/login'); return null; }
 
