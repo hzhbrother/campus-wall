@@ -1,5 +1,6 @@
-// 数据库初始化 seed: 创建超级管理员 + 默认勋章 (幂等, 可重复运行)
-import { PrismaClient, UserRole, PostStatus } from '@prisma/client';
+// 数据库初始化 seed: 仅创建超级管理员 + 默认勋章 (幂等, 可重复运行)
+// 不创建任何示例用户/帖子/学校/团体, 由管理员在后台自行管理
+import { PrismaClient, UserRole } from '@prisma/client';
 import * as bcrypt from 'bcryptjs';
 
 // 系统默认勋章 (管理员仍可在后台编辑名称/图标/阈值/启停; seed 只在缺失时补建, 不覆盖已有修改)
@@ -31,42 +32,28 @@ async function main() {
 
   const passwordHash = await bcrypt.hash(adminPwd, 10);
 
-  // 超级管理员: 已存在则更新角色, 不存在则创建
-  const admin = await prisma.user.upsert({
-    where: { email: adminEmail },
-    update: { role: UserRole.SUPER_ADMIN },
-    create: {
-      email: adminEmail,
-      nickname: '校园墙管理员',
-      password: passwordHash,
-      role: UserRole.SUPER_ADMIN,
-    },
-  });
-  console.log('✅ 超级管理员已就绪:', admin.email, 'role:', admin.role);
+  // 超级管理员: 已存在则只确保角色为 SUPER_ADMIN (不覆盖密码等), 不存在则创建
+  // 使用 findFirst + upsert 的 update 条件, 保证永远只有一个超级管理员
+  const existingAdmin = await prisma.user.findFirst({ where: { role: UserRole.SUPER_ADMIN } });
+  const adminEmailExists = await prisma.user.findUnique({ where: { email: adminEmail } });
 
-  // 示例用户 + 示例帖子: 仅在从未创建过的情况下创建 (幂等 — 已有则跳过)
-  const existingDemo = await prisma.user.findFirst({ where: { email: 'demo@campus.edu' } });
-  if (!existingDemo) {
-    const demoPwd = await bcrypt.hash('Demo@12345', 10);
-    const demoUser = await prisma.user.create({
-      data: {
-        email: 'demo@campus.edu',
-        nickname: '校园小明',
-        password: demoPwd,
-        role: UserRole.USER,
+  let admin;
+  if (existingAdmin && !adminEmailExists) {
+    // 已有超管但不是配置的邮箱: 确保现有超管角色不变, 不新建
+    admin = existingAdmin;
+    console.log('⚠️  已存在超级管理员:', admin.email, ', 跳过创建新超管');
+  } else {
+    admin = await prisma.user.upsert({
+      where: { email: adminEmail },
+      update: { role: UserRole.SUPER_ADMIN },
+      create: {
+        email: adminEmail,
+        nickname: '校园墙管理员',
+        password: passwordHash,
+        role: UserRole.SUPER_ADMIN,
       },
     });
-    await prisma.post.create({
-      data: {
-        authorId: demoUser.id,
-        title: '欢迎来到校园墙!',
-        content: '这里是校园墙, 你可以发布失物招领、二手交易、表白、寻物启事等内容。请遵守校园规范, 文明发言。',
-        category: '校园',
-        status: PostStatus.APPROVED,
-        pinned: true,
-      },
-    });
-    console.log('✅ 示例用户 demo@campus.edu / Demo@12345 已创建');
+    console.log('✅ 超级管理员已就绪:', admin.email, 'role:', admin.role);
   }
 
   // 系统默认勋章: 按 name 去重, 已存在则跳过, 不存在则补建 — 后台修改不会被覆盖
