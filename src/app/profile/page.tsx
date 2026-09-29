@@ -484,11 +484,9 @@ function ProfilePageInner() {
   }
 
   // ---- 首页视图 ----
-  // 已手动认证的用户隐藏「认证」入口
-  const isIdVerified = user.verificationStatus === 'APPROVED';
   const menuItems = [
     { key: 'homepage', label: '我的主页', icon: '🏠' },
-    ...(isIdVerified ? [] : [{ key: 'verification', label: '认证', icon: '✅' }]),
+    { key: 'verification', label: '认证', icon: '✅' },
     { key: 'violations', label: '违规与信用', icon: '📋' },
     { key: 'badges', label: '证书/徽章', icon: '🎖️' },
     { key: 'checkin', label: '签到积分', icon: '🪙' },
@@ -1115,10 +1113,12 @@ function VerificationModal({ user, onClose, onVerified, onSubmitted, onLater }: 
     if (isQual) refreshQualStatus();
   }, [isQual, refreshQualStatus]);
 
-  // 管理员无需身份认证, 打开弹窗直接进入资质/荣誉认证
+  // 身份认证已通过 → 打开弹窗默认切到资质/荣誉认证
   useEffect(() => {
-    if (isAdmin && !verifyType) setVerifyType('QUALIFICATION');
-  }, [isAdmin, verifyType]);
+    if (verifyType) return; // 用户已手动选了类型就不覆盖
+    const idApproved = isSuperAdmin || !!user.verified || (user.verificationStatus === 'APPROVED');
+    if (isAdmin || idApproved) setVerifyType('QUALIFICATION');
+  }, [isAdmin, isSuperAdmin, verifyType, user.verified, user.verificationStatus]);
 
   // 身份认证 vs 资质认证 使用各自独立的状态字段, 互不污染
   const idStatus = localStatus || user.verificationStatus || 'NONE';
@@ -1305,21 +1305,36 @@ function VerificationModal({ user, onClose, onVerified, onSubmitted, onLater }: 
         {!isAdmin && (
           <div className="mb-3">
             <label className="block text-sm font-medium text-gray-700 mb-2">选择认证类型</label>
+            {idApproved && !isQual && (
+              <div className="mb-2 rounded-lg bg-green-50 px-3 py-2 text-xs text-green-700">
+                ✅ 身份认证已通过, 建议继续完成资质/荣誉认证
+              </div>
+            )}
             <div className="grid grid-cols-2 gap-2">
-              {VERIFY_TYPE_OPTIONS.map(opt => (
-                <button
-                  key={opt.value}
-                  onClick={() => { setVerifyType(opt.value); setTemplateId(''); setPhoto(''); }}
-                  className={`flex flex-col items-center justify-center rounded-xl border-2 p-3 transition ${
-                    verifyType === opt.value
-                      ? 'border-blue-500 bg-blue-50'
-                      : 'border-gray-200 bg-white hover:border-blue-300'
-                  }`}
-                >
-                  <div className="text-2xl mb-1">{opt.icon}</div>
-                  <div className={`text-xs font-medium ${verifyType === opt.value ? 'text-blue-700' : 'text-gray-700'}`}>{opt.label}</div>
-                </button>
-              ))}
+              {VERIFY_TYPE_OPTIONS.map(opt => {
+                const optIsId = opt.value === 'IDENTITY';
+                const optIsIdDone = optIsId && idApproved;
+                return (
+                  <button
+                    key={opt.value}
+                    onClick={() => { setVerifyType(opt.value); setTemplateId(''); setPhoto(''); }}
+                    disabled={optIsIdDone}
+                    className={`relative flex flex-col items-center justify-center rounded-xl border-2 p-3 transition ${
+                      verifyType === opt.value
+                        ? 'border-blue-500 bg-blue-50'
+                        : 'border-gray-200 bg-white hover:border-blue-300'
+                    } ${optIsIdDone ? 'opacity-70 cursor-not-allowed' : ''}`}
+                  >
+                    {optIsIdDone && (
+                      <span className="absolute top-1 right-1 flex items-center gap-0.5 rounded-full bg-green-500 px-1.5 py-0.5 text-[10px] text-white">
+                        ✅ 已通过
+                      </span>
+                    )}
+                    <div className="text-2xl mb-1">{opt.icon}</div>
+                    <div className={`text-xs font-medium ${verifyType === opt.value ? 'text-blue-700' : 'text-gray-700'}`}>{opt.label}</div>
+                  </button>
+                );
+              })}
             </div>
           </div>
         )}
