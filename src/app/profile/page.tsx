@@ -869,7 +869,7 @@ function ProfilePageInner() {
       {/* 切换账号 + 退出登录 */}
       {user && (
         <div className="space-y-2">
-          {savedAccounts.length > 1 && (
+          {savedAccounts.length >= 1 && (
             <button
               onClick={() => setView('account-switch')}
               className="w-full rounded-2xl bg-white py-3.5 text-sm text-gray-700 shadow-sm hover:bg-gray-50 flex items-center justify-center gap-1.5"

@@ -10,13 +10,14 @@ import { JUHE_TYPES } from '@/lib/aggregated-login';
 const OAUTH_BASE = process.env.NEXT_PUBLIC_API_BASE || '';
 
 export default function LoginPage() {
-  const { login, user, loading } = useAuth();
+  const { login, user, loading, savedAccounts, switchAccount } = useAuth();
   const router = useRouter();
   const [account, setAccount] = useState('');
   const [password, setPassword] = useState('');
   const [showPwd, setShowPwd] = useState(false);
   const [err, setErr] = useState('');
   const [busy, setBusy] = useState(false);
+  const [switchBusy, setSwitchBusy] = useState<string | null>(null);
   const [showAggregated, setShowAggregated] = useState(false);
   const [juheReady, setJuheReady] = useState(false);
 
@@ -58,6 +59,45 @@ export default function LoginPage() {
         </div>
 
         {err && <div className="bg-red-50 text-red-600 text-sm p-3 rounded-lg mb-4">{err}</div>}
+
+        {/* 已保存账号: 一键登录 */}
+        {savedAccounts.length > 0 && (
+          <div className="mb-6">
+            <div className="text-xs text-slate-400 mb-2">点击直接登录已保存的账号</div>
+            <div className="space-y-2">
+              {savedAccounts.map(acc => (
+                <button
+                  key={acc.userId}
+                  type="button"
+                  disabled={switchBusy !== null}
+                  onClick={async () => {
+                    setErr(''); setSwitchBusy(acc.userId);
+                    try {
+                      await switchAccount(acc.userId);
+                      // 成功后由 useEffect user 变化跳转
+                    } catch (e: any) {
+                      setErr(e.message || '登录已过期, 请重新输入密码登录');
+                    } finally {
+                      setSwitchBusy(null);
+                    }
+                  }}
+                  className="w-full flex items-center gap-3 rounded-xl border border-slate-200 bg-white p-3 text-left hover:bg-slate-50 disabled:opacity-50 transition"
+                >
+                  <div className="h-10 w-10 rounded-full bg-slate-200 overflow-hidden flex items-center justify-center text-sm font-medium text-slate-600 shrink-0">
+                    {acc.avatar ? <img src={acc.avatar} alt="" className="h-full w-full object-cover" /> : (acc.nickname || 'U')[0].toUpperCase()}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="text-sm font-medium text-slate-900 truncate">{acc.nickname}</div>
+                    <div className="text-xs text-slate-400">{acc.role === 'SUPER_ADMIN' ? '超级管理员' : acc.role === 'ADMIN' ? '管理员' : '用户'}</div>
+                  </div>
+                  <span className="text-xs text-blue-500 font-medium">
+                    {switchBusy === acc.userId ? '登录中…' : '一键登录'}
+                  </span>
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
 
         <form onSubmit={onSubmit} className="space-y-4">
           {/* 账号名 / 手机号 / 邮箱 */}
