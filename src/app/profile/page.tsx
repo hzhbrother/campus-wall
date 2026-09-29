@@ -22,7 +22,7 @@ const AdminPanel = dynamic(() => import('@/components/admin/AdminPanel').then(m 
   loading: () => <div className="py-12 text-center text-gray-400">加载中…</div>,
 });
 
-type View = 'home' | 'admin' | 'edit' | 'security' | 'violations' | 'my-badges' | 'checkin' | 'contact' | AdminTab;
+type View = 'home' | 'admin' | 'edit' | 'security' | 'violations' | 'my-badges' | 'checkin' | 'contact' | 'account-switch' | AdminTab;
 
 // ---------- 通用行组件 (定义在组件外, 避免每次渲染重建导致 input 失焦) ----------
 const Row = ({ label, children, onClick, border = true }: { label: React.ReactNode; children: React.ReactNode; onClick?: () => void; border?: boolean }) => (
@@ -699,6 +699,77 @@ function ProfilePageInner() {
     );
   }
 
+  // ---- 切换账号视图 ----
+  if (view === 'account-switch' && user) {
+    return (
+      <div className="space-y-4">
+        <button onClick={() => setView('home')} className="flex items-center gap-1 text-sm text-gray-500">
+          <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="m15 18-6-6 6-6" strokeLinecap="round" strokeLinejoin="round"/></svg>
+          返回
+        </button>
+
+        <div className="rounded-2xl bg-white shadow-sm overflow-hidden">
+          <div className="px-4 py-3 border-b border-gray-100">
+            <div className="text-base font-bold text-gray-900">切换账号</div>
+            <div className="text-xs text-gray-400 mt-0.5">最多 {maxAccounts} 个账号, 点击直接切换</div>
+          </div>
+          {savedAccounts.map((acc, idx) => {
+            const isCurrent = acc.userId === user.id;
+            return (
+              <div key={acc.userId} className={`flex items-center gap-3 px-4 py-3.5 ${idx > 0 ? 'border-t border-gray-100' : ''} ${isCurrent ? 'bg-blue-50' : ''}`}>
+                <div className="h-10 w-10 rounded-full bg-gray-200 overflow-hidden flex items-center justify-center text-sm font-medium text-gray-600 shrink-0">
+                  {acc.avatar ? <img src={acc.avatar} alt="" className="h-full w-full object-cover" /> : (acc.nickname || 'U')[0].toUpperCase()}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="text-sm font-medium text-gray-900 truncate">{acc.nickname}</div>
+                  <div className="text-xs text-gray-400">{acc.role === 'SUPER_ADMIN' ? '超级管理员' : acc.role === 'ADMIN' ? '管理员' : '用户'}</div>
+                </div>
+                {isCurrent ? (
+                  <span className="rounded-full bg-blue-100 px-2.5 py-1 text-xs text-blue-600 font-medium">当前</span>
+                ) : (
+                  <button
+                    onClick={async () => {
+                      try {
+                        await switchAccount(acc.userId);
+                        setView('home');
+                      } catch (e: any) {
+                        alert(e.message || '切换失败, 该账号可能已过期');
+                      }
+                    }}
+                    className="rounded-full bg-blue-500 px-4 py-1.5 text-xs text-white font-medium hover:bg-blue-600"
+                  >
+                    切换
+                  </button>
+                )}
+                {!isCurrent && (
+                  <button
+                    onClick={() => { if (confirm(`移除账号「${acc.nickname}」? 需重新登录才能切回`)) removeSavedAccount(acc.userId); }}
+                    className="text-xs text-gray-400 hover:text-red-500"
+                  >
+                    移除
+                  </button>
+                )}
+              </div>
+            );
+          })}
+          {savedAccounts.length < maxAccounts && (
+            <button
+              onClick={() => router.push('/login')}
+              className="w-full px-4 py-3.5 border-t border-gray-100 text-sm text-blue-500 hover:bg-gray-50 flex items-center justify-center gap-2"
+            >
+              <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 5v14M5 12h14" strokeLinecap="round" strokeLinejoin="round"/></svg>
+              添加账号
+            </button>
+          )}
+        </div>
+
+        <button onClick={() => { logout(); router.push('/'); }} className="w-full rounded-2xl bg-white py-3.5 text-sm text-red-500 shadow-sm hover:bg-gray-50">
+          退出当前账号
+        </button>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-4">
       {/* 渐变头部 (管理员可配置背景图) */}
@@ -795,61 +866,21 @@ function ProfilePageInner() {
         </div>
       </div>
 
-      {/* 退出登录 */}
+      {/* 切换账号 + 退出登录 */}
       {user && (
-        <button onClick={() => { logout(); router.push('/'); }} className="w-full rounded-2xl bg-white py-3.5 text-sm text-red-500 shadow-sm hover:bg-gray-50">
-          退出登录
-        </button>
-      )}
-
-      {/* 多账号切换 */}
-      {user && savedAccounts.length > 0 && (
-        <div className="rounded-2xl bg-white shadow-sm overflow-hidden">
-          <div className="px-4 py-3 border-b border-gray-100">
-            <div className="text-sm font-medium text-gray-900">账号切换</div>
-            <div className="text-xs text-gray-400 mt-0.5">最多 {maxAccounts} 个账号, 点击直接切换</div>
-          </div>
-          {savedAccounts.map((acc, idx) => {
-            const isCurrent = acc.userId === user.id;
-            return (
-              <div key={acc.userId} className={`flex items-center gap-3 px-4 py-3 ${idx > 0 ? 'border-t border-gray-100' : ''} ${isCurrent ? 'bg-blue-50' : ''}`}>
-                <div className="h-8 w-8 rounded-full bg-gray-200 overflow-hidden flex items-center justify-center text-sm font-medium text-gray-600 shrink-0">
-                  {acc.avatar ? <img src={acc.avatar} alt="" className="h-full w-full object-cover" /> : (acc.nickname || 'U')[0].toUpperCase()}
-                </div>
-                <div className="flex-1 min-w-0">
-                  <div className="text-sm font-medium text-gray-900 truncate">{acc.nickname}</div>
-                  <div className="text-xs text-gray-400">{acc.role === 'SUPER_ADMIN' ? '超级管理员' : acc.role === 'ADMIN' ? '管理员' : '用户'}</div>
-                </div>
-                {isCurrent ? (
-                  <span className="text-xs text-blue-500 font-medium">当前</span>
-                ) : (
-                  <button
-                    onClick={async () => { await switchAccount(acc.userId); }}
-                    className="text-xs text-blue-500 font-medium hover:underline"
-                  >
-                    切换
-                  </button>
-                )}
-                {!isCurrent && (
-                  <button
-                    onClick={() => { if (confirm(`移除账号「${acc.nickname}」? 需重新登录才能切回`)) removeSavedAccount(acc.userId); }}
-                    className="text-xs text-gray-400 hover:text-red-500"
-                  >
-                    移除
-                  </button>
-                )}
-              </div>
-            );
-          })}
-          {savedAccounts.length < maxAccounts && (
+        <div className="space-y-2">
+          {savedAccounts.length > 1 && (
             <button
-              onClick={() => router.push('/login')}
-              className="w-full px-4 py-3 border-t border-gray-100 text-sm text-blue-500 hover:bg-gray-50 flex items-center gap-2"
+              onClick={() => setView('account-switch')}
+              className="w-full rounded-2xl bg-white py-3.5 text-sm text-gray-700 shadow-sm hover:bg-gray-50 flex items-center justify-center gap-1.5"
             >
-              <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 5v14M5 12h14" strokeLinecap="round" strokeLinejoin="round"/></svg>
-              添加账号
+              <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M17 1l4 4-4 4" strokeLinecap="round" strokeLinejoin="round"/><path d="M3 11V9a4 4 0 0 1 4-4h14M7 23l-4-4 4-4" strokeLinecap="round" strokeLinejoin="round"/><path d="M21 13v2a4 4 0 0 1-4 4H3" strokeLinecap="round" strokeLinejoin="round"/></svg>
+              切换账号
             </button>
           )}
+          <button onClick={() => { logout(); router.push('/'); }} className="w-full rounded-2xl bg-white py-3.5 text-sm text-red-500 shadow-sm hover:bg-gray-50">
+            退出登录
+          </button>
         </div>
       )}
 
