@@ -244,15 +244,16 @@ export default function VerifyPage() {
           )}
           {!isSuperAdmin && (
             <button
-              onClick={() => {
-                if (confirm('申请更改实名信息需重新提交认证, 原认证将被重置。确定继续?')) {
-                  // 重置本地状态让表单出现
-                  setVerifyState({
-                    verified: false,
-                    verifiedAt: null,
-                    verificationStatus: 'NONE',
-                    verificationRejectReason: null,
-                  });
+              onClick={async () => {
+                if (!confirm('申请更改实名信息需重新提交认证, 原认证将被重置。确定继续?')) return;
+                try {
+                  await api.del('/api/users/me/verification');
+                  await refreshUser();
+                  // 清除今天的提醒标记, 回到 profile 后弹出提醒
+                  localStorage.removeItem('auth_reminder_date');
+                  router.push('/profile');
+                } catch (e: any) {
+                  alert(e.message || '操作失败');
                 }
               }}
               className="mt-4 text-xs text-blue-500 hover:underline"

@@ -609,7 +609,18 @@ function ProfilePageInner() {
               </div>
               {/* 底部更改入口 */}
               <button
-                onClick={() => { if (confirm('申请更改实名信息需重新提交认证, 原认证将被重置。确定继续?')) router.push('/verify'); }}
+                onClick={async () => {
+                  if (!confirm('申请更改实名信息需重新提交认证, 原认证将被重置。确定继续?')) return;
+                  try {
+                    await api.del('/api/users/me/verification');
+                    await refreshUser();
+                    setView('home');
+                    // 清除今天的提醒标记, 让下次进入时弹出提醒
+                    localStorage.removeItem('auth_reminder_date');
+                  } catch (e: any) {
+                    alert(e.message || '操作失败');
+                  }
+                }}
                 className="mt-4 text-xs text-gray-400"
               >
                 不是我的实名, 需要<span className="text-blue-500">更改</span>

@@ -122,6 +122,32 @@ export async function POST(req: NextRequest) {
   }
 }
 
+// DELETE /api/users/me/verification  重置认证状态 (用户主动取消实名)
+export async function DELETE(req: NextRequest) {
+  try {
+    const me = await getUserFromRequest(req);
+    if (!me) return NextResponse.json({ message: '未登录' }, { status: 401 });
+
+    await prisma.user.update({
+      where: { id: me.id },
+      data: {
+        verificationStatus: VerificationStatus.NONE,
+        verificationPhoto: null,
+        verificationPhotoType: null,
+        verificationTemplateId: null,
+        verificationRejectReason: null,
+        verificationAiResult: null,
+        verified: false,
+        verifiedAt: null,
+      },
+    });
+
+    return NextResponse.json({ message: '认证已重置' });
+  } catch (e) {
+    return errorResponse(e);
+  }
+}
+
 // AI 初审: 判断是否校园卡 + 清晰度, 通过则进入人工复审, 不通过则直接驳回
 async function runAiReview(userId: string, photo: string, templateId: string | null, isFace: boolean, faceName: string | null, faceId: string | null) {
   // 并行执行: AI 初审 + AI 图片真实性检测
