@@ -50,6 +50,48 @@ export interface AuthUser {
   _count?: { posts: number; comments: number; likes: number; likesReceived: number };
 }
 
+// 多账号: 存储在 localStorage 中的已登录账号列表
+export interface SavedAccount {
+  token: string;
+  userId: string;
+  nickname: string;
+  avatar?: string | null;
+  role: Role;
+}
+
+const ACCOUNTS_KEY = 'cw_accounts';
+const TOKEN_KEY = 'cw_token';
+
+function getSavedAccounts(): SavedAccount[] {
+  if (typeof window === 'undefined') return [];
+  try {
+    return JSON.parse(localStorage.getItem(ACCOUNTS_KEY) || '[]');
+  } catch {
+    return [];
+  }
+}
+
+function saveAccounts(list: SavedAccount[]) {
+  localStorage.setItem(ACCOUNTS_KEY, JSON.stringify(list));
+}
+
+function upsertAccount(user: AuthUser, token: string, max = 3) {
+  const list = getSavedAccounts().filter(a => a.userId !== user.id);
+  list.unshift({
+    token,
+    userId: user.id,
+    nickname: user.nickname,
+    avatar: user.avatar,
+    role: user.role,
+  });
+  // 超过上限: 保留最新的 max 个 (最旧的会被丢弃)
+  saveAccounts(list.slice(0, max));
+}
+
+function removeAccount(userId: string) {
+  saveAccounts(getSavedAccounts().filter(a => a.userId !== userId));
+}
+
 interface AuthCtx {
   user: AuthUser | null;
   loading: boolean;
@@ -58,6 +100,11 @@ interface AuthCtx {
   applyToken: (token: string) => Promise<AuthUser | null>;
   logout: () => void;
   refreshUser: () => Promise<AuthUser | null>;
+  // 多账号
+  savedAccounts: SavedAccount[];
+  switchAccount: (userId: string) => Promise<AuthUser | null>;
+  removeSavedAccount: (userId: string) => void;
+  maxAccounts: number;
 }
 
 const Ctx = createContext<AuthCtx>(null as any);
@@ -65,11 +112,27 @@ const Ctx = createContext<AuthCtx>(null as any);
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<AuthUser | null>(null);
   const [loading, setLoading] = useState(true);
+  const [savedAccounts, setSavedAccounts] = useState<SavedAccount[]>([]);
+  const [maxAccounts, setMaxAccounts] = useState(3);
+
+  // 加载 maxAccounts 配置
+  useEffect(() => {
+    api.get<{ max_accounts?: string }>('/api/site-config')
+      .then(d => {
+        const v = parseInt(d.max_accounts || '3', 10);
+        if (!isNaN(v) && v >= 1) setMaxAccounts(v);
+      })
+      .catch(() => {});
+  }, []);
 
   const fetchMe = useCallback(async (): Promise<AuthUser | null> => {
     try {
       const me = await api.get<AuthUser>('/api/auth/me');
       setUser(me);
+      // 更新 savedAccounts 中的信息 (头像/昵称可能变了)
+      const token = localStorage.getItem(TOKEN_KEY);
+      if (token) upsertAccount(me, token, maxAccounts);
+      setSavedAccounts(getSavedAccounts());
       return me;
     } catch {
       setUser(null);
@@ -77,10 +140,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [maxAccounts]);
 
   useEffect(() => {
-    if (typeof window !== 'undefined' && localStorage.getItem('cw_token')) {
+    if (typeof window !== 'undefined' && localStorage.getItem(TOKEN_KEY)) {
+      setSavedAccounts(getSavedAccounts());
       fetchMe();
     } else {
       setLoading(false);
@@ -88,27 +152,46 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, [fetchMe]);
 
   const applyToken = useCallback(async (token: string): Promise<AuthUser | null> => {
-    localStorage.setItem('cw_token', token);
+    localStorage.setItem(TOKEN_KEY, token);
     return fetchMe();
   }, [fetchMe]);
 
   const login = useCallback(async (account: string, password: string): Promise<AuthUser> => {
     const res = await api.post<{ token: string; user: AuthUser }>('/api/auth/login', { account, password });
-    localStorage.setItem('cw_token', res.token);
+    localStorage.setItem(TOKEN_KEY, res.token);
+    upsertAccount(res.user, res.token, maxAccounts);
+    setSavedAccounts(getSavedAccounts());
     setUser(res.user);
     return res.user;
-  }, []);
+  }, [maxAccounts]);
 
   const register = useCallback(async (data: { nickname: string; email: string; emailCode: string; password: string; realName?: string; grade?: string; className?: string; remark?: string }): Promise<AuthUser> => {
     const res = await api.post<{ token: string; user: AuthUser }>('/api/auth/register', data);
-    localStorage.setItem('cw_token', res.token);
+    localStorage.setItem(TOKEN_KEY, res.token);
+    upsertAccount(res.user, res.token, maxAccounts);
+    setSavedAccounts(getSavedAccounts());
     setUser(res.user);
     return res.user;
-  }, []);
+  }, [maxAccounts]);
 
   const logout = useCallback(() => {
-    localStorage.removeItem('cw_token');
+    if (user) removeAccount(user.id);
+    localStorage.removeItem(TOKEN_KEY);
+    setSavedAccounts(getSavedAccounts());
     setUser(null);
+  }, [user]);
+
+  // 切换账号: 直接用已保存的 token, 无需重新输入密码
+  const switchAccount = useCallback(async (userId: string): Promise<AuthUser | null> => {
+    const acc = getSavedAccounts().find(a => a.userId === userId);
+    if (!acc) return null;
+    localStorage.setItem(TOKEN_KEY, acc.token);
+    return fetchMe();
+  }, [fetchMe]);
+
+  const removeSavedAccount = useCallback((userId: string) => {
+    removeAccount(userId);
+    setSavedAccounts(getSavedAccounts());
   }, []);
 
   // 监听 api.ts 派发的 401 事件: 清除用户态让 UI 自然降级
@@ -120,7 +203,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   return (
-    <Ctx.Provider value={{ user, loading, login, register, applyToken, logout, refreshUser: fetchMe }}>
+    <Ctx.Provider value={{ user, loading, login, register, applyToken, logout, refreshUser: fetchMe, savedAccounts, switchAccount, removeSavedAccount, maxAccounts }}>
       {children}
     </Ctx.Provider>
   );

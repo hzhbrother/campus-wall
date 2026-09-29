@@ -13,7 +13,7 @@ const CONFIG_KEYS = [
   // SMTP
   'smtp_enabled', 'smtp_host', 'smtp_port', 'smtp_user', 'smtp_pass', 'smtp_from', 'smtp_from_name', 'smtp_from_email', 'smtp_secure', 'smtp_tls_reject_unauthorized',
   // 功能开关
-  'allow_register', 'post_requires_approval', 'allow_anonymous', 'email_notify_enabled', 'comment_enabled',
+  'allow_register', 'post_requires_approval', 'allow_anonymous', 'email_notify_enabled', 'comment_enabled', 'max_accounts',
   // 内容设置
   'post_categories', 'daily_post_limit', 'sensitive_words', 'announcement_text',
   // 协议内容

@@ -334,7 +334,7 @@ function EditProfile({ user, onSaved, forcePhone = false, refreshUser }: { user:
 function ProfilePageInner() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const { user, loading, logout, refreshUser } = useAuth();
+  const { user, loading, logout, refreshUser, savedAccounts, switchAccount, removeSavedAccount, maxAccounts } = useAuth();
   const [view, setView] = useState<View>('home');
   const [adminTab, setAdminTab] = useState<AdminTab>('overview');
   const [showPwdModal, setShowPwdModal] = useState(false);
@@ -800,6 +800,57 @@ function ProfilePageInner() {
         <button onClick={() => { logout(); router.push('/'); }} className="w-full rounded-2xl bg-white py-3.5 text-sm text-red-500 shadow-sm hover:bg-gray-50">
           退出登录
         </button>
+      )}
+
+      {/* 多账号切换 */}
+      {user && savedAccounts.length > 0 && (
+        <div className="rounded-2xl bg-white shadow-sm overflow-hidden">
+          <div className="px-4 py-3 border-b border-gray-100">
+            <div className="text-sm font-medium text-gray-900">账号切换</div>
+            <div className="text-xs text-gray-400 mt-0.5">最多 {maxAccounts} 个账号, 点击直接切换</div>
+          </div>
+          {savedAccounts.map((acc, idx) => {
+            const isCurrent = acc.userId === user.id;
+            return (
+              <div key={acc.userId} className={`flex items-center gap-3 px-4 py-3 ${idx > 0 ? 'border-t border-gray-100' : ''} ${isCurrent ? 'bg-blue-50' : ''}`}>
+                <div className="h-8 w-8 rounded-full bg-gray-200 overflow-hidden flex items-center justify-center text-sm font-medium text-gray-600 shrink-0">
+                  {acc.avatar ? <img src={acc.avatar} alt="" className="h-full w-full object-cover" /> : (acc.nickname || 'U')[0].toUpperCase()}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="text-sm font-medium text-gray-900 truncate">{acc.nickname}</div>
+                  <div className="text-xs text-gray-400">{acc.role === 'SUPER_ADMIN' ? '超级管理员' : acc.role === 'ADMIN' ? '管理员' : '用户'}</div>
+                </div>
+                {isCurrent ? (
+                  <span className="text-xs text-blue-500 font-medium">当前</span>
+                ) : (
+                  <button
+                    onClick={async () => { await switchAccount(acc.userId); }}
+                    className="text-xs text-blue-500 font-medium hover:underline"
+                  >
+                    切换
+                  </button>
+                )}
+                {!isCurrent && (
+                  <button
+                    onClick={() => { if (confirm(`移除账号「${acc.nickname}」? 需重新登录才能切回`)) removeSavedAccount(acc.userId); }}
+                    className="text-xs text-gray-400 hover:text-red-500"
+                  >
+                    移除
+                  </button>
+                )}
+              </div>
+            );
+          })}
+          {savedAccounts.length < maxAccounts && (
+            <button
+              onClick={() => router.push('/login')}
+              className="w-full px-4 py-3 border-t border-gray-100 text-sm text-blue-500 hover:bg-gray-50 flex items-center gap-2"
+            >
+              <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 5v14M5 12h14" strokeLinecap="round" strokeLinejoin="round"/></svg>
+              添加账号
+            </button>
+          )}
+        </div>
       )}
 
       {/* 头像放大灯箱 */}

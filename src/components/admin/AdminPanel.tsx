@@ -1995,6 +1995,15 @@ function SiteSettings() {
                 <p className="text-xs text-gray-400">0 表示不限制，仅对普通用户生效</p>
               </div>
             </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">最大同登账号数</label>
+                <input type="number" min="1" max="10" value={cfg.max_accounts || '3'} onChange={e => set('max_accounts', e.target.value)} className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm" placeholder="3" />
+              </div>
+              <div className="flex items-end">
+                <p className="text-xs text-gray-400">同一设备最多可同时登录的账号数量</p>
+              </div>
+            </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">敏感词过滤（逗号分隔）</label>
               <textarea value={cfg.sensitive_words || ''} onChange={e => set('sensitive_words', e.target.value)} rows={2} className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm" placeholder="广告,诈骗,违规" />
