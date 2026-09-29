@@ -335,6 +335,9 @@ function ProfilePageInner() {
   const [showVerifyModal, setShowVerifyModal] = useState(false);
   const [showJoinOrg, setShowJoinOrg] = useState(false);
   const [joinOrgDismissed, setJoinOrgDismissed] = useState(false);
+
+  // 未认证每日提醒 (localStorage 存上次提醒日期)
+  const [showAuthReminder, setShowAuthReminder] = useState(false);
   const [showAvatarLightbox, setShowAvatarLightbox] = useState(false);
   const [profileBg, setProfileBg] = useState('');
 
@@ -365,6 +368,22 @@ function ProfilePageInner() {
       setShowJoinOrg(true);
     }
   }, [loading, user, joinOrgDismissed]);
+
+  // 未认证每日提醒: 每天首次进入「我的」页面时弹一次
+  useEffect(() => {
+    if (loading || !user) return;
+    const isVerified = user.verificationStatus === 'APPROVED' || !!user.verified;
+    if (isVerified) return; // 已认证不弹
+    // 今天已提醒过 → 跳过
+    const today = new Date().toISOString().slice(0, 10);
+    const lastReminded = localStorage.getItem('auth_reminder_date');
+    if (lastReminded === today) return;
+    // 注册后不足 3 天不打扰
+    const created = user.createdAt ? new Date(user.createdAt).getTime() : Date.now();
+    const daysSinceReg = (Date.now() - created) / 86400000;
+    if (daysSinceReg < 1) return;
+    setShowAuthReminder(true);
+  }, [loading, user]);
 
   useEffect(() => {
     if (searchParams.get('edit') === '1') {
@@ -776,6 +795,52 @@ function ProfilePageInner() {
         />
       )}
 
+      {/* 未认证每日提醒弹窗 */}
+      {showAuthReminder && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 p-4">
+          <div className="w-full max-w-sm rounded-2xl bg-white p-6 shadow-xl">
+            {/* 大图标 */}
+            <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-orange-100">
+              <svg className="h-9 w-9 text-orange-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <path d="M12 9v4m0 4h.01M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" strokeLinecap="round" strokeLinejoin="round"/>
+              </svg>
+            </div>
+            <h3 className="text-center text-lg font-bold text-gray-800">建议完成身份认证</h3>
+            <p className="mt-2 text-center text-sm text-gray-500 leading-relaxed">
+              完成身份认证后可解锁发帖、评论、点赞、关注等功能, 同时享受更高的信任标识和权限。
+            </p>
+            {/* 权益受限说明 */}
+            <div className="mt-4 rounded-lg bg-orange-50 px-3 py-2 text-xs text-orange-700 space-y-1">
+              <div className="flex items-center gap-1.5"><span>🔒</span><span>未认证将限制发帖、评论、点赞</span></div>
+              <div className="flex items-center gap-1.5"><span>⚠️</span><span>无法申请徽章和资质认证</span></div>
+              <div className="flex items-center gap-1.5"><span>❓</span><span>社区信任标识不显示</span></div>
+            </div>
+            {/* 按钮 */}
+            <div className="mt-5 space-y-2">
+              <button
+                onClick={() => {
+                  localStorage.setItem('auth_reminder_date', new Date().toISOString().slice(0, 10));
+                  setShowAuthReminder(false);
+                  setShowVerifyModal(true);
+                }}
+                className="w-full rounded-xl bg-gradient-to-r from-blue-500 to-indigo-500 py-3 text-sm font-medium text-white shadow-sm hover:opacity-90"
+              >
+                立即认证
+              </button>
+              <button
+                onClick={() => {
+                  localStorage.setItem('auth_reminder_date', new Date().toISOString().slice(0, 10));
+                  setShowAuthReminder(false);
+                }}
+                className="w-full rounded-xl bg-gray-100 py-3 text-sm text-gray-600 hover:bg-gray-200"
+              >
+                我再想想
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* 实名认证弹窗 */}
       {showVerifyModal && user && (
         <VerificationModal
@@ -783,6 +848,10 @@ function ProfilePageInner() {
           onClose={() => setShowVerifyModal(false)}
           onVerified={() => { refreshUser(); setShowVerifyModal(false); }}
           onSubmitted={() => refreshUser()}
+          onLater={() => {
+            // 用户点了「我再想想」: 关闭弹窗并在"认证"菜单入口提示
+            setShowVerifyModal(false);
+          }}
         />
       )}
     </div>
@@ -980,7 +1049,7 @@ const VERIFY_TYPE_OPTIONS: { value: VerifyType; label: string; icon: string; des
   { value: 'QUALIFICATION', label: '资质/荣誉认证', icon: '🏅', desc: '学生会/广播站/证书等, 可重复认证' },
 ];
 
-function VerificationModal({ user, onClose, onVerified, onSubmitted }: { user: any; onClose: () => void; onVerified: () => void; onSubmitted?: () => void }) {
+function VerificationModal({ user, onClose, onVerified, onSubmitted, onLater }: { user: any; onClose: () => void; onVerified: () => void; onSubmitted?: () => void; onLater?: () => void }) {
   const [photo, setPhoto] = useState<string>('');
   const [photo2, setPhoto2] = useState<string>(''); // 第二张照片 (卡面反面/证书内页)
   const [templateId, setTemplateId] = useState<string>('');

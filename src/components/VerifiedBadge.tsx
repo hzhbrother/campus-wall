@@ -11,7 +11,7 @@ export function VerifiedBadge({ verified, className = '' }: VerifiedBadgeProps) 
         <svg className="h-2.5 w-2.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3">
           <path d="m5 12 5 5L20 7" strokeLinecap="round" strokeLinejoin="round" />
         </svg>
-        已认证
+        已身份认证
       </span>
     );
   }
