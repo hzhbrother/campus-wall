@@ -80,6 +80,28 @@ export async function PATCH(req: NextRequest) {
       }
     }
 
+    // 昵称唯一校验 (如果修改了昵称)
+    if (dto.nickname !== undefined && dto.nickname !== me.nickname) {
+      const nickExists = await prisma.user.findFirst({
+        where: { nickname: dto.nickname, id: { not: me.id } },
+        select: { id: true },
+      });
+      if (nickExists) {
+        return NextResponse.json({ message: '该账号名已被使用' }, { status: 409 });
+      }
+    }
+
+    // 邮箱唯一校验 (主动检查, 不依赖数据库约束兜底)
+    if (dto.email && dto.email !== me.email) {
+      const emailExists = await prisma.user.findFirst({
+        where: { email: dto.email, id: { not: me.id } },
+        select: { id: true },
+      });
+      if (emailExists) {
+        return NextResponse.json({ message: '该邮箱已绑定其他账号' }, { status: 409 });
+      }
+    }
+
     // 移除 emailCode (不存入数据库)
     const { emailCode, ...rest } = dto;
     const data: any = { ...rest };
