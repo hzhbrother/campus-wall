@@ -405,6 +405,7 @@ function ProfilePageInner() {
   usePageRefresh(() => { refreshUser(); }, [refreshUser], true);
 
   if (loading) return <div className="min-h-screen flex items-center justify-center text-gray-400">加载中…</div>;
+  if (!user) { router.push('/login'); return null; }
 
   const counts = (user as any)?._count || { posts: 0, comments: 0, likes: 0, favorites: 0, likesReceived: 0 };
 
