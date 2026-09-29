@@ -486,9 +486,12 @@ function ProfilePageInner() {
   }
 
   // ---- 首页视图 ----
+  const idApproved = user.verificationStatus === 'APPROVED' || !!user.verified;
   const menuItems = [
     { key: 'homepage', label: '我的主页', icon: '🏠' },
-    { key: 'verification', label: '认证', icon: '✅' },
+    ...(idApproved
+      ? [{ key: 'qualification', label: '资质/荣誉认证', icon: '🏅' }]
+      : [{ key: 'verification', label: '身份认证', icon: '✅' }]),
     { key: 'violations', label: '违规与信用', icon: '📋' },
     { key: 'badges', label: '证书/徽章', icon: '🎖️' },
     { key: 'checkin', label: '签到积分', icon: '🪙' },
@@ -501,7 +504,8 @@ function ProfilePageInner() {
   const handleMenu = (key: string) => {
     if (key === 'homepage' && user) { router.push(`/users/${user.id}`); return; }
     if (key === 'admin') { setView('overview'); return; }
-    if (key === 'verification') { setVerifyModalInitial(null); setShowVerifyModal(true); return; }
+    if (key === 'verification') { router.push('/verify'); return; }
+    if (key === 'qualification') { setShowVerifyModal(true); return; }
     if (key === 'violations') { setView('violations'); return; }
     if (key === 'badges') { setView('my-badges'); return; }
     if (key === 'checkin') { setView('checkin'); return; }
@@ -605,7 +609,7 @@ function ProfilePageInner() {
               </div>
               {/* 底部更改入口 */}
               <button
-                onClick={() => { if (confirm('申请更改实名信息需重新提交认证, 原认证将被重置。确定继续?')) { setVerifyModalInitial('IDENTITY'); setShowVerifyModal(true); } }}
+                onClick={() => { if (confirm('申请更改实名信息需重新提交认证, 原认证将被重置。确定继续?')) router.push('/verify'); }}
                 className="mt-4 text-xs text-gray-400"
               >
                 不是我的实名, 需要<span className="text-blue-500">更改</span>
@@ -821,8 +825,7 @@ function ProfilePageInner() {
                 onClick={() => {
                   localStorage.setItem('auth_reminder_date', new Date().toISOString().slice(0, 10));
                   setShowAuthReminder(false);
-                  setVerifyModalInitial('IDENTITY');
-                  setShowVerifyModal(true);
+                  router.push('/verify');
                 }}
                 className="w-full rounded-xl bg-gradient-to-r from-blue-500 to-indigo-500 py-3 text-sm font-medium text-white shadow-sm hover:opacity-90"
               >
@@ -1046,8 +1049,8 @@ function PrivacySettingsModal({ onClose, onSaved }: { onClose: () => void; onSav
 // ---------- 认证弹窗 (身份认证 / 资质荣誉认证) ----------
 type VerifyType = 'IDENTITY' | 'QUALIFICATION';
 
+// 身份认证已独立到 /verify 页面, 此弹窗只处理资质/荣誉认证
 const VERIFY_TYPE_OPTIONS: { value: VerifyType; label: string; icon: string; desc: string }[] = [
-  { value: 'IDENTITY', label: '身份认证', icon: '🎓', desc: '学生/老师身份认证 (校园卡或工牌)' },
   { value: 'QUALIFICATION', label: '资质/荣誉认证', icon: '🏅', desc: '学生会/广播站/证书等, 可重复认证' },
 ];
 
@@ -1117,13 +1120,10 @@ function VerificationModal({ user, initialType, onClose, onVerified, onSubmitted
     if (isQual) refreshQualStatus();
   }, [isQual, refreshQualStatus]);
 
-  // 初始类型: initialType 强制优先; 否则管理员/已通过身份自动切资质认证
+  // 弹窗只处理资质/荣誉认证, 打开即默认 QUALIFICATION
   useEffect(() => {
-    if (verifyType) return; // 用户已手动选了类型就不覆盖
-    if (initialType) { setVerifyType(initialType); return; }
-    const idApproved = isSuperAdmin || !!user.verified || (user.verificationStatus === 'APPROVED');
-    if (isAdmin || idApproved) setVerifyType('QUALIFICATION');
-  }, [initialType, isAdmin, isSuperAdmin, verifyType, user.verified, user.verificationStatus]);
+    if (!verifyType) setVerifyType('QUALIFICATION');
+  }, [verifyType]);
 
   // 身份认证 vs 资质认证 使用各自独立的状态字段, 互不污染
   const idStatus = localStatus || user.verificationStatus || 'NONE';
@@ -1238,15 +1238,7 @@ function VerificationModal({ user, initialType, onClose, onVerified, onSubmitted
         </div>
         <div className="flex-1 min-h-0 overflow-y-auto px-4 pb-6 pt-4">
 
-        {/* 超级管理员: 身份认证自动通过 (资质认证仍需手动提交) */}
-        {isSuperAdmin && !isQual ? (
-          <div className="rounded-xl bg-green-50 p-4 text-center">
-            <div className="text-3xl mb-1">✅</div>
-            <div className="text-sm font-medium text-green-700">已身份认证</div>
-            <div className="text-xs text-green-600 mt-1">超级管理员身份自动通过身份认证</div>
-            <div className="text-xs text-gray-400 mt-1">如需资质/荣誉认证, 请选择下方对应类型</div>
-          </div>
-        ) : isApproved ? (
+        {isApproved ? (
           <div className="rounded-xl bg-green-50 p-4 text-center">
             <div className="text-3xl mb-1">✅</div>
             <div className="text-sm font-medium text-green-700">已{verifyLabel}</div>
