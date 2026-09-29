@@ -465,9 +465,11 @@ function ProfilePageInner() {
   }
 
   // ---- 首页视图 ----
+  // 已手动认证的用户隐藏「认证」入口
+  const isIdVerified = user.verificationStatus === 'APPROVED';
   const menuItems = [
     { key: 'homepage', label: '我的主页', icon: '🏠' },
-    { key: 'verification', label: '认证', icon: '✅' },
+    ...(isIdVerified ? [] : [{ key: 'verification', label: '认证', icon: '✅' }]),
     { key: 'violations', label: '违规与信用', icon: '📋' },
     { key: 'badges', label: '证书/徽章', icon: '🎖️' },
     { key: 'checkin', label: '签到积分', icon: '🪙' },
@@ -522,6 +524,7 @@ function ProfilePageInner() {
 
   // ---- 账户与安全视图 ----
   if (view === 'security' && user) {
+    const verified = user.verificationStatus === 'APPROVED';
     const securityItems = [
       { key: 'password', label: '修改密码', icon: '🔑', onClick: () => setShowPwdModal(true) },
       { key: 'notif', label: '通知设置', icon: '🔔', onClick: () => setShowNotifModal(true) },
@@ -535,6 +538,43 @@ function ProfilePageInner() {
           <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="m15 18-6-6 6-6" strokeLinecap="round" strokeLinejoin="round"/></svg>
           返回
         </button>
+
+        {/* 实名信息卡片 (已认证) */}
+        {verified && (
+          <div className="rounded-2xl bg-white shadow-sm p-6">
+            <div className="flex flex-col items-center">
+              {/* 绿色对勾图标 */}
+              <div className="mb-3 h-16 w-16 rounded-full bg-green-100 flex items-center justify-center">
+                <svg className="h-10 w-10 text-green-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3">
+                  <path d="M5 12l5 5L20 7" strokeLinecap="round" strokeLinejoin="round"/>
+                </svg>
+              </div>
+              <div className="text-base font-medium text-gray-800 mb-1">实名认证成功</div>
+              <div className="text-xs text-gray-400 mb-4">实名信息认证后不可修改</div>
+              {/* 实名信息 */}
+              <div className="w-full border-t border-gray-100 pt-4 space-y-2">
+                <div className="flex justify-between text-sm">
+                  <span className="text-gray-400">真实姓名</span>
+                  <span className="text-gray-800">{user.realName || '—'}</span>
+                </div>
+                {user.studentId && (
+                  <div className="flex justify-between text-sm">
+                    <span className="text-gray-400">学号</span>
+                    <span className="text-gray-800">{user.studentId}</span>
+                  </div>
+                )}
+              </div>
+              {/* 底部更改入口 */}
+              <button
+                onClick={() => { if (confirm('申请更改实名信息需重新提交认证, 原认证将被重置。确定继续?')) setShowVerifyModal(true); }}
+                className="mt-4 text-xs text-gray-400"
+              >
+                不是我的实名, 需要<span className="text-blue-500">更改</span>
+              </button>
+            </div>
+          </div>
+        )}
+
         <div className="rounded-2xl bg-white shadow-sm overflow-hidden">
           {securityItems.map((item, idx) => (
             <div key={item.key} onClick={item.onClick} className={`flex items-center gap-3 px-4 py-4 cursor-pointer hover:bg-gray-50 ${idx > 0 ? 'border-t border-gray-100' : ''}`}>
