@@ -18,6 +18,7 @@ export interface AuthUser {
   avatarRejectReason?: string | null;
   coverImage?: string | null;
   realName?: string | null;
+  studentId?: string | null;
   countryCode?: string | null;
   phoneNumber?: string | null;
   grade?: string | null;
