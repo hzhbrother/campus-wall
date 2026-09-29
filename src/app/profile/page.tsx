@@ -539,7 +539,7 @@ function ProfilePageInner() {
           返回
         </button>
 
-        {/* 实名信息卡片 (已认证) */}
+        {/* 实名信息卡片 (已认证, 跟随管理员设置的实名字段) */}
         {verified && (
           <div className="rounded-2xl bg-white shadow-sm p-6">
             <div className="flex flex-col items-center">
@@ -551,16 +551,36 @@ function ProfilePageInner() {
               </div>
               <div className="text-base font-medium text-gray-800 mb-1">实名认证成功</div>
               <div className="text-xs text-gray-400 mb-4">实名信息认证后不可修改</div>
-              {/* 实名信息 */}
+              {/* 实名信息 (仅显示管理员填写过的字段) */}
               <div className="w-full border-t border-gray-100 pt-4 space-y-2">
-                <div className="flex justify-between text-sm">
-                  <span className="text-gray-400">真实姓名</span>
-                  <span className="text-gray-800">{user.realName || '—'}</span>
-                </div>
+                {user.realName && (
+                  <div className="flex justify-between text-sm">
+                    <span className="text-gray-400">真实姓名</span>
+                    <span className="text-gray-800">{user.realName}</span>
+                  </div>
+                )}
                 {user.studentId && (
                   <div className="flex justify-between text-sm">
                     <span className="text-gray-400">学号</span>
                     <span className="text-gray-800">{user.studentId}</span>
+                  </div>
+                )}
+                {user.grade && (
+                  <div className="flex justify-between text-sm">
+                    <span className="text-gray-400">年级</span>
+                    <span className="text-gray-800">{user.grade}</span>
+                  </div>
+                )}
+                {user.className && (
+                  <div className="flex justify-between text-sm">
+                    <span className="text-gray-400">班级</span>
+                    <span className="text-gray-800">{user.className}</span>
+                  </div>
+                )}
+                {user.school?.name && (
+                  <div className="flex justify-between text-sm">
+                    <span className="text-gray-400">学校</span>
+                    <span className="text-gray-800">{user.school.name}</span>
                   </div>
                 )}
               </div>
