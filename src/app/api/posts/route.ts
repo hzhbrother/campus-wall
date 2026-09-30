@@ -7,7 +7,7 @@ import { Prisma } from '@prisma/client';
 import { prisma } from '@/lib/prisma';
 import { getUserFromRequest } from '@/lib/server-auth';
 import { errorResponse } from '@/lib/api-response';
-import { getSiteConfigBool, getSiteConfigValue, getPostCategories } from '@/lib/site-config';
+import { getSiteConfigBool, getSiteConfigValue, getPostCategories, getReviewCategories } from '@/lib/site-config';
 import { isUserBanned } from '@/lib/server-auth';
 import { createNotification } from '@/lib/notification-service';
 import { checkAndAwardBadges } from '@/lib/badge-service';
@@ -81,10 +81,10 @@ export async function POST(req: NextRequest) {
     const isAdmin = me.role === UserRole.ADMIN || me.role === UserRole.SUPER_ADMIN;
 
     // 读取站点配置
-    const [categories, allowAnonymous, requiresApproval, dailyLimit, sensitiveWords] = await Promise.all([
+    const [categories, allowAnonymous, reviewCategories, dailyLimit, sensitiveWords] = await Promise.all([
       getPostCategories(),
       getSiteConfigBool('allow_anonymous', true),
-      getSiteConfigBool('post_requires_approval', true),
+      getReviewCategories(),
       getSiteConfigValue('daily_post_limit', '0'),
       getSiteConfigValue('sensitive_words', ''),
     ]);
@@ -128,8 +128,9 @@ export async function POST(req: NextRequest) {
       if (todayCount >= limit) return NextResponse.json({ message: `今日发帖已达上限 (${limit}条)` }, { status: 429 });
     }
 
-    // 审核状态: 管理员直通, 普通用户按配置决定是否审核
-    const status = isAdmin || !requiresApproval ? PostStatus.APPROVED : PostStatus.PENDING;
+    // 审核状态: 管理员直通; 普通帖子直接发布; 商业/招募类需审核
+    const needsReview = reviewCategories.includes(dto.category);
+    const status = isAdmin || !needsReview ? PostStatus.APPROVED : PostStatus.PENDING;
 
     const post = await prisma.post.create({
       data: {

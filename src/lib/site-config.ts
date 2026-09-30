@@ -21,6 +21,13 @@ export async function getSiteConfigBool(key: string, defaultValue = false): Prom
 
 export async function getPostCategories(): Promise<string[]> {
   const v = await getSiteConfigValue('post_categories');
-  if (!v) return ['校园', '失物招领', '二手交易', '表白墙', '寻物启事', '招聘兼职', '求助问答'];
+  if (!v) return ['校园', '失物招领', '二手交易', '表白墙', '寻物启事', '招聘兼职', '求助问答', '商业推广'];
+  return v.split(',').map(s => s.trim()).filter(Boolean);
+}
+
+// 需要审核的分类 (商业/招募类), 管理员可在站点配置 review_categories 中自定义
+export async function getReviewCategories(): Promise<string[]> {
+  const v = await getSiteConfigValue('review_categories');
+  if (!v) return ['招聘兼职', '商业推广'];
   return v.split(',').map(s => s.trim()).filter(Boolean);
 }
