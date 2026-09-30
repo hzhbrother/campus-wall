@@ -12,6 +12,11 @@ const OAUTH_BASE = process.env.NEXT_PUBLIC_API_BASE || '';
 export default function LoginPage() {
   const { login, user, loading, savedAccounts, switchAccount } = useAuth();
   const router = useRouter();
+  // add=1 表示从「添加账号」入口进入, 已登录也不自动跳转, 让用户继续登录新账号
+  const [isAddAccount, setIsAddAccount] = useState(false);
+  useEffect(() => {
+    setIsAddAccount(new URLSearchParams(window.location.search).get('add') === '1');
+  }, []);
   const [account, setAccount] = useState('');
   const [password, setPassword] = useState('');
   const [showPwd, setShowPwd] = useState(false);
@@ -21,10 +26,10 @@ export default function LoginPage() {
   const [showAggregated, setShowAggregated] = useState(false);
   const [juheReady, setJuheReady] = useState(false);
 
-  // 已登录则跳转首页 (联系方式由全局浮窗强制完善)
+  // 已登录则跳转首页 (add=1 时不跳, 让用户添加新账号)
   useEffect(() => {
-    if (!loading && user) router.replace('/');
-  }, [user, loading, router]);
+    if (!loading && user && !isAddAccount) router.replace('/');
+  }, [user, loading, router, isAddAccount]);
 
   // 检测聚合登录是否可用
   useEffect(() => {
@@ -36,7 +41,7 @@ export default function LoginPage() {
     setErr(''); setBusy(true);
     try {
       await login(account, password);
-      // 登录成功后由 useEffect 中的 user 变化处理跳转
+      router.replace('/');
     } catch (e: any) {
       setErr(e.message);
     } finally {
@@ -74,7 +79,7 @@ export default function LoginPage() {
                     setErr(''); setSwitchBusy(acc.userId);
                     try {
                       await switchAccount(acc.userId);
-                      // 成功后由 useEffect user 变化跳转
+                      router.replace('/');
                     } catch (e: any) {
                       setErr(e.message || '登录已过期, 请重新输入密码登录');
                     } finally {
