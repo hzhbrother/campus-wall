@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/auth-context';
 import { api } from '@/lib/api';
 import { compressImage } from '@/lib/image-compress';
+import { formatUserCode } from '@/lib/user-number';
 
 type PhotoType = 'CARD' | 'FACE';
 type VerificationStatus = 'NONE' | 'AI_REVIEWING' | 'PENDING' | 'APPROVED' | 'REJECTED';
