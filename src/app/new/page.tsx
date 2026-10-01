@@ -6,7 +6,7 @@ import { useAuth } from '@/lib/auth-context';
 import { api } from '@/lib/api';
 import { usePageRefresh } from '@/lib/use-page-refresh';
 
-const DEFAULT_CATEGORIES = ['校园', '失物招领', '二手交易', '表白墙', '寻物启事', '招聘兼职', '求助问答'];
+const DEFAULT_CATEGORIES = ['日常', '校园', '失物招领', '二手交易', '表白墙', '寻物启事', '招聘兼职', '求助问答', '商业推广'];
 const MAX_LEN = 1000;
 const MAX_IMAGES = 3;          // 最多 3 张图
 const COMPRESS_THRESHOLD = 2 * 1024 * 1024; // 超过 2MB 才压缩, 否则保留原图

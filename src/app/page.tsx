@@ -7,7 +7,7 @@ import { api } from '@/lib/api';
 import { PostCard, PostListItem } from '@/components/PostCard';
 import { usePageRefresh } from '@/lib/use-page-refresh';
 
-const DEFAULT_CATEGORIES = ['校园', '失物招领', '二手交易', '表白墙', '寻物启事', '招聘兼职', '求助问答'];
+const DEFAULT_CATEGORIES = ['日常', '校园', '失物招领', '二手交易', '表白墙', '寻物启事', '招聘兼职', '求助问答', '商业推广'];
 
 export default function HomePage() {
   const [items, setItems] = useState<PostListItem[]>([]);

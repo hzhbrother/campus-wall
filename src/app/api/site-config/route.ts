@@ -25,7 +25,7 @@ export async function GET() {
   if (!map.allow_register) map.allow_register = 'true';
   if (!map.allow_anonymous) map.allow_anonymous = 'true';
   if (!map.comment_enabled) map.comment_enabled = 'true';
-  if (!map.post_categories) map.post_categories = '校园,失物招领,二手交易,表白墙,寻物启事,招聘兼职,求助问答';
+  if (!map.post_categories) map.post_categories = '日常,校园,失物招领,二手交易,表白墙,寻物启事,招聘兼职,求助问答,商业推广';
   if (!map.announcement_text) map.announcement_text = '欢迎来到校园墙！请文明发言，禁止发布违规内容。失物招领请尽量附上图片，二手交易请当面验货。';
   if (!map.max_accounts) map.max_accounts = '3';
   return NextResponse.json(map);

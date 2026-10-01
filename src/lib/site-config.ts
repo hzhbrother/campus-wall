@@ -21,7 +21,7 @@ export async function getSiteConfigBool(key: string, defaultValue = false): Prom
 
 export async function getPostCategories(): Promise<string[]> {
   const v = await getSiteConfigValue('post_categories');
-  if (!v) return ['校园', '失物招领', '二手交易', '表白墙', '寻物启事', '招聘兼职', '求助问答', '商业推广'];
+  if (!v) return ['日常', '校园', '失物招领', '二手交易', '表白墙', '寻物启事', '招聘兼职', '求助问答', '商业推广'];
   return v.split(',').map(s => s.trim()).filter(Boolean);
 }
 

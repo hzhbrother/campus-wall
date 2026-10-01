@@ -1983,7 +1983,7 @@ function SiteSettings() {
           <div className="space-y-3">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">帖子分类（逗号分隔）</label>
-              <textarea value={cfg.post_categories || ''} onChange={e => set('post_categories', e.target.value)} rows={2} className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm" placeholder="校园,失物招领,二手交易,表白墙,寻物启事,招聘兼职,求助问答" />
+              <textarea value={cfg.post_categories || ''} onChange={e => set('post_categories', e.target.value)} rows={2} className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm" placeholder="日常,校园,失物招领,二手交易,表白墙,寻物启事,招聘兼职,求助问答,商业推广" />
               <p className="text-xs text-gray-400 mt-1">修改后将影响发帖时的分类选项</p>
             </div>
             <div className="grid grid-cols-2 gap-3">
