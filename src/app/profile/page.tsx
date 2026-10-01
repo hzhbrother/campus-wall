@@ -11,6 +11,7 @@ import { usePageRefresh } from '@/lib/use-page-refresh';
 import { VerifiedBadge } from '@/components/VerifiedBadge';
 import { BadgesView } from '@/components/BadgesView';
 import { CheckInView } from '@/components/CheckInView';
+import { WishView } from '@/components/WishView';
 import { JoinOrgModal } from '@/components/JoinOrgModal';
 import { formatUserCode } from '@/lib/user-number';
 import { DEFAULT_ROLE_PERMISSIONS } from '@/lib/permissions';
@@ -22,7 +23,7 @@ const AdminPanel = dynamic(() => import('@/components/admin/AdminPanel').then(m 
   loading: () => <div className="py-12 text-center text-gray-400">加载中…</div>,
 });
 
-type View = 'home' | 'admin' | 'edit' | 'security' | 'violations' | 'my-badges' | 'checkin' | 'contact' | 'account-switch' | AdminTab;
+type View = 'home' | 'admin' | 'edit' | 'security' | 'violations' | 'my-badges' | 'checkin' | 'wish' | 'contact' | 'account-switch' | AdminTab;
 
 // ---------- 通用行组件 (定义在组件外, 避免每次渲染重建导致 input 失焦) ----------
 const Row = ({ label, children, onClick, border = true }: { label: React.ReactNode; children: React.ReactNode; onClick?: () => void; border?: boolean }) => (
@@ -511,6 +512,7 @@ function ProfilePageInner() {
     { key: 'violations', label: '违规与信用', icon: '📋' },
     { key: 'badges', label: '证书/徽章', icon: '🎖️' },
     { key: 'checkin', label: '签到积分', icon: '🪙' },
+    { key: 'wish', label: '许愿单', icon: '🎯' },
     { key: 'security', label: '账户与安全', icon: '🔒' },
     ...(isAdmin ? [{ key: 'admin', label: '管理后台', icon: '⚙️' }] : []),
     { key: 'about', label: '关于校园墙', icon: 'ℹ️' },
@@ -525,6 +527,7 @@ function ProfilePageInner() {
     if (key === 'violations') { setView('violations'); return; }
     if (key === 'badges') { setView('my-badges'); return; }
     if (key === 'checkin') { setView('checkin'); return; }
+    if (key === 'wish') { setView('wish'); return; }
     if (key === 'security') { setView('security'); return; }
     if (key === 'about') { router.push('/about'); return; }
     if (key === 'contact') { setView('contact'); return; }
@@ -675,6 +678,11 @@ function ProfilePageInner() {
   // ---- 签到积分视图 ----
   if (view === 'checkin') {
     return <CheckInView onBack={() => setView('home')} onPointsChanged={() => refreshUser()} />;
+  }
+
+  // ---- 许愿单视图 ----
+  if (view === 'wish') {
+    return <WishView onBack={() => setView('home')} />;
   }
 
   // ---- 联系我们视图 ----
