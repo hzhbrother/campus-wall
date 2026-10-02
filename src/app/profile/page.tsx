@@ -514,6 +514,9 @@ function ProfilePageInner() {
       { key: 'notifications', label: '通知发布', perm: 'notification.send' },
       { key: 'schools', label: '学校管理', perm: 'school.manage' },
       { key: 'orgs', label: '团体管理', perm: 'org.manage' },
+      { key: 'quicklinks', label: '快捷通道', perm: 'quicklink.manage' },
+      { key: 'shop', label: '积分商城', perm: 'shop.manage' },
+      { key: 'wishes', label: '许愿单', perm: 'wish.review' },
       { key: 'badges', label: '徽章管理', perm: 'badge.manage' },
       { key: 'template', label: '识别模板', perm: 'template.manage' },
       // 站点配置类 + 角色管理 仅超级管理员可见 (role.manage / settings.* 为超管专属权限)

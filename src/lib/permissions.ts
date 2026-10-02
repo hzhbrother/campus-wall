@@ -44,6 +44,11 @@ export const PERMISSIONS: PermissionMeta[] = [
   { code: 'school.manage', name: '学校管理', group: '基础数据' },
   { code: 'org.manage', name: '团体管理', group: '基础数据' },
 
+  // ---- 运营管理 ----
+  { code: 'quicklink.manage', name: '快捷通道管理', group: '运营管理' },
+  { code: 'shop.manage', name: '积分商城管理', group: '运营管理' },
+  { code: 'wish.review', name: '许愿单审核', group: '运营管理' },
+
   // ---- 申诉管理 ----
   { code: 'appeal.view', name: '查看封禁申诉', group: '申诉管理' },
   { code: 'appeal.handle', name: '处理封禁申诉', group: '申诉管理' },
@@ -87,6 +92,7 @@ export const DEFAULT_ROLE_PERMISSIONS: Record<string, string[]> = {
     'verification.review', 'qualification.review',
     'badge.manage',
     'school.manage', 'org.manage',
+    'quicklink.manage', 'shop.manage', 'wish.review',
     'appeal.view', 'appeal.handle',
     'notification.send',
   ],

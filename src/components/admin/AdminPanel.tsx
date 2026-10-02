@@ -7,7 +7,7 @@ import { compressImage } from '@/lib/image-compress';
 import TemplateManager from './TemplateManager';
 import { BadgesManager } from './BadgesManager';
 
-export type AdminTab = 'overview' | 'posts' | 'moderation' | 'comments' | 'users' | 'avatars' | 'verification' | 'qualifications' | 'template' | 'appeals' | 'notifications' | 'settings' | 'email' | 'agreement' | 'roles' | 'badges' | 'schools' | 'orgs';
+export type AdminTab = 'overview' | 'posts' | 'moderation' | 'comments' | 'users' | 'avatars' | 'verification' | 'qualifications' | 'template' | 'appeals' | 'notifications' | 'settings' | 'email' | 'agreement' | 'roles' | 'badges' | 'schools' | 'orgs' | 'quicklinks' | 'shop' | 'wishes';
 
 // ---------- 通用 UI ----------
 function SectionTitle({ title, desc }: { title: string; desc?: string }) {
@@ -3585,6 +3585,353 @@ function AvatarReviewTab() {
   );
 }
 
+// ---------- 快捷通道管理 ----------
+function QuickLinksManager() {
+  const [items, setItems] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [showForm, setShowForm] = useState(false);
+  const [editing, setEditing] = useState<any>(null);
+  const [err, setErr] = useState('');
+
+  const load = () => {
+    api.get<{ items: any[] }>('/api/admin/quick-links')
+      .then(d => setItems(d.items))
+      .catch(e => setErr(e.message))
+      .finally(() => setLoading(false));
+  };
+  useEffect(() => { load(); }, []);
+
+  const openNew = () => { setEditing({ title: '', url: '', icon: '', sortOrder: 0, isActive: true }); setShowForm(true); setErr(''); };
+  const openEdit = (item: any) => { setEditing({ ...item }); setShowForm(true); setErr(''); };
+
+  const save = async () => {
+    if (!editing.title.trim() || !editing.url.trim()) { setErr('请填写名称和链接'); return; }
+    try {
+      if (editing.id) {
+        await api.patch(`/api/admin/quick-links/${editing.id}`, editing);
+      } else {
+        await api.post('/api/admin/quick-links', editing);
+      }
+      setShowForm(false); load();
+    } catch (e: any) { setErr(e.message); }
+  };
+
+  const remove = async (id: string) => {
+    if (!confirm('确定删除该快捷通道?')) return;
+    try { await api.del(`/api/admin/quick-links/${id}`); load(); }
+    catch (e: any) { setErr(e.message); }
+  };
+
+  const handleImage = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const f = e.target.files?.[0]; if (!f) return;
+    try { const b64 = await compressImage(f, 512, 0.7); setEditing({ ...editing, icon: b64 }); }
+    catch { alert('图片处理失败'); }
+  };
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center justify-between">
+        <SectionTitle title="快捷通道管理" desc="管理首页快捷通道, 点击次数多的自动排前" />
+        <button onClick={openNew} className="rounded-lg bg-blue-500 px-4 py-2 text-sm text-white hover:bg-blue-600">+ 新增</button>
+      </div>
+      {err && <div className="text-sm text-red-500">{err}</div>}
+
+      {showForm && (
+        <div className="rounded-2xl bg-white p-5 shadow-sm space-y-3">
+          <div className="flex gap-3">
+            <div className="space-y-2">
+              <div className="h-16 w-16 rounded-xl bg-gray-100 overflow-hidden flex items-center justify-center">
+                {editing.icon ? <img src={editing.icon} alt="" className="h-full w-full object-cover" /> : <span className="text-gray-300">图标</span>}
+              </div>
+              <label className="block text-center text-xs text-blue-500 cursor-pointer">
+                上传<input type="file" accept="image/*" onChange={handleImage} className="hidden" />
+              </label>
+            </div>
+            <div className="flex-1 space-y-3">
+              <input value={editing.title} onChange={e => setEditing({ ...editing, title: e.target.value })} placeholder="名称" className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm" />
+              <input value={editing.url} onChange={e => setEditing({ ...editing, url: e.target.value })} placeholder="链接 URL" className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm" />
+              <div className="flex items-center gap-4">
+                <label className="flex items-center gap-1 text-sm text-gray-600">
+                  <input type="number" value={editing.sortOrder} onChange={e => setEditing({ ...editing, sortOrder: Number(e.target.value) })} className="w-16 rounded border border-gray-300 px-2 py-1 text-sm" /> 排序
+                </label>
+                <label className="flex items-center gap-1 text-sm text-gray-600">
+                  <input type="checkbox" checked={editing.isActive} onChange={e => setEditing({ ...editing, isActive: e.target.checked })} /> 启用
+                </label>
+              </div>
+            </div>
+          </div>
+          <div className="flex gap-2">
+            <button onClick={save} className="rounded-lg bg-blue-500 px-4 py-2 text-sm text-white hover:bg-blue-600">保存</button>
+            <button onClick={() => setShowForm(false)} className="rounded-lg bg-gray-100 px-4 py-2 text-sm hover:bg-gray-200">取消</button>
+          </div>
+        </div>
+      )}
+
+      {loading ? <p className="text-sm text-gray-400">加载中…</p> : (
+        <div className="overflow-hidden rounded-2xl bg-white shadow-sm">
+          <table className="w-full text-sm">
+            <thead className="bg-gray-50 text-gray-500">
+              <tr><th className="px-4 py-2.5 text-left">名称</th><th className="px-4 py-2.5 text-left">链接</th><th className="px-4 py-2.5 text-center">点击</th><th className="px-4 py-2.5 text-center">状态</th><th className="px-4 py-2.5 text-right">操作</th></tr>
+            </thead>
+            <tbody>
+              {items.map(it => (
+                <tr key={it.id} className="border-t border-gray-100">
+                  <td className="px-4 py-2.5 flex items-center gap-2">
+                    {it.icon && <img src={it.icon} alt="" className="h-7 w-7 rounded-lg object-cover" />}
+                    <span>{it.title}</span>
+                  </td>
+                  <td className="px-4 py-2.5 text-gray-500 truncate max-w-[200px]">{it.url}</td>
+                  <td className="px-4 py-2.5 text-center">{it.clickCount}</td>
+                  <td className="px-4 py-2.5 text-center">{it.isActive ? <span className="text-green-500">启用</span> : <span className="text-gray-400">禁用</span>}</td>
+                  <td className="px-4 py-2.5 text-right">
+                    <button onClick={() => openEdit(it)} className="text-blue-500 hover:underline mr-2">编辑</button>
+                    <button onClick={() => remove(it.id)} className="text-red-400 hover:underline">删除</button>
+                  </td>
+                </tr>
+              ))}
+              {items.length === 0 && <tr><td colSpan={5} className="px-4 py-8 text-center text-gray-400">暂无数据</td></tr>}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ---------- 积分商城管理 ----------
+function ShopManager() {
+  const [tab, setTab] = useState<'items' | 'exchanges'>('items');
+  const [items, setItems] = useState<any[]>([]);
+  const [exchanges, setExchanges] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [showForm, setShowForm] = useState(false);
+  const [editing, setEditing] = useState<any>(null);
+  const [err, setErr] = useState('');
+
+  const load = () => {
+    setLoading(true);
+    api.get<{ items: any[] }>('/api/admin/shop/items')
+      .then(d => setItems(d.items))
+      .catch(e => setErr(e.message));
+    api.get<{ items: any[] }>('/api/admin/shop/exchanges')
+      .then(d => setExchanges(d.items))
+      .catch(() => {});
+    setLoading(false);
+  };
+  useEffect(() => { load(); }, []);
+
+  const openNew = () => { setEditing({ name: '', description: '', image: '', pointsCost: 100, stock: -1, isActive: true }); setShowForm(true); setErr(''); };
+  const openEdit = (item: any) => { setEditing({ ...item }); setShowForm(true); setErr(''); };
+
+  const save = async () => {
+    if (!editing.name.trim()) { setErr('请填写商品名称'); return; }
+    try {
+      if (editing.id) { await api.patch(`/api/admin/shop/items/${editing.id}`, editing); }
+      else { await api.post('/api/admin/shop/items', editing); }
+      setShowForm(false); load();
+    } catch (e: any) { setErr(e.message); }
+  };
+
+  const remove = async (id: string) => {
+    if (!confirm('确定删除该商品?')) return;
+    try { await api.del(`/api/admin/shop/items/${id}`); load(); }
+    catch (e: any) { setErr(e.message); }
+  };
+
+  const updateExchange = async (id: string, status: string) => {
+    try { await api.patch(`/api/admin/shop/exchanges/${id}`, { status }); load(); }
+    catch (e: any) { alert(e.message); }
+  };
+
+  const handleImage = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const f = e.target.files?.[0]; if (!f) return;
+    try { const b64 = await compressImage(f, 800, 0.7); setEditing({ ...editing, image: b64 }); }
+    catch { alert('图片处理失败'); }
+  };
+
+  const statusLabel = (s: string) => {
+    if (s === 'FULFILLED') return <span className="text-green-500">已发放</span>;
+    if (s === 'CANCELLED') return <span className="text-gray-400">已取消</span>;
+    return <span className="text-amber-500">待发放</span>;
+  };
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center justify-between">
+        <SectionTitle title="积分商城管理" desc="管理兑换商品与兑换记录" />
+        {tab === 'items' && <button onClick={openNew} className="rounded-lg bg-amber-500 px-4 py-2 text-sm text-white hover:bg-amber-600">+ 新增商品</button>}
+      </div>
+      {err && <div className="text-sm text-red-500">{err}</div>}
+
+      <div className="flex gap-2">
+        <button onClick={() => setTab('items')} className={`rounded-lg px-4 py-2 text-sm ${tab === 'items' ? 'bg-blue-500 text-white' : 'bg-gray-100'}`}>商品管理</button>
+        <button onClick={() => setTab('exchanges')} className={`rounded-lg px-4 py-2 text-sm ${tab === 'exchanges' ? 'bg-blue-500 text-white' : 'bg-gray-100'}`}>兑换记录</button>
+      </div>
+
+      {showForm && tab === 'items' && (
+        <div className="rounded-2xl bg-white p-5 shadow-sm space-y-3">
+          <div className="flex gap-4">
+            <div className="space-y-2">
+              <div className="h-24 w-24 rounded-xl bg-gray-100 overflow-hidden flex items-center justify-center">
+                {editing.image ? <img src={editing.image} alt="" className="h-full w-full object-cover" /> : <span className="text-3xl text-gray-300">🎁</span>}
+              </div>
+              <label className="block text-center text-xs text-blue-500 cursor-pointer">
+                上传图片<input type="file" accept="image/*" onChange={handleImage} className="hidden" />
+              </label>
+            </div>
+            <div className="flex-1 space-y-3">
+              <input value={editing.name} onChange={e => setEditing({ ...editing, name: e.target.value })} placeholder="商品名称" className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm" />
+              <textarea value={editing.description || ''} onChange={e => setEditing({ ...editing, description: e.target.value })} placeholder="商品描述" rows={2} className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm" />
+              <div className="flex gap-3">
+                <div className="flex-1">
+                  <label className="text-xs text-gray-500">所需积分</label>
+                  <input type="number" value={editing.pointsCost} onChange={e => setEditing({ ...editing, pointsCost: Number(e.target.value) })} className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm" />
+                </div>
+                <div className="flex-1">
+                  <label className="text-xs text-gray-500">库存 (-1不限)</label>
+                  <input type="number" value={editing.stock} onChange={e => setEditing({ ...editing, stock: Number(e.target.value) })} className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm" />
+                </div>
+                <label className="flex items-end gap-1 text-sm text-gray-600">
+                  <input type="checkbox" checked={editing.isActive} onChange={e => setEditing({ ...editing, isActive: e.target.checked })} /> 上架
+                </label>
+              </div>
+            </div>
+          </div>
+          <div className="flex gap-2">
+            <button onClick={save} className="rounded-lg bg-amber-500 px-4 py-2 text-sm text-white hover:bg-amber-600">保存</button>
+            <button onClick={() => setShowForm(false)} className="rounded-lg bg-gray-100 px-4 py-2 text-sm hover:bg-gray-200">取消</button>
+          </div>
+        </div>
+      )}
+
+      {tab === 'items' ? (
+        <div className="overflow-hidden rounded-2xl bg-white shadow-sm">
+          <table className="w-full text-sm">
+            <thead className="bg-gray-50 text-gray-500">
+              <tr><th className="px-4 py-2.5 text-left">商品</th><th className="px-4 py-2.5 text-center">积分</th><th className="px-4 py-2.5 text-center">库存</th><th className="px-4 py-2.5 text-center">状态</th><th className="px-4 py-2.5 text-right">操作</th></tr>
+            </thead>
+            <tbody>
+              {items.map(it => (
+                <tr key={it.id} className="border-t border-gray-100">
+                  <td className="px-4 py-2.5 flex items-center gap-2">
+                    {it.image && <img src={it.image} alt="" className="h-10 w-10 rounded-lg object-cover" />}
+                    <div><div className="font-medium">{it.name}</div>{it.description && <div className="text-xs text-gray-400 truncate max-w-[200px]">{it.description}</div>}</div>
+                  </td>
+                  <td className="px-4 py-2.5 text-center text-amber-600 font-medium">{it.pointsCost}</td>
+                  <td className="px-4 py-2.5 text-center">{it.stock === -1 ? '不限' : it.stock}</td>
+                  <td className="px-4 py-2.5 text-center">{it.isActive ? <span className="text-green-500">上架</span> : <span className="text-gray-400">下架</span>}</td>
+                  <td className="px-4 py-2.5 text-right">
+                    <button onClick={() => openEdit(it)} className="text-blue-500 hover:underline mr-2">编辑</button>
+                    <button onClick={() => remove(it.id)} className="text-red-400 hover:underline">删除</button>
+                  </td>
+                </tr>
+              ))}
+              {items.length === 0 && <tr><td colSpan={5} className="px-4 py-8 text-center text-gray-400">暂无商品</td></tr>}
+            </tbody>
+          </table>
+        </div>
+      ) : (
+        <div className="overflow-hidden rounded-2xl bg-white shadow-sm">
+          <table className="w-full text-sm">
+            <thead className="bg-gray-50 text-gray-500">
+              <tr><th className="px-4 py-2.5 text-left">用户</th><th className="px-4 py-2.5 text-left">商品</th><th className="px-4 py-2.5 text-center">积分</th><th className="px-4 py-2.5 text-center">状态</th><th className="px-4 py-2.5 text-center">时间</th><th className="px-4 py-2.5 text-right">操作</th></tr>
+            </thead>
+            <tbody>
+              {exchanges.map(r => (
+                <tr key={r.id} className="border-t border-gray-100">
+                  <td className="px-4 py-2.5">{r.user?.nickname}</td>
+                  <td className="px-4 py-2.5">{r.item?.name}</td>
+                  <td className="px-4 py-2.5 text-center text-amber-600">{r.pointsCost}</td>
+                  <td className="px-4 py-2.5 text-center">{statusLabel(r.status)}</td>
+                  <td className="px-4 py-2.5 text-center text-gray-400 text-xs">{new Date(r.createdAt).toLocaleDateString('zh-CN')}</td>
+                  <td className="px-4 py-2.5 text-right">
+                    {r.status === 'PENDING' && (
+                      <>
+                        <button onClick={() => updateExchange(r.id, 'FULFILLED')} className="text-green-500 hover:underline mr-2">发放</button>
+                        <button onClick={() => updateExchange(r.id, 'CANCELLED')} className="text-red-400 hover:underline">取消</button>
+                      </>
+                    )}
+                  </td>
+                </tr>
+              ))}
+              {exchanges.length === 0 && <tr><td colSpan={6} className="px-4 py-8 text-center text-gray-400">暂无兑换记录</td></tr>}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ---------- 许愿单审核 ----------
+function WishesManager() {
+  const [items, setItems] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [err, setErr] = useState('');
+
+  const load = () => {
+    api.get<{ items: any[] }>('/api/admin/wishes')
+      .then(d => setItems(d.items))
+      .catch(e => setErr(e.message))
+      .finally(() => setLoading(false));
+  };
+  useEffect(() => { load(); }, []);
+
+  const setStatus = async (id: string, status: string) => {
+    try { await api.patch(`/api/admin/wishes/${id}`, { status }); load(); }
+    catch (e: any) { alert(e.message); }
+  };
+
+  const remove = async (id: string) => {
+    if (!confirm('确定删除该许愿?')) return;
+    try { await api.del(`/api/admin/wishes/${id}`); load(); }
+    catch (e: any) { alert(e.message); }
+  };
+
+  const statusBadge = (s: string) => {
+    if (s === 'ADOPTED') return <span className="rounded-full bg-green-100 px-2 py-0.5 text-xs text-green-600">已采纳</span>;
+    if (s === 'REVIEWED') return <span className="rounded-full bg-blue-100 px-2 py-0.5 text-xs text-blue-600">已查看</span>;
+    return <span className="rounded-full bg-amber-100 px-2 py-0.5 text-xs text-amber-600">待查看</span>;
+  };
+
+  return (
+    <div className="space-y-4">
+      <SectionTitle title="许愿单审核" desc="查看用户许愿, 标记已查看或采纳" />
+      {err && <div className="text-sm text-red-500">{err}</div>}
+      {loading ? <p className="text-sm text-gray-400">加载中…</p> : (
+        <div className="space-y-3">
+          {items.map(w => (
+            <div key={w.id} className="rounded-2xl bg-white shadow-sm p-4">
+              <div className="flex gap-3">
+                {w.image && <img src={w.image} alt="" className="h-16 w-16 rounded-lg object-cover shrink-0" />}
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 mb-1">
+                    <span className="font-semibold text-gray-900">{w.itemName}</span>
+                    {statusBadge(w.status)}
+                  </div>
+                  <p className="text-sm text-gray-600 line-clamp-2">{w.description}</p>
+                  <div className="flex items-center gap-2 mt-1.5 text-xs text-gray-400">
+                    <span>{w.user?.nickname}</span>
+                    {w.user?.email && <span>· {w.user.email}</span>}
+                    <span>· {new Date(w.createdAt).toLocaleString('zh-CN')}</span>
+                  </div>
+                </div>
+              </div>
+              <div className="flex gap-2 mt-3">
+                {w.status !== 'REVIEWED' && <button onClick={() => setStatus(w.id, 'REVIEWED')} className="rounded-lg bg-blue-50 px-3 py-1.5 text-xs text-blue-500 hover:bg-blue-100">标记已查看</button>}
+                {w.status !== 'ADOPTED' && <button onClick={() => setStatus(w.id, 'ADOPTED')} className="rounded-lg bg-green-50 px-3 py-1.5 text-xs text-green-600 hover:bg-green-100">采纳</button>}
+                {w.status !== 'PENDING' && <button onClick={() => setStatus(w.id, 'PENDING')} className="rounded-lg bg-gray-50 px-3 py-1.5 text-xs text-gray-500 hover:bg-gray-100">重置</button>}
+                <button onClick={() => remove(w.id)} className="rounded-lg bg-red-50 px-3 py-1.5 text-xs text-red-400 hover:bg-red-100 ml-auto">删除</button>
+              </div>
+            </div>
+          ))}
+          {items.length === 0 && <div className="rounded-2xl bg-white shadow-sm p-10 text-center text-gray-400">暂无许愿</div>}
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ---------- 管理后台主组件 ----------
 export function AdminPanel({ tab, isSuper }: { tab: AdminTab; isSuper: boolean }) {
   switch (tab) {
@@ -3606,6 +3953,9 @@ export function AdminPanel({ tab, isSuper }: { tab: AdminTab; isSuper: boolean }
     case 'badges': return <BadgesManager />;
     case 'schools': return <SchoolsManager />;
     case 'orgs': return <OrgsManager />;
+    case 'quicklinks': return <QuickLinksManager />;
+    case 'shop': return <ShopManager />;
+    case 'wishes': return <WishesManager />;
     default: return <OverviewTab />;
   }
 }
