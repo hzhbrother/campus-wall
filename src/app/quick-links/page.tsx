@@ -30,8 +30,8 @@ export default function QuickLinksPage() {
   if (loading) return <div className="p-4 text-center text-gray-400">加载中…</div>;
 
   return (
-    <div className="space-y-4">
-      <h1 className="text-xl font-bold text-gray-900 px-4 pt-4">快捷通道</h1>
+    <div className="space-y-4 -mx-4">
+      <h1 className="text-xl font-bold text-gray-900 px-4 pt-1">快捷通道</h1>
       {links.length === 0 ? (
         <div className="px-4 py-12 text-center text-gray-400">
           <p className="text-4xl mb-2">🔗</p>

@@ -48,8 +48,8 @@ export default function ShopPage() {
   };
 
   return (
-    <div className="space-y-4">
-      <div className="px-4 pt-4">
+    <div className="space-y-4 -mx-4">
+      <div className="px-4 pt-1">
         <h1 className="text-xl font-bold text-gray-900">积分商城</h1>
         {user && <p className="text-sm text-gray-500 mt-1">当前积分: <span className="font-semibold text-amber-600">{user.points || 0}</span></p>}
       </div>

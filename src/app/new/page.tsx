@@ -158,7 +158,7 @@ export default function NewPostPage() {
   }
 
   return (
-    <div className="pb-36">
+    <div className="pb-36 -mx-4">
       {/* 顶部提示 */}
       <div className="mx-4 mt-3 rounded-lg bg-orange-50 px-3 py-2 text-center text-xs text-orange-600">
         禁止发布重复信息, 广告营销类, 含二维码等内容
