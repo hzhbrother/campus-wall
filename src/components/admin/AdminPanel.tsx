@@ -1188,6 +1188,7 @@ function PointsAdjustModal({ user, onClose, onDone }: { user: any; onClose: () =
   const [err, setErr] = useState('');
   const [logs, setLogs] = useState<any[]>([]);
   const [loadingLogs, setLoadingLogs] = useState(false);
+  const [currentPoints, setCurrentPoints] = useState<number>(user.points ?? 0);
 
   const loadLogs = () => {
     setLoadingLogs(true);
@@ -1202,7 +1203,8 @@ function PointsAdjustModal({ user, onClose, onDone }: { user: any; onClose: () =
     if (amount === 0) { setErr('请输入变动积分 (正数增加, 负数扣除)'); return; }
     setSaving(true); setErr('');
     try {
-      await api.post(`/api/admin/users/${user.id}/points`, { amount, reason: reason.trim() || undefined });
+      const res = await api.post<{ success: boolean; points: number }>(`/api/admin/users/${user.id}/points`, { amount, reason: reason.trim() || undefined });
+      setCurrentPoints(res.points);
       onDone();
       loadLogs();
       setAmount(0); setReason('');
@@ -1210,13 +1212,13 @@ function PointsAdjustModal({ user, onClose, onDone }: { user: any; onClose: () =
     finally { setSaving(false); }
   };
 
-  const preview = (user.points ?? 0) + amount;
+  const preview = currentPoints + amount;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" onClick={onClose}>
       <div className="w-full max-w-lg rounded-2xl bg-white p-6 shadow-2xl max-h-[85vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
         <h3 className="text-lg font-bold text-gray-900 mb-1">调整积分</h3>
-        <p className="text-sm text-gray-500 mb-4">用户: <span className="font-semibold text-gray-700">{user.nickname}</span> · 当前积分: <span className="font-semibold text-amber-600">{user.points ?? 0}</span></p>
+        <p className="text-sm text-gray-500 mb-4">用户: <span className="font-semibold text-gray-700">{user.nickname}</span> · 当前积分: <span className="font-semibold text-amber-600">{currentPoints}</span></p>
 
         <div className="space-y-4">
           <div className="flex gap-3">
