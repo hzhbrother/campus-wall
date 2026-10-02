@@ -184,6 +184,8 @@ model User {
   qualificationComments QualificationComment[]
   qualificationLikes QualificationLike[]
   checkIns     CheckInRecord[]
+  pointsLogs   PointsLog[]  @relation("PointsLogUser")
+  pointsLogsAsAdmin PointsLog[] @relation("PointsLogAdmin")
   wishItems    WishItem[]
   exchanges    ExchangeRecord[]
   school       School?          @relation(fields: [schoolId], references: [id])
@@ -592,6 +594,24 @@ model CheckInRecord {
 
   @@unique([userId, date])
   @@index([userId])
+}
+
+// ---- 积分流水 (管理员赠与/扣除) ----
+
+model PointsLog {
+  id          String   @id @default(cuid())
+  userId      String
+  adminId     String              // 操作管理员 ID
+  amount      Int                 // 变动积分 (正=增加, 负=扣除)
+  balanceAfter Int                // 变动后余额
+  reason      String?             // 备注原因
+  createdAt   DateTime @default(now())
+
+  user        User     @relation("PointsLogUser", fields: [userId], references: [id], onDelete: Cascade)
+  admin       User     @relation("PointsLogAdmin", fields: [adminId], references: [id])
+
+  @@index([userId])
+  @@index([createdAt])
 }
 
 // ---- 学校 ----

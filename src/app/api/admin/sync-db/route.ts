@@ -55,6 +55,15 @@ const TABLES_SQL = [
     status TEXT NOT NULL DEFAULT 'PENDING',
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP
   )`,
+  `CREATE TABLE IF NOT EXISTS "PointsLog" (
+    id TEXT PRIMARY KEY,
+    "userId" TEXT NOT NULL,
+    "adminId" TEXT NOT NULL,
+    amount INTEGER NOT NULL,
+    "balanceAfter" INTEGER NOT NULL,
+    reason TEXT,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP
+  )`,
 ];
 
 const INDEXES_SQL = [
@@ -63,6 +72,8 @@ const INDEXES_SQL = [
   `CREATE INDEX IF NOT EXISTS "WishItem_userId_idx" ON "WishItem"("userId")`,
   `CREATE INDEX IF NOT EXISTS "WishItem_status_idx" ON "WishItem"("status")`,
   `CREATE INDEX IF NOT EXISTS "WishItem_createdAt_idx" ON "WishItem"("createdAt")`,
+  `CREATE INDEX IF NOT EXISTS "PointsLog_userId_idx" ON "PointsLog"("userId")`,
+  `CREATE INDEX IF NOT EXISTS "PointsLog_createdAt_idx" ON "PointsLog"("createdAt")`,
 ];
 
 export async function GET(req: NextRequest) {

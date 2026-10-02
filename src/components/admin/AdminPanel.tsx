@@ -345,6 +345,7 @@ function UsersTab({ isSuper }: { isSuper: boolean }) {
   const [editUser, setEditUser] = useState<any>(null);
   const [banUser, setBanUser] = useState<any>(null);
   const [deleteTarget, setDeleteTarget] = useState<any>(null);
+  const [pointsUser, setPointsUser] = useState<any>(null);
   const [showCreate, setShowCreate] = useState(false);
   const [showBatch, setShowBatch] = useState(false);
   const [showImport, setShowImport] = useState(false);
@@ -451,6 +452,7 @@ function UsersTab({ isSuper }: { isSuper: boolean }) {
                   </div>
                   <p className="mt-0.5 text-xs text-gray-400">
                     {u.realName ? u.realName + ' · ' : ''}{u.email ? u.email + ' · ' : ''}帖子 {u._count?.posts}
+                    <span className="ml-2 font-medium text-amber-600">积分 {u.points ?? 0}</span>
                     {typeof u.credibilityScore === 'number' && <span className={`ml-2 font-medium ${scoreColor(u.credibilityScore)}`}>诚信分 {u.credibilityScore}</span>}
                   </p>
                   {banInfo(u) && <p className="mt-0.5 text-xs text-red-500 font-medium">{banInfo(u)}{u.banReason ? ' · ' + u.banReason : ''}</p>}
@@ -462,6 +464,7 @@ function UsersTab({ isSuper }: { isSuper: boolean }) {
                 )}
                 <button onClick={() => setBanUser(u)} className="rounded-lg bg-orange-50 px-3 py-1.5 text-xs text-orange-600 hover:bg-orange-100">封禁</button>
                 <a href={`/users/${u.id}`} target="_blank" rel="noreferrer" className="rounded-lg bg-slate-50 px-3 py-1.5 text-xs text-slate-600 hover:bg-slate-100">查看主页</a>
+                <button onClick={() => setPointsUser(u)} className="rounded-lg bg-amber-50 px-3 py-1.5 text-xs text-amber-600 hover:bg-amber-100">调整积分</button>
                 {isSuper && <button onClick={() => setDeleteTarget(u)} className="rounded-lg bg-red-50 px-3 py-1.5 text-xs text-red-600 hover:bg-red-100">删除</button>}
                 <button onClick={() => setEditUser(u)} className="rounded-lg bg-blue-50 px-4 py-1.5 text-xs text-blue-600 hover:bg-blue-100">编辑</button>
               </div>
@@ -480,6 +483,7 @@ function UsersTab({ isSuper }: { isSuper: boolean }) {
       {editUser && <EditUserModal user={editUser} onClose={() => setEditUser(null)} onSaved={load} isSuper={isSuper} />}
       {banUser && <BanUserModal user={banUser} onClose={() => setBanUser(null)} onDone={load} />}
       {deleteTarget && <DeleteConfirmModal user={deleteTarget} onClose={() => setDeleteTarget(null)} onDone={load} />}
+      {pointsUser && <PointsAdjustModal user={pointsUser} onClose={() => setPointsUser(null)} onDone={load} />}
       {showCreate && <CreateUserModal onClose={() => setShowCreate(false)} onDone={load} isSuper={isSuper} />}
       {showBatch && <BatchUpdateModal selectedIds={selected} onClose={() => setShowBatch(false)} onDone={() => { load(); setSelected(new Set()); }} />}
       {showImport && <ImportModal onClose={() => setShowImport(false)} onDone={load} />}
@@ -1170,6 +1174,102 @@ function DeleteConfirmModal({ user, onClose, onDone }: { user: any; onClose: () 
           <button onClick={doDelete} disabled={saving} className="flex-1 rounded-lg bg-red-600 py-2.5 text-sm font-medium text-white hover:bg-red-700 disabled:opacity-50">
             {saving ? '删除中...' : '确定删除'}
           </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ---------- 积分调整弹窗 ----------
+function PointsAdjustModal({ user, onClose, onDone }: { user: any; onClose: () => void; onDone: () => void }) {
+  const [amount, setAmount] = useState<number>(0);
+  const [reason, setReason] = useState('');
+  const [saving, setSaving] = useState(false);
+  const [err, setErr] = useState('');
+  const [logs, setLogs] = useState<any[]>([]);
+  const [loadingLogs, setLoadingLogs] = useState(false);
+
+  const loadLogs = () => {
+    setLoadingLogs(true);
+    api.get<{ items: any[] }>(`/api/admin/users/${user.id}/points`)
+      .then(d => setLogs(d.items))
+      .catch(() => {})
+      .finally(() => setLoadingLogs(false));
+  };
+  useEffect(() => { loadLogs(); }, []);
+
+  const doAdjust = async () => {
+    if (amount === 0) { setErr('请输入变动积分 (正数增加, 负数扣除)'); return; }
+    setSaving(true); setErr('');
+    try {
+      await api.post(`/api/admin/users/${user.id}/points`, { amount, reason: reason.trim() || undefined });
+      onDone();
+      loadLogs();
+      setAmount(0); setReason('');
+    } catch (e: any) { setErr(e.message); }
+    finally { setSaving(false); }
+  };
+
+  const preview = (user.points ?? 0) + amount;
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" onClick={onClose}>
+      <div className="w-full max-w-lg rounded-2xl bg-white p-6 shadow-2xl max-h-[85vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
+        <h3 className="text-lg font-bold text-gray-900 mb-1">调整积分</h3>
+        <p className="text-sm text-gray-500 mb-4">用户: <span className="font-semibold text-gray-700">{user.nickname}</span> · 当前积分: <span className="font-semibold text-amber-600">{user.points ?? 0}</span></p>
+
+        <div className="space-y-4">
+          <div className="flex gap-3">
+            <button onClick={() => setAmount(a => a + 10)} className="flex-1 rounded-lg bg-green-50 py-2 text-sm text-green-600 hover:bg-green-100">+10</button>
+            <button onClick={() => setAmount(a => a + 50)} className="flex-1 rounded-lg bg-green-50 py-2 text-sm text-green-600 hover:bg-green-100">+50</button>
+            <button onClick={() => setAmount(a => a + 100)} className="flex-1 rounded-lg bg-green-50 py-2 text-sm text-green-600 hover:bg-green-100">+100</button>
+            <button onClick={() => setAmount(a => a - 10)} className="flex-1 rounded-lg bg-red-50 py-2 text-sm text-red-500 hover:bg-red-100">-10</button>
+            <button onClick={() => setAmount(a => a - 50)} className="flex-1 rounded-lg bg-red-50 py-2 text-sm text-red-500 hover:bg-red-100">-50</button>
+          </div>
+
+          <div>
+            <label className="text-xs text-gray-500">变动积分 (正数=赠与, 负数=扣除)</label>
+            <input type="number" value={amount} onChange={e => setAmount(Number(e.target.value))} className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm" />
+            {amount !== 0 && (
+              <p className="mt-1 text-xs text-gray-500">变动后积分: <span className="font-semibold text-amber-600">{preview}</span>{preview < 0 && <span className="text-red-500"> (不能为负)</span>}</p>
+            )}
+          </div>
+
+          <div>
+            <label className="text-xs text-gray-500">备注原因 (可选)</label>
+            <input value={reason} onChange={e => setReason(e.target.value)} placeholder="如: 活动奖励、违规扣除等" maxLength={200} className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm" />
+          </div>
+
+          {err && <div className="text-sm text-red-500">{err}</div>}
+
+          <div className="flex gap-3">
+            <button onClick={onClose} className="flex-1 rounded-lg bg-gray-100 py-2.5 text-sm text-gray-700 hover:bg-gray-200">关闭</button>
+            <button onClick={doAdjust} disabled={saving || amount === 0 || preview < 0} className="flex-1 rounded-lg bg-amber-500 py-2.5 text-sm font-medium text-white hover:bg-amber-600 disabled:opacity-50">
+              {saving ? '提交中...' : amount > 0 ? '确认赠与' : '确认扣除'}
+            </button>
+          </div>
+        </div>
+
+        <div className="mt-6">
+          <h4 className="text-sm font-semibold text-gray-700 mb-2">积分流水 (最近50条)</h4>
+          {loadingLogs ? <p className="text-xs text-gray-400">加载中…</p> : logs.length === 0 ? (
+            <p className="text-xs text-gray-400">暂无记录</p>
+          ) : (
+            <div className="space-y-1.5">
+              {logs.map(l => (
+                <div key={l.id} className="flex items-center justify-between rounded-lg bg-gray-50 px-3 py-2 text-xs">
+                  <div>
+                    <span className={`font-semibold ${l.amount > 0 ? 'text-green-600' : 'text-red-500'}`}>{l.amount > 0 ? '+' : ''}{l.amount}</span>
+                    <span className="ml-2 text-gray-500">{l.reason || '无备注'}</span>
+                  </div>
+                  <div className="text-right">
+                    <div className="text-gray-400">{l.admin?.nickname || '管理员'}</div>
+                    <div className="text-gray-400">{new Date(l.createdAt).toLocaleString('zh-CN')}</div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       </div>
     </div>
