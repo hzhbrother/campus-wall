@@ -2096,9 +2096,88 @@ function SiteSettings() {
           <h3 className="font-semibold text-gray-900 mb-3">📝 内容设置</h3>
           <div className="space-y-3">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">帖子分类（逗号分隔）</label>
-              <textarea value={cfg.post_categories || ''} onChange={e => set('post_categories', e.target.value)} rows={2} className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm" placeholder="日常,校园,失物招领,二手交易,表白墙,寻物启事,招聘兼职,求助问答,商业推广" />
-              <p className="text-xs text-gray-400 mt-1">修改后将影响发帖时的分类选项</p>
+              <label className="block text-sm font-medium text-gray-700 mb-2">📝 帖子分类管理</label>
+              <p className="text-xs text-gray-400 mb-3">勾选「需审核」的分类，用户发帖后需管理员审核通过才会显示。</p>
+
+              {/* 分类列表 + 审核复选框 */}
+              <div className="space-y-2 mb-3">
+                {(cfg.post_categories || '').split(',').map(s => s.trim()).filter(Boolean).map((cat, idx, arr) => {
+                  const reviewList = (cfg.review_categories || '').split(',').map(s => s.trim()).filter(Boolean);
+                  const checked = reviewList.includes(cat);
+                  return (
+                    <div key={idx} className="flex items-center gap-3 rounded-lg border border-gray-200 p-2.5">
+                      <input
+                        type="checkbox"
+                        checked={checked}
+                        onChange={e => {
+                          const list = (cfg.review_categories || '').split(',').map(s => s.trim()).filter(Boolean);
+                          if (e.target.checked) { if (!list.includes(cat)) list.push(cat); }
+                          else { const i = list.indexOf(cat); if (i >= 0) list.splice(i, 1); }
+                          set('review_categories', list.join(','));
+                        }}
+                        className="h-4 w-4 shrink-0 accent-orange-500"
+                      />
+                      <span className="flex-1 text-sm font-medium text-gray-800">{cat}</span>
+                      {checked && (
+                        <span className="flex h-5 items-center rounded-full bg-orange-100 px-2 text-xs font-bold text-orange-600">需审核</span>
+                      )}
+                      <button
+                        onClick={() => {
+                          const newArr = arr.filter((_, i) => i !== idx);
+                          set('post_categories', newArr.join(','));
+                          // 同时从审核列表移除
+                          const rl = (cfg.review_categories || '').split(',').map(s => s.trim()).filter(Boolean);
+                          const ri = rl.indexOf(cat);
+                          if (ri >= 0) { rl.splice(ri, 1); set('review_categories', rl.join(',')); }
+                        }}
+                        className="text-xs text-red-500 hover:text-red-700 shrink-0"
+                      >
+                        删除
+                      </button>
+                    </div>
+                  );
+                })}
+                {(cfg.post_categories || '').split(',').map(s => s.trim()).filter(Boolean).length === 0 && (
+                  <p className="text-sm text-gray-400 py-2">暂无分类，请在下方添加</p>
+                )}
+              </div>
+
+              {/* 添加新分类 */}
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  id="new-category-input"
+                  placeholder="输入新分类名称"
+                  className="flex-1 rounded-lg border border-gray-300 px-3 py-2 text-sm"
+                  onKeyDown={e => {
+                    if (e.key === 'Enter') {
+                      const val = (e.target as HTMLInputElement).value.trim();
+                      if (!val) return;
+                      const list = (cfg.post_categories || '').split(',').map(s => s.trim()).filter(Boolean);
+                      if (!list.includes(val)) {
+                        set('post_categories', [...list, val].join(','));
+                      }
+                      (e.target as HTMLInputElement).value = '';
+                    }
+                  }}
+                />
+                <button
+                  onClick={() => {
+                    const input = document.getElementById('new-category-input') as HTMLInputElement;
+                    const val = input?.value.trim();
+                    if (!val) return;
+                    const list = (cfg.post_categories || '').split(',').map(s => s.trim()).filter(Boolean);
+                    if (!list.includes(val)) {
+                      set('post_categories', [...list, val].join(','));
+                    }
+                    if (input) input.value = '';
+                  }}
+                  className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700"
+                >
+                  添加
+                </button>
+              </div>
+              <p className="text-xs text-gray-400 mt-2">提示：默认「招聘兼职」「商业推广」需要审核，管理员可自行调整。</p>
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div>

@@ -53,6 +53,7 @@ export default function NewPostPage() {
   const [images, setImages] = useState<string[]>([]);
   const [category, setCategory] = useState('');
   const [categories, setCategories] = useState<string[]>(DEFAULT_CATEGORIES);
+  const [reviewCategories, setReviewCategories] = useState<string[]>(['招聘兼职', '商业推广']);
   const [showCategory, setShowCategory] = useState(false);
   const [isAnonymous, setIsAnonymous] = useState(false);
   const [err, setErr] = useState('');
@@ -69,8 +70,11 @@ export default function NewPostPage() {
 
   // 加载分类 (从站点配置读取)
   const loadCats = () => {
-    api.get<string[]>('/api/posts/categories')
-      .then(cats => setCategories(cats.length ? cats : DEFAULT_CATEGORIES))
+    api.get<{ categories: string[]; reviewCategories: string[] }>('/api/posts/categories')
+      .then(d => {
+        setCategories(d.categories.length ? d.categories : DEFAULT_CATEGORIES);
+        setReviewCategories(d.reviewCategories || []);
+      })
       .catch(() => {});
   };
   usePageRefresh(loadCats, []);
@@ -270,17 +274,29 @@ export default function NewPostPage() {
       {showCategory && (
         <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40" onClick={() => setShowCategory(false)}>
           <div className="w-full max-w-[640px] rounded-t-2xl bg-white p-4 pb-8" onClick={e => e.stopPropagation()}>
-            <h3 className="mb-3 text-center text-base font-medium text-slate-900">选择主题分类</h3>
+            <h3 className="mb-1 text-center text-base font-medium text-slate-900">选择主题分类</h3>
+            <p className="mb-3 text-center text-xs text-slate-400">
+              带 <span className="inline-flex h-4 w-4 items-center justify-center rounded-full bg-orange-500 text-[10px] font-bold text-white align-middle">审</span> 标记的分类需管理员审核
+            </p>
             <div className="grid grid-cols-3 gap-2">
-              {categories.map(c => (
-                <button
-                  key={c}
-                  onClick={() => { setCategory(c); setShowCategory(false); }}
-                  className={`rounded-lg py-3 text-sm ${category === c ? 'bg-blue-500 text-white' : 'bg-slate-50 text-slate-700'}`}
-                >
-                  {c}
-                </button>
-              ))}
+              {categories.map(c => {
+                const needReview = reviewCategories.includes(c);
+                const active = category === c;
+                return (
+                  <button
+                    key={c}
+                    onClick={() => { setCategory(c); setShowCategory(false); }}
+                    className={`relative rounded-lg py-3 text-sm ${active ? 'bg-blue-500 text-white' : 'bg-slate-50 text-slate-700'}`}
+                  >
+                    {c}
+                    {needReview && (
+                      <span className={`absolute -top-1.5 -right-1.5 flex h-4 min-w-4 items-center justify-center rounded-full px-1 text-[10px] font-bold leading-none ${active ? 'bg-red-500 text-white' : 'bg-orange-500 text-white'}`}>
+                        审
+                      </span>
+                    )}
+                  </button>
+                );
+              })}
             </div>
             <button onClick={() => setShowCategory(false)} className="mt-4 w-full rounded-lg bg-slate-100 py-2.5 text-sm text-slate-600">取消</button>
           </div>

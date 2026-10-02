@@ -13,6 +13,7 @@ export default function HomePage() {
   const [items, setItems] = useState<PostListItem[]>([]);
   const [hotItems, setHotItems] = useState<PostListItem[]>([]);
   const [categories, setCategories] = useState<string[]>(DEFAULT_CATEGORIES);
+  const [reviewCategories, setReviewCategories] = useState<string[]>(['招聘兼职', '商业推广']);
   const [announcement, setAnnouncement] = useState('欢迎来到校园墙！请文明发言，禁止发布违规内容。失物招领请尽量附上图片，二手交易请当面验货。');
   const [category, setCategory] = useState<string>('');
   const [q, setQ] = useState('');
@@ -40,8 +41,11 @@ export default function HomePage() {
     api.get<{ items: PostListItem[] }>('/api/posts?sort=hot&pageSize=5')
       .then(d => setHotItems(d.items))
       .catch(() => {});
-    api.get<string[]>('/api/posts/categories')
-      .then(cats => setCategories(cats.length ? cats : DEFAULT_CATEGORIES))
+    api.get<{ categories: string[]; reviewCategories: string[] }>('/api/posts/categories')
+      .then(d => {
+        setCategories(d.categories.length ? d.categories : DEFAULT_CATEGORIES);
+        setReviewCategories(d.reviewCategories || []);
+      })
       .catch(() => {});
     api.get<Record<string, string>>('/api/site-config')
       .then(d => { if (d.announcement_text) setAnnouncement(d.announcement_text); })
@@ -75,17 +79,30 @@ export default function HomePage() {
         >
           推荐
         </button>
-        {categories.map((c) => (
-          <button
-            key={c}
-            onClick={() => setCategory(c === category ? '' : c)}
-            className={`shrink-0 px-3.5 py-1.5 rounded-full text-sm font-medium transition ${
-              c === category ? 'bg-slate-900 text-white' : 'bg-white text-slate-500'
-            }`}
-          >
-            {c}
-          </button>
-        ))}
+        {categories.map((c) => {
+          const needReview = reviewCategories.includes(c);
+          const active = c === category;
+          return (
+            <button
+              key={c}
+              onClick={() => setCategory(c === category ? '' : c)}
+              className={`relative shrink-0 px-3.5 py-1.5 rounded-full text-sm font-medium transition ${
+                active ? 'bg-slate-900 text-white' : 'bg-white text-slate-500'
+              }`}
+            >
+              {c}
+              {needReview && (
+                <span
+                  className={`absolute -top-1.5 -right-1.5 flex h-4 min-w-4 items-center justify-center rounded-full px-1 text-[10px] font-bold leading-none ${
+                    active ? 'bg-red-500 text-white' : 'bg-orange-500 text-white'
+                  }`}
+                >
+                  审
+                </span>
+              )}
+            </button>
+          );
+        })}
         <button
           onClick={() => setSearchOpen(s => !s)}
           className="shrink-0 ml-auto p-2 rounded-full bg-white text-slate-500"
