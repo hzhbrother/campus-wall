@@ -78,6 +78,19 @@ export default function PostDetailPage({ params }: { params: { id: string } }) {
     } catch (e: any) { alert(e.message); }
   };
 
+  // 作者/管理员删除帖子
+  const isAuthor = user && post && user.id === post.author.id;
+  const isAdmin = user && ['ADMIN', 'SUPER_ADMIN'].includes(user.role);
+  const canDelete = !!isAuthor || !!isAdmin;
+
+  const handleDelete = async () => {
+    if (!confirm('确定删除这条帖子吗？删除后不可恢复。')) return;
+    try {
+      await api.del(`/api/posts/${id}`);
+      router.push('/');
+    } catch (e: any) { alert(e.message); }
+  };
+
   if (err) return <div className="card p-6 text-center text-red-500">{err}</div>;
   if (!post) return <p className="text-center text-slate-400 py-10">加载中…</p>;
 
@@ -116,15 +129,25 @@ export default function PostDetailPage({ params }: { params: { id: string } }) {
         </div>
       </div>
 
-      {/* 管理员/教师置顶操作 */}
-      {user && ['ADMIN', 'SUPER_ADMIN', 'TEACHER'].includes(user.role) && (
+      {/* 管理员/教师置顶操作 + 作者删除 */}
+      {(canDelete || (user && ['ADMIN', 'SUPER_ADMIN', 'TEACHER'].includes(user.role))) && (
         <div className="flex gap-2">
-          <button
-            className={`text-sm flex-1 ${post.pinned ? 'btn-primary' : 'btn-ghost'}`}
-            onClick={togglePin}
-          >
-            📌 {post.pinned ? '取消置顶' : '置顶'}
-          </button>
+          {user && ['ADMIN', 'SUPER_ADMIN', 'TEACHER'].includes(user.role) && (
+            <button
+              className={`text-sm flex-1 ${post.pinned ? 'btn-primary' : 'btn-ghost'}`}
+              onClick={togglePin}
+            >
+              📌 {post.pinned ? '取消置顶' : '置顶'}
+            </button>
+          )}
+          {canDelete && (
+            <button
+              onClick={handleDelete}
+              className="text-sm flex-1 rounded-lg bg-red-50 px-4 py-2 text-red-600 hover:bg-red-100"
+            >
+              🗑 删除帖子
+            </button>
+          )}
         </div>
       )}
 
