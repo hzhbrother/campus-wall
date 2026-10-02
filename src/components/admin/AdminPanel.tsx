@@ -510,7 +510,6 @@ function EditUserModal({ user, onClose, onSaved, isSuper }: { user: any; onClose
   const [avatar, setAvatar] = useState(user.avatar || '');
   // 封面编辑
   const [coverImage, setCoverImage] = useState(user.coverImage || '');
-  const [coverUrl, setCoverUrl] = useState(user.coverImage || '');
   const [coverUploading, setCoverUploading] = useState(false);
   const coverFileRef = useRef<HTMLInputElement>(null);
   // 头像审核驳回原因
@@ -551,22 +550,15 @@ function EditUserModal({ user, onClose, onSaved, isSuper }: { user: any; onClose
     try {
       const dataUrl = await compressImage(file, 1280, 0.75);
       setCoverImage(dataUrl);
-      setCoverUrl(dataUrl);
     } finally {
       setCoverUploading(false);
       e.target.value = '';
     }
   };
 
-  // 封面: 通过 URL 设置
-  const handleCoverUrlSave = () => {
-    setCoverImage(coverUrl.trim());
-  };
-
   // 封面: 移除
   const handleCoverRemove = () => {
     setCoverImage('');
-    setCoverUrl('');
   };
 
   // 头像审核: 通过 (将 pendingAvatar 应用为正式头像)
@@ -862,38 +854,35 @@ function EditUserModal({ user, onClose, onSaved, isSuper }: { user: any; onClose
             <p className="mt-1 text-xs text-amber-700/80">管理员可强制重置用户密码, 保存后用户需用新密码登录。</p>
           </div>
 
-          {/* 封面编辑: URL 输入 + 上传按钮 + 移除按钮 */}
+          {/* 封面编辑: 直接上传 + 预览 + 删除 */}
           <div className="rounded-lg border border-gray-200 p-3">
-            <div className="mb-2 flex items-center justify-between">
-              <label className="text-sm font-medium text-gray-700">封面图</label>
-              {coverImage && (
-                <button onClick={handleCoverRemove} className="text-xs text-red-500 hover:underline">移除封面</button>
-              )}
-            </div>
-            {/* 封面预览 */}
-            {coverImage ? (
-              <div className="mb-2 h-24 w-full overflow-hidden rounded-lg border border-gray-200">
-                <img src={coverImage} alt="封面预览" className="h-full w-full object-cover" />
+            <label className="mb-2 block text-sm font-medium text-gray-700">封面图</label>
+            <div className="flex items-start gap-3">
+              {/* 缩略图预览 */}
+              <div className="h-20 w-20 shrink-0 overflow-hidden rounded-lg border border-gray-200 bg-gray-50">
+                {coverImage ? (
+                  <img src={coverImage} alt="封面预览" className="h-full w-full object-cover" />
+                ) : (
+                  <div className="flex h-full w-full items-center justify-center text-xs text-gray-300">无预览</div>
+                )}
               </div>
-            ) : (
-              <div className="mb-2 flex h-24 w-full items-center justify-center rounded-lg border border-dashed border-gray-300 bg-gray-50 text-xs text-gray-400">
-                暂无封面
+              {/* 上传 + 删除 */}
+              <div className="flex flex-1 flex-col gap-2">
+                <label className={`cursor-pointer rounded-lg bg-blue-500 py-2.5 text-center text-sm font-medium text-white hover:bg-blue-600 ${coverUploading ? 'opacity-50' : ''}`}>
+                  {coverUploading ? '上传中…' : (coverImage ? '重新上传' : '立即上传图片')}
+                  <input ref={coverFileRef} type="file" accept="image/*" className="hidden" onChange={handleCoverFile} />
+                </label>
+                {coverImage && (
+                  <button
+                    onClick={handleCoverRemove}
+                    className="rounded-lg py-2 text-center text-sm font-medium text-red-500 hover:bg-red-50"
+                  >
+                    删除
+                  </button>
+                )}
               </div>
-            )}
-            <div className="flex gap-2">
-              <input
-                value={coverUrl}
-                onChange={e => setCoverUrl(e.target.value)}
-                onBlur={handleCoverUrlSave}
-                className="flex-1 rounded-lg border border-gray-300 px-3 py-2 text-sm"
-                placeholder="粘贴封面图片 URL, 失焦后生效"
-              />
-              <label className={`cursor-pointer rounded-lg bg-blue-50 px-3 py-2 text-xs text-blue-600 hover:bg-blue-100 ${coverUploading ? 'opacity-50' : ''}`}>
-                {coverUploading ? '上传中…' : '上传图片'}
-                <input ref={coverFileRef} type="file" accept="image/*" className="hidden" onChange={handleCoverFile} />
-              </label>
             </div>
-            <p className="mt-1 text-xs text-gray-400">上传图片会自动压缩到 1280px, 移除后保存即清空封面</p>
+            <p className="mt-2 text-xs text-gray-400">上传图片会自动压缩到 1280px，删除后保存即清空封面</p>
           </div>
 
           <div>

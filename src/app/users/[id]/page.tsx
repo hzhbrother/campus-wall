@@ -567,37 +567,38 @@ export default function UserProfilePage() {
       {showCoverModal && (
         <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/50 sm:items-center" onClick={() => { setShowCoverModal(false); modalOpenRef.current = false; }}>
           <div className="w-full max-w-md rounded-t-3xl bg-white p-5 sm:rounded-2xl" onClick={e => e.stopPropagation()}>
-            <div className="mb-4 flex items-center justify-between">
-              <h3 className="text-lg font-bold text-gray-900">封面图</h3>
-              {coverPreview && (
-                <button onClick={handleCoverRemove} className="text-xs text-red-500 hover:underline">移除封面</button>
-              )}
-            </div>
-            {/* 预览 */}
-            {coverPreview ? (
-              <div className="mb-3 h-32 w-full overflow-hidden rounded-xl border border-gray-200">
-                <img src={coverPreview} alt="封面预览" className="h-full w-full object-cover" />
+            <h3 className="mb-4 text-lg font-bold text-gray-900">封面图</h3>
+
+            {/* 预览 + 上传按钮 */}
+            <div className="flex items-start gap-3">
+              {/* 缩略图预览 */}
+              <div className="h-20 w-20 shrink-0 overflow-hidden rounded-lg border border-gray-200 bg-gray-50">
+                {coverPreview ? (
+                  <img src={coverPreview} alt="封面预览" className="h-full w-full object-cover" />
+                ) : (
+                  <div className="flex h-full w-full items-center justify-center text-xs text-gray-300">无预览</div>
+                )}
               </div>
-            ) : (
-              <div className="mb-3 flex h-32 w-full items-center justify-center rounded-xl border border-dashed border-gray-300 bg-gray-50 text-sm text-gray-400">
-                暂无封面
+
+              {/* 上传 + 删除 */}
+              <div className="flex flex-1 flex-col gap-2">
+                <label className={`cursor-pointer rounded-lg bg-blue-500 py-2.5 text-center text-sm font-medium text-white hover:bg-blue-600 ${coverUploading ? 'opacity-50' : ''}`}>
+                  {coverUploading ? '上传中…' : (coverPreview ? '重新上传' : '立即上传图片')}
+                  <input ref={coverFileRef} type="file" accept="image/*" className="hidden" onChange={handleCoverFile} />
+                </label>
+                {coverPreview && (
+                  <button
+                    onClick={handleCoverRemove}
+                    className="rounded-lg py-2 text-center text-sm font-medium text-red-500 hover:bg-red-50"
+                  >
+                    删除
+                  </button>
+                )}
               </div>
-            )}
-            {/* URL 输入 + 上传按钮 */}
-            <div className="flex gap-2">
-              <input
-                value={coverUrl}
-                onChange={e => setCoverUrl(e.target.value)}
-                onBlur={handleCoverUrlSave}
-                className="flex-1 rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/40"
-                placeholder="粘贴封面图片 URL, 失焦后生效"
-              />
-              <label className={`cursor-pointer rounded-lg bg-blue-50 px-3 py-2 text-sm text-blue-600 hover:bg-blue-100 ${coverUploading ? 'opacity-50' : ''}`}>
-                {coverUploading ? '上传中…' : '上传图片'}
-                <input ref={coverFileRef} type="file" accept="image/*" className="hidden" onChange={handleCoverFile} />
-              </label>
             </div>
-            <p className="mt-1.5 text-xs text-gray-400">上传图片会自动压缩到 1280px, 提交后直接生效</p>
+
+            <p className="mt-3 text-xs text-gray-400">上传图片会自动压缩到 1280px，删除后提交即清空封面</p>
+
             {/* 提交 / 取消 */}
             <div className="mt-5 flex gap-3">
               <button
