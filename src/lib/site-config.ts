@@ -25,9 +25,13 @@ export async function getPostCategories(): Promise<string[]> {
   return v.split(',').map(s => s.trim()).filter(Boolean);
 }
 
-// 需要审核的分类 (商业/招募类), 管理员可在站点配置 review_categories 中自定义
+// 需要审核的分类: 管理员在站点配置 review_categories 中勾选的分类
+// 配置为空字符串时表示不审核任何分类 (管理员完全控制)
+// 配置 key 不存在 (从未设置) 时使用默认值
 export async function getReviewCategories(): Promise<string[]> {
-  const v = await getSiteConfigValue('review_categories');
-  if (!v) return ['招聘兼职', '商业推广'];
+  const row = await prisma.siteConfig.findUnique({ where: { key: 'review_categories' } });
+  if (!row) return ['招聘兼职', '商业推广']; // 从未设置过: 默认审核这两个
+  const v = row.value.trim();
+  if (!v) return []; // 管理员显式清空: 不审核任何分类
   return v.split(',').map(s => s.trim()).filter(Boolean);
 }
