@@ -185,6 +185,7 @@ model User {
   qualificationLikes QualificationLike[]
   checkIns     CheckInRecord[]
   wishItems    WishItem[]
+  exchanges    ExchangeRecord[]
   school       School?          @relation(fields: [schoolId], references: [id])
   organization Organization?    @relation(fields: [organizationId], references: [id])
   follows      Follow[]         @relation("FollowerUser") // 我关注了谁
@@ -624,6 +625,53 @@ model WishItem {
   @@index([userId])
   @@index([status])
   @@index([createdAt])
+}
+
+// ---- 快捷通道 ----
+
+model QuickLink {
+  id          String   @id @default(cuid())
+  title       String                         // 显示名称
+  url         String                         // 跳转链接
+  icon        String?                         // 图标 (base64 图片 或 URL)
+  sortOrder   Int      @default(0)            // 排序 (小的在前)
+  clickCount  Int      @default(0)            // 点击人次
+  isActive    Boolean  @default(true)         // 是否启用
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+// ---- 积分商城商品 ----
+
+model ShopItem {
+  id          String   @id @default(cuid())
+  name        String                         // 商品名称
+  description String?                         // 商品描述
+  image       String?                         // 商品图片 (base64 或 URL)
+  pointsCost  Int                              // 兑换所需积分
+  stock       Int      @default(-1)            // 库存 (-1 = 不限)
+  isActive    Boolean  @default(true)          // 是否上架
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  exchanges   ExchangeRecord[]
+}
+
+// ---- 积分兑换记录 ----
+
+model ExchangeRecord {
+  id          String   @id @default(cuid())
+  userId      String
+  itemId      String
+  pointsCost  Int                              // 兑换时花费的积分
+  status      String   @default("PENDING")     // PENDING(待发放) | FULFILLED(已发放) | CANCELLED(已取消)
+  createdAt   DateTime @default(now())
+
+  user        User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  item        ShopItem   @relation(fields: [itemId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([itemId])
 }
 
 // ---- 团体 (非学校组织, 如社团/救援队/志愿者团队等) ----

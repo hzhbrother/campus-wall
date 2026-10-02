@@ -15,6 +15,7 @@ import { WishView } from '@/components/WishView';
 import { JoinOrgModal } from '@/components/JoinOrgModal';
 import { formatUserCode } from '@/lib/user-number';
 import { DEFAULT_ROLE_PERMISSIONS } from '@/lib/permissions';
+import { JUHE_TYPES } from '@/lib/aggregated-login';
 import type { AdminTab } from '@/components/admin/AdminPanel';
 
 // 管理后台懒加载 (大幅减少首屏体积)
@@ -36,6 +37,72 @@ const Row = ({ label, children, onClick, border = true }: { label: React.ReactNo
 const Arrow = () => (
   <svg className="h-4 w-4 text-gray-300" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="m9 18 6-6-6-6" strokeLinecap="round" strokeLinejoin="round"/></svg>
 );
+
+// ---------- 第三方账号绑定卡片 ----------
+function AccountBindingsCard({ userId }: { userId: string }) {
+  const [accounts, setAccounts] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [busy, setBusy] = useState<string | null>(null);
+
+  const load = useCallback(() => {
+    api.get<{ accounts: any[] }>('/api/users/me/accounts')
+      .then(d => setAccounts(d.accounts))
+      .catch(() => {})
+      .finally(() => setLoading(false));
+  }, []);
+
+  useEffect(() => { load(); }, [load]);
+
+  const handleBind = (type: string) => {
+    // 跳转到聚合登录绑定模式
+    window.location.href = `/api/auth/oauth/aggregated/${type}?bind=1`;
+  };
+
+  const handleUnbind = async (provider: string) => {
+    if (!confirm(`确定解绑 ${provider} 账号吗?`)) return;
+    setBusy(provider);
+    try {
+      await api.del(`/api/users/me/accounts/${provider}`);
+      load();
+    } catch (e: any) {
+      alert(e?.message || '解绑失败');
+    } finally { setBusy(null); }
+  };
+
+  const isBound = (provider: string) => accounts.some(a => a.provider === provider);
+
+  if (loading) return <div className="rounded-2xl bg-white shadow-sm p-4 text-sm text-gray-400">加载中…</div>;
+
+  return (
+    <div className="rounded-2xl bg-white shadow-sm p-4">
+      <h3 className="font-semibold text-gray-900 mb-3">第三方账号绑定</h3>
+      <div className="space-y-2">
+        {JUHE_TYPES.map(t => (
+          <div key={t.type} className="flex items-center gap-3 py-2">
+            <span className="text-xl">{t.icon}</span>
+            <span className="flex-1 text-sm text-gray-800">{t.label}</span>
+            {isBound(t.provider) ? (
+              <button
+                onClick={() => handleUnbind(t.provider)}
+                disabled={busy === t.provider}
+                className="rounded-full bg-red-50 px-3 py-1 text-xs text-red-500 hover:bg-red-100 disabled:opacity-50"
+              >
+                {busy === t.provider ? '解绑中…' : '解绑'}
+              </button>
+            ) : (
+              <button
+                onClick={() => handleBind(t.type)}
+                className="rounded-full bg-blue-50 px-3 py-1 text-xs text-blue-500 hover:bg-blue-100"
+              >
+                绑定
+              </button>
+            )}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
 
 // ---------- 个人资料编辑 ----------
 function EditProfile({ user, onSaved, forcePhone = false, refreshUser }: { user: any; onSaved: () => void; forcePhone?: boolean; refreshUser?: () => void }) {
@@ -657,6 +724,9 @@ function ProfilePageInner() {
             </div>
           ))}
         </div>
+
+        {/* 第三方账号绑定 */}
+        <AccountBindingsCard userId={user.id} />
 
         {/* 修改密码弹窗 */}
         {showPwdModal && <ChangePasswordModal onClose={() => setShowPwdModal(false)} />}

@@ -15,6 +15,7 @@ export async function GET(req: NextRequest) {
   const code = url.searchParams.get('code');
   const type = url.searchParams.get('type') || req.cookies.get('juhe_type')?.value;
   const cookieState = req.cookies.get('oauth_state')?.value;
+  const bindUid = req.cookies.get('oauth_bind_uid')?.value;
 
   if (!type) return feError('登录类型丢失, 请重试');
   if (!code) return feError('未收到授权码');
@@ -25,7 +26,34 @@ export async function GET(req: NextRequest) {
   try {
     const info = await getAggregatedUserInfo(type, code);
 
-    // 查找或创建账号
+    // 绑定模式: 绑定到指定用户
+    if (bindUid) {
+      const existing = await prisma.account.findUnique({
+        where: { provider_providerUid: { provider: meta.provider, providerUid: info.social_uid } },
+      });
+      if (existing && existing.userId !== bindUid) {
+        return feError('该第三方账号已被其他用户绑定');
+      }
+
+      await prisma.account.upsert({
+        where: { provider_providerUid: { provider: meta.provider, providerUid: info.social_uid } },
+        update: { userId: bindUid },
+        create: {
+          userId: bindUid,
+          provider: meta.provider,
+          providerUid: info.social_uid,
+          rawProfile: { type, ...info } as any,
+        },
+      });
+
+      const res = NextResponse.redirect(`${origin}/profile?bind=success`);
+      res.cookies.delete('oauth_state');
+      res.cookies.delete('juhe_type');
+      res.cookies.delete('oauth_bind_uid');
+      return res;
+    }
+
+    // 普通登录/注册流程
     let account = await prisma.account.findUnique({
       where: { provider_providerUid: { provider: meta.provider, providerUid: info.social_uid } },
     });
@@ -40,7 +68,6 @@ export async function GET(req: NextRequest) {
     }
 
     if (!user) {
-      // 新用户
       const baseName = (info.nickname || info.social_uid).slice(0, 24);
       let nickname = baseName;
       let i = 0;
@@ -71,6 +98,7 @@ export async function GET(req: NextRequest) {
     const res = NextResponse.redirect(`${origin}/oauth/callback?${params.toString()}`);
     res.cookies.delete('oauth_state');
     res.cookies.delete('juhe_type');
+    res.cookies.delete('oauth_bind_uid');
     return res;
   } catch (e: any) {
     return feError(e?.message || '聚合登录失败');
