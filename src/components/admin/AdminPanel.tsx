@@ -3,6 +3,7 @@
 import { useEffect, useState, useCallback, useRef } from 'react';
 import { api } from '@/lib/api';
 import { PERMISSIONS, PERMISSIONS_BY_GROUP, SUPER_ADMIN_ONLY_PERMISSIONS } from '@/lib/permissions';
+import { JUHE_TYPES } from '@/lib/aggregated-login';
 import { compressImage } from '@/lib/image-compress';
 import TemplateManager from './TemplateManager';
 import { BadgesManager } from './BadgesManager';
@@ -2116,6 +2117,33 @@ function SiteSettings() {
               <input value={cfg.announcement_text || ''} onChange={e => set('announcement_text', e.target.value)} className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm" placeholder="欢迎来到校园墙！请文明发言..." />
               <p className="text-xs text-gray-400 mt-1">显示在首页顶部的滚动公告栏</p>
             </div>
+          </div>
+        </div>
+
+        <div className="rounded-xl border border-gray-100 p-4">
+          <h3 className="font-semibold text-gray-900 mb-1">🔐 开放登录方式</h3>
+          <p className="text-xs text-gray-400 mb-3">勾选后用户可在登录页使用该方式快捷登录</p>
+          <div className="grid grid-cols-3 gap-2">
+            {JUHE_TYPES.map(t => {
+              const open = (cfg.open_login_types || '').split(',').includes(t.type);
+              return (
+                <label key={t.type} className={`flex items-center gap-2 rounded-lg border p-2.5 cursor-pointer transition ${open ? 'border-blue-400 bg-blue-50' : 'border-gray-200 hover:border-gray-300'}`}>
+                  <input
+                    type="checkbox"
+                    checked={open}
+                    onChange={e => {
+                      const list = (cfg.open_login_types || '').split(',').filter(Boolean);
+                      if (e.target.checked) list.push(t.type);
+                      else { const i = list.indexOf(t.type); if (i >= 0) list.splice(i, 1); }
+                      set('open_login_types', list.join(','));
+                    }}
+                    className="h-4 w-4 shrink-0"
+                  />
+                  <span className="text-lg">{t.icon}</span>
+                  <span className="text-sm text-gray-700 truncate">{t.label}</span>
+                </label>
+              );
+            })}
           </div>
         </div>
 

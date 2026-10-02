@@ -25,15 +25,20 @@ export default function LoginPage() {
   const [switchBusy, setSwitchBusy] = useState<string | null>(null);
   const [showAggregated, setShowAggregated] = useState(false);
   const [juheReady, setJuheReady] = useState(false);
+  const [openTypes, setOpenTypes] = useState<string[]>([]);
 
   // 已登录则跳转首页 (add=1 时不跳, 让用户添加新账号)
   useEffect(() => {
     if (!loading && user && !isAddAccount) router.replace('/');
   }, [user, loading, router, isAddAccount]);
 
-  // 检测聚合登录是否可用
+  // 检测聚合登录是否可用 + 获取开放的登录方式
   useEffect(() => {
     api.get('/api/auth/aggregated/status').then((d: any) => setJuheReady(d.configured)).catch(() => setJuheReady(false));
+    api.get('/api/site-config').then((d: any) => {
+      const types = d.open_login_types;
+      if (types) setOpenTypes(types.split(',').filter(Boolean));
+    }).catch(() => setOpenTypes([]));
   }, []);
 
   const onSubmit = async (e: React.FormEvent) => {
@@ -190,15 +195,15 @@ export default function LoginPage() {
               {juheReady ? '通过聚合云一键授权登录' : '聚合登录暂未配置, 请联系管理员'}
             </p>
             <div className="grid grid-cols-4 gap-3">
-              {JUHE_TYPES.map(p => (
+              {(openTypes.length > 0 ? JUHE_TYPES.filter(p => openTypes.includes(p.type)) : JUHE_TYPES).map(p => (
                 <button
                   key={p.type}
                   disabled={!juheReady}
                   onClick={() => startAggregated(p.type)}
-                  className="flex flex-col items-center gap-1.5 rounded-xl py-3 text-slate-600 hover:bg-slate-50 disabled:opacity-40"
+                  className="flex flex-col items-center gap-1.5 rounded-xl py-3 text-slate-600 hover:bg-slate-50 disabled:opacity-40 transition"
                 >
-                  <span className="text-2xl">{p.icon}</span>
-                  <span className="text-xs">{p.label}</span>
+                  <span className="flex h-11 w-11 items-center justify-center rounded-full bg-slate-50 text-2xl">{p.icon}</span>
+                  <span className="text-xs font-medium text-slate-700">{p.label}</span>
                 </button>
               ))}
             </div>

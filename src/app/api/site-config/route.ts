@@ -13,6 +13,7 @@ const PUBLIC_KEYS = [
   'about_content',
   'profile_bg',
   'max_accounts',
+  'open_login_types',
 ];
 
 export async function GET() {
