@@ -80,9 +80,6 @@ export default function QuickLinksPage() {
                   )}
                 </div>
                 <span className="text-xs text-gray-700 text-center line-clamp-1 max-w-[64px]">{link.title}</span>
-                {link.clickCount > 0 && (
-                  <span className="text-[10px] text-gray-400">{link.clickCount} 次点击</span>
-                )}
               </Link>
             ))}
           </div>

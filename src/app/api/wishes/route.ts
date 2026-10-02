@@ -42,12 +42,22 @@ export async function POST(req: NextRequest) {
   }
 }
 
-// GET: 获取许愿列表 (公开, 按时间倒序)
+// GET: 获取许愿列表
+//   ?mine=1  只获取当前用户的许愿 (需登录)
+//   不传    获取所有许愿 (公开, 按时间倒序)
 export async function GET(req: NextRequest) {
   const url = new URL(req.url);
   const limit = Math.min(Number(url.searchParams.get('limit') || 20), 50);
+  const mine = url.searchParams.get('mine') === '1';
+
+  const where: any = {};
+  if (mine) {
+    const me = await requireUser(req);
+    where.userId = me.id;
+  }
 
   const wishes = await prisma.wishItem.findMany({
+    where,
     orderBy: { createdAt: 'desc' },
     take: limit,
     include: { user: { select: { nickname: true } } },

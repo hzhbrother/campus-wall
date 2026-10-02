@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { api } from '@/lib/api';
 import { useAuth } from '@/lib/auth-context';
+import { WishFormModal } from '@/components/WishFormModal';
 
 interface ShopItem {
   id: string;
@@ -19,6 +20,7 @@ export default function ShopPage() {
   const [loading, setLoading] = useState(true);
   const [exchanging, setExchanging] = useState<string | null>(null);
   const [msg, setMsg] = useState('');
+  const [showWish, setShowWish] = useState(false);
 
   useEffect(() => {
     api.get<{ items: ShopItem[] }>('/api/shop/items')
@@ -45,8 +47,18 @@ export default function ShopPage() {
     <div className="-mx-4">
       {/* 顶部渐变横幅 */}
       <div className="bg-gradient-to-br from-amber-400 via-amber-500 to-orange-500 px-4 pt-4 pb-8">
-        <h1 className="text-2xl font-bold text-white">积分商城</h1>
-        <p className="text-amber-50 text-sm mt-1">用积分兑换你喜欢的好物</p>
+        <div className="flex items-start justify-between">
+          <div>
+            <h1 className="text-2xl font-bold text-white">积分商城</h1>
+            <p className="text-amber-50 text-sm mt-1">用积分兑换你喜欢的好物</p>
+          </div>
+          <button
+            onClick={() => user ? setShowWish(true) : (window.location.href = '/login')}
+            className="shrink-0 rounded-full bg-white/20 backdrop-blur-sm px-4 py-2 text-sm font-medium text-white hover:bg-white/30 transition"
+          >
+            🎯 我要许愿
+          </button>
+        </div>
         {user && (
           <div className="mt-4 inline-flex items-center gap-2 rounded-full bg-white/20 backdrop-blur-sm px-4 py-2">
             <span className="text-lg">🪙</span>
@@ -115,6 +127,9 @@ export default function ShopPage() {
           </div>
         )}
       </div>
+
+      {/* 许愿弹窗 */}
+      <WishFormModal open={showWish} onClose={() => setShowWish(false)} />
     </div>
   );
 }

@@ -7,7 +7,11 @@ export const dynamic = 'force-dynamic';
 export async function GET() {
   const links = await prisma.quickLink.findMany({
     where: { isActive: true },
-    orderBy: [{ sortOrder: 'asc' }, { createdAt: 'asc' }],
+    orderBy: [
+      { clickCount: 'desc' },   // 点击次数多的排前面
+      { sortOrder: 'asc' },
+      { createdAt: 'asc' },
+    ],
   });
   return NextResponse.json({ items: links });
 }
