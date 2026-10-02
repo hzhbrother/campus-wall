@@ -1996,8 +1996,18 @@ function SiteSettings() {
 
   const save = async () => {
     setSaving(true); setMsg('');
-    try { await api.patch('/api/admin/site-config', cfg); setMsg('保存成功'); }
-    catch (e: any) { setMsg(e.message); } finally { setSaving(false); }
+    try {
+      await api.patch('/api/admin/site-config', cfg);
+      // 保存配置后自动同步数据库结构 (补全枚举值 / 创建缺失的表)
+      try {
+        const syncRes = await api.get<{ tables?: string[]; errors?: string[] }>('/api/admin/sync-db');
+        const tables = syncRes?.tables?.length || 0;
+        const errors = syncRes?.errors?.length || 0;
+        setMsg(`保存成功 (数据库结构同步完成: ${tables} 张表${errors ? `, ${errors} 条警告` : ''})`);
+      } catch (e: any) {
+        setMsg(`保存成功, 但数据库结构同步失败: ${e.message}`);
+      }
+    } catch (e: any) { setMsg(e.message); } finally { setSaving(false); }
   };
 
   if (loading) return <p className="py-6 text-center text-gray-400">加载中…</p>;
@@ -2123,6 +2133,34 @@ function SiteSettings() {
         <div className="rounded-xl border border-gray-100 p-4">
           <h3 className="font-semibold text-gray-900 mb-1">🔐 开放登录方式</h3>
           <p className="text-xs text-gray-400 mb-3">勾选后用户可在登录页使用该方式快捷登录</p>
+
+          {/* 聚合云 API 凭证 */}
+          <div className="mb-4 rounded-lg bg-blue-50/50 p-3 space-y-3">
+            <div className="text-xs text-blue-700 font-medium">聚合云 (juhedenglu.cn) API 凭证</div>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="block text-xs font-medium text-gray-700 mb-1">App ID</label>
+                <input
+                  value={cfg.juhe_app_id || ''}
+                  onChange={e => set('juhe_app_id', e.target.value)}
+                  className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
+                  placeholder="聚合云 App ID"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-gray-700 mb-1">App Key</label>
+                <input
+                  type="password"
+                  value={cfg.juhe_app_key || ''}
+                  onChange={e => set('juhe_app_key', e.target.value)}
+                  className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
+                  placeholder="聚合云 App Key"
+                />
+              </div>
+            </div>
+            <p className="text-[11px] text-gray-400">填写后即可启用第三方登录; 留空时将回退使用服务器环境变量 JUHE_APP_ID / JUHE_APP_KEY</p>
+          </div>
+
           <div className="grid grid-cols-3 gap-2">
             {JUHE_TYPES.map(t => {
               const open = (cfg.open_login_types || '').split(',').includes(t.type);

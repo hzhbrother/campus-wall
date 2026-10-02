@@ -2,6 +2,8 @@
 import { NextResponse } from 'next/server';
 import { isAggregatedLoginConfigured } from '@/lib/aggregated-login';
 
+export const dynamic = 'force-dynamic';
+
 export async function GET() {
-  return NextResponse.json({ configured: isAggregatedLoginConfigured() });
+  return NextResponse.json({ configured: await isAggregatedLoginConfigured() });
 }

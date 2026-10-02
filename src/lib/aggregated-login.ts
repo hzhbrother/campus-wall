@@ -1,10 +1,17 @@
 // 聚合登录 (聚合云 / juhedenglu.cn) 对接
 // 文档: https://www.juhedenglu.cn/help/developer.html
 // 只需一对 JUHE_APP_ID / JUHE_APP_KEY, 即可接入 QQ/微信/微博/支付宝/百度/抖音/华为/小米/Google/GitHub 等
+// 凭证优先从站点配置 (site_config: juhe_app_id / juhe_app_key) 读取, 未配置时回退到环境变量
+import { getSiteConfigValue } from './site-config';
 
-const JUHE_APP_ID = process.env.JUHE_APP_ID || '';
-const JUHE_APP_KEY = process.env.JUHE_APP_KEY || '';
 const JUHE_API = 'https://open.juhedenglu.cn/connect.php';
+
+// 动态读取聚合登录凭证: 站点配置优先, 环境变量兜底
+async function getJuheCredentials(): Promise<{ appId: string; appKey: string }> {
+  const appId = (await getSiteConfigValue('juhe_app_id')) || process.env.JUHE_APP_ID || '';
+  const appKey = (await getSiteConfigValue('juhe_app_key')) || process.env.JUHE_APP_KEY || '';
+  return { appId, appKey };
+}
 
 // 聚合登录支持的类型 (provider 对应 AccountProvider 枚举值)
 export const JUHE_TYPES = [
@@ -22,8 +29,9 @@ export const JUHE_TYPES = [
   { type: 'microsoft', label: '微软',    icon: '🪟', provider: 'GOOGLE' },
 ] as const;
 
-export function isAggregatedLoginConfigured(): boolean {
-  return !!JUHE_APP_ID && !!JUHE_APP_KEY;
+export async function isAggregatedLoginConfigured(): Promise<boolean> {
+  const { appId, appKey } = await getJuheCredentials();
+  return !!appId && !!appKey;
 }
 
 export function getJuheTypeMeta(type: string) {
@@ -35,7 +43,8 @@ export async function getAggregatedLoginUrl(
   type: string,
   redirectUri: string
 ): Promise<string> {
-  if (!isAggregatedLoginConfigured()) {
+  const { appId, appKey } = await getJuheCredentials();
+  if (!appId || !appKey) {
     throw new Error('聚合登录未配置 JUHE_APP_ID / JUHE_APP_KEY');
   }
   const meta = getJuheTypeMeta(type);
@@ -43,8 +52,8 @@ export async function getAggregatedLoginUrl(
 
   const params = new URLSearchParams({
     act: 'login',
-    appid: JUHE_APP_ID,
-    appkey: JUHE_APP_KEY,
+    appid: appId,
+    appkey: appKey,
     type,
     redirect_uri: redirectUri,
   });
@@ -72,13 +81,14 @@ export async function getAggregatedUserInfo(
   type: string,
   code: string
 ): Promise<JuheUserInfo> {
-  if (!isAggregatedLoginConfigured()) {
+  const { appId, appKey } = await getJuheCredentials();
+  if (!appId || !appKey) {
     throw new Error('聚合登录未配置 JUHE_APP_ID / JUHE_APP_KEY');
   }
   const params = new URLSearchParams({
     act: 'callback',
-    appid: JUHE_APP_ID,
-    appkey: JUHE_APP_KEY,
+    appid: appId,
+    appkey: appKey,
     type,
     code,
   });
