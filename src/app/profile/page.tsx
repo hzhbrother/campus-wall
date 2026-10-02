@@ -17,6 +17,7 @@ import { JoinOrgModal } from '@/components/JoinOrgModal';
 import { formatUserCode } from '@/lib/user-number';
 import { DEFAULT_ROLE_PERMISSIONS } from '@/lib/permissions';
 import { JUHE_TYPES } from '@/lib/aggregated-login';
+import { BrandIcon } from '@/components/BrandIcons';
 import type { AdminTab } from '@/components/admin/AdminPanel';
 
 // 管理后台懒加载 (大幅减少首屏体积)
@@ -80,7 +81,9 @@ function AccountBindingsCard({ userId }: { userId: string }) {
       <div className="space-y-2">
         {JUHE_TYPES.map(t => (
           <div key={t.type} className="flex items-center gap-3 py-2">
-            <span className="text-xl">{t.icon}</span>
+            <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-white ring-1 ring-gray-100">
+              <BrandIcon type={t.type} size={18} />
+            </span>
             <span className="flex-1 text-sm text-gray-800">{t.label}</span>
             {isBound(t.provider) ? (
               <button

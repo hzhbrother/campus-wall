@@ -9,9 +9,8 @@ export const dynamic = 'force-dynamic';
 
 // AccountProvider 枚举的全部值 (与 schema.prisma 保持一致)
 const ALL_PROVIDERS = [
-  'LOCAL', 'GITHUB', 'GITEE', 'GOOGLE', 'WECHAT', 'QQ', 'WEIBO',
-  'HUAWEI', 'XIAOMI', 'ALIPAY', 'BAIDU', 'DOUYIN', 'BILIBILI',
-  'FEISHU', 'DINGTALK', 'FACEBOOK', 'TWITTER', 'TELEGRAM',
+  'LOCAL', 'GITHUB', 'GOOGLE', 'WECHAT', 'QQ', 'WEIBO',
+  'HUAWEI', 'XIAOMI', 'ALIPAY', 'BAIDU', 'DOUYIN', 'BILIBILI', 'DINGTALK',
 ];
 
 // 需要创建的表 (与 schema.prisma 保持一致)

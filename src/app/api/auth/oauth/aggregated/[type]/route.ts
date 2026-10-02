@@ -16,7 +16,7 @@ export async function GET(req: NextRequest, { params }: { params: { type: string
   const redirectUri = `${origin}/api/auth/callback/aggregated`;
 
   try {
-    const url = await getAggregatedLoginUrl(type, redirectUri);
+    const { url } = await getAggregatedLoginUrl(type, redirectUri);
     const state = randomBytes(8).toString('hex');
     const res = NextResponse.redirect(url);
     res.cookies.set('oauth_state', state, { httpOnly: true, sameSite: 'lax', maxAge: 600, path: '/' });

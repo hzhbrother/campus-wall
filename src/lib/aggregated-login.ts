@@ -1,10 +1,10 @@
-// 聚合登录 (聚合云 / juhedenglu.cn) 对接
-// 文档: https://www.juhedenglu.cn/help/developer.html
-// 只需一对 JUHE_APP_ID / JUHE_APP_KEY, 即可接入 QQ/微信/微博/支付宝/百度/抖音/华为/小米/Google/GitHub 等
+// 聚合登录 (彩虹云 / u.cccyun.cc) 对接
+// 文档: https://u.cccyun.cc/doc.php
+// 只需一对 App ID / App Key, 即可接入 QQ/微信/支付宝/微博/百度/华为/小米/抖音/哔哩哔哩/钉钉
 // 凭证优先从站点配置 (site_config: juhe_app_id / juhe_app_key) 读取, 未配置时回退到环境变量
 import { getSiteConfigValue } from './site-config';
 
-const JUHE_API = 'https://open.juhedenglu.cn/connect.php';
+const JUHE_API = 'https://u.cccyun.cc/connect.php';
 
 // 动态读取聚合登录凭证: 站点配置优先, 环境变量兜底
 async function getJuheCredentials(): Promise<{ appId: string; appKey: string }> {
@@ -14,19 +14,18 @@ async function getJuheCredentials(): Promise<{ appId: string; appKey: string }> 
 }
 
 // 聚合登录支持的类型 (provider 对应 AccountProvider 枚举值)
+// 对齐彩虹云官方文档支持的 10 种登录方式
 export const JUHE_TYPES = [
-  { type: 'qq',        label: 'QQ',      icon: '🐧', provider: 'QQ' },
-  { type: 'wx',        label: '微信',    icon: '💬', provider: 'WECHAT' },
-  { type: 'sina',      label: '微博',    icon: '🌐', provider: 'WEIBO' },
-  { type: 'alipay',    label: '支付宝',  icon: '💰', provider: 'ALIPAY' },
-  { type: 'baidu',     label: '百度',    icon: '🐾', provider: 'BAIDU' },
-  { type: 'douyin',    label: '抖音',    icon: '🎵', provider: 'DOUYIN' },
-  { type: 'huawei',    label: '华为',    icon: '📱', provider: 'HUAWEI' },
-  { type: 'xiaomi',    label: '小米',    icon: '📲', provider: 'QQ' },
-  { type: 'gitee',     label: 'Gitee',   icon: '🐙', provider: 'GITHUB' },
-  { type: 'github',    label: 'GitHub',  icon: '🐱', provider: 'GITHUB' },
-  { type: 'google',    label: 'Google',  icon: '🔍', provider: 'GOOGLE' },
-  { type: 'microsoft', label: '微软',    icon: '🪟', provider: 'GOOGLE' },
+  { type: 'qq',       label: 'QQ',       provider: 'QQ' },
+  { type: 'wx',       label: '微信',     provider: 'WECHAT' },
+  { type: 'alipay',   label: '支付宝',   provider: 'ALIPAY' },
+  { type: 'sina',     label: '微博',     provider: 'WEIBO' },
+  { type: 'baidu',    label: '百度',     provider: 'BAIDU' },
+  { type: 'huawei',   label: '华为',     provider: 'HUAWEI' },
+  { type: 'xiaomi',   label: '小米',     provider: 'XIAOMI' },
+  { type: 'douyin',   label: '抖音',     provider: 'DOUYIN' },
+  { type: 'bilibili', label: '哔哩哔哩', provider: 'BILIBILI' },
+  { type: 'dingtalk', label: '钉钉',     provider: 'DINGTALK' },
 ] as const;
 
 export async function isAggregatedLoginConfigured(): Promise<boolean> {
@@ -39,13 +38,15 @@ export function getJuheTypeMeta(type: string) {
 }
 
 // Step1: 获取跳转登录地址
+// 彩虹云返回 { code, msg, url, qrcode? }
+// 微信/支付宝等扫码登录会额外返回 qrcode 字段
 export async function getAggregatedLoginUrl(
   type: string,
   redirectUri: string
-): Promise<string> {
+): Promise<{ url: string; qrcode?: string }> {
   const { appId, appKey } = await getJuheCredentials();
   if (!appId || !appKey) {
-    throw new Error('聚合登录未配置 JUHE_APP_ID / JUHE_APP_KEY');
+    throw new Error('聚合登录未配置 App ID / App Key');
   }
   const meta = getJuheTypeMeta(type);
   if (!meta) throw new Error('不支持的聚合登录类型: ' + type);
@@ -62,7 +63,7 @@ export async function getAggregatedLoginUrl(
   if (data.code !== 0 || !data.url) {
     throw new Error(data.msg || '获取聚合登录地址失败');
   }
-  return data.url as string;
+  return { url: data.url as string, qrcode: data.qrcode as string | undefined };
 }
 
 // Step4: 通过 Authorization Code 获取用户信息
@@ -83,7 +84,7 @@ export async function getAggregatedUserInfo(
 ): Promise<JuheUserInfo> {
   const { appId, appKey } = await getJuheCredentials();
   if (!appId || !appKey) {
-    throw new Error('聚合登录未配置 JUHE_APP_ID / JUHE_APP_KEY');
+    throw new Error('聚合登录未配置 App ID / App Key');
   }
   const params = new URLSearchParams({
     act: 'callback',
@@ -94,6 +95,10 @@ export async function getAggregatedUserInfo(
   });
   const res = await fetch(`${JUHE_API}?${params.toString()}`);
   const data = await res.json();
+  // code=2: 用户未完成登录/取消授权
+  if (data.code === 2) {
+    throw new Error('您取消了登录授权，请重试');
+  }
   if (data.code !== 0) {
     throw new Error(data.msg || '聚合登录获取用户信息失败');
   }

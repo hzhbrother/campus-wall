@@ -6,6 +6,7 @@ import Link from 'next/link';
 import { useAuth } from '@/lib/auth-context';
 import { api } from '@/lib/api';
 import { JUHE_TYPES } from '@/lib/aggregated-login';
+import { BrandIcon } from '@/components/BrandIcons';
 
 const OAUTH_BASE = process.env.NEXT_PUBLIC_API_BASE || '';
 
@@ -192,18 +193,20 @@ export default function LoginPage() {
             <div className="mx-auto mb-4 h-1 w-10 rounded-full bg-slate-200" />
             <h3 className="mb-1 text-center text-lg font-bold text-slate-900">选择登录方式</h3>
             <p className="mb-5 text-center text-xs text-slate-400">
-              {juheReady ? '通过聚合云一键授权登录' : '聚合登录暂未配置, 请联系管理员'}
+              {juheReady ? '通过彩虹云一键授权登录' : '聚合登录暂未配置, 请联系管理员'}
             </p>
-            <div className="grid grid-cols-4 gap-3">
+            <div className="grid grid-cols-5 gap-3">
               {(openTypes.length > 0 ? JUHE_TYPES.filter(p => openTypes.includes(p.type)) : JUHE_TYPES).map(p => (
                 <button
                   key={p.type}
                   disabled={!juheReady}
                   onClick={() => startAggregated(p.type)}
-                  className="flex flex-col items-center gap-1.5 rounded-xl py-3 text-slate-600 hover:bg-slate-50 disabled:opacity-40 transition"
+                  className="flex flex-col items-center gap-2 rounded-2xl py-3 transition hover:bg-slate-50 disabled:opacity-40 disabled:hover:bg-transparent"
                 >
-                  <span className="flex h-11 w-11 items-center justify-center rounded-full bg-slate-50 text-2xl">{p.icon}</span>
-                  <span className="text-xs font-medium text-slate-700">{p.label}</span>
+                  <span className="flex h-12 w-12 items-center justify-center rounded-full bg-slate-50 shadow-sm ring-1 ring-slate-100">
+                    <BrandIcon type={p.type} size={26} />
+                  </span>
+                  <span className="text-xs font-medium text-slate-600">{p.label}</span>
                 </button>
               ))}
             </div>

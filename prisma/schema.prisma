@@ -36,9 +36,12 @@ enum AccountProvider {
   QQ
   WEIBO
   HUAWEI
+  XIAOMI
   ALIPAY
   BAIDU
   DOUYIN
+  BILIBILI
+  DINGTALK
 }
 
 enum PostStatus {

@@ -4,6 +4,7 @@ import { useEffect, useState, useCallback, useRef } from 'react';
 import { api } from '@/lib/api';
 import { PERMISSIONS, PERMISSIONS_BY_GROUP, SUPER_ADMIN_ONLY_PERMISSIONS } from '@/lib/permissions';
 import { JUHE_TYPES } from '@/lib/aggregated-login';
+import { BrandIcon } from '@/components/BrandIcons';
 import { compressImage } from '@/lib/image-compress';
 import TemplateManager from './TemplateManager';
 import { BadgesManager } from './BadgesManager';
@@ -2134,9 +2135,9 @@ function SiteSettings() {
           <h3 className="font-semibold text-gray-900 mb-1">🔐 开放登录方式</h3>
           <p className="text-xs text-gray-400 mb-3">勾选后用户可在登录页使用该方式快捷登录</p>
 
-          {/* 聚合云 API 凭证 */}
+          {/* 彩虹云 API 凭证 */}
           <div className="mb-4 rounded-lg bg-blue-50/50 p-3 space-y-3">
-            <div className="text-xs text-blue-700 font-medium">聚合云 (juhedenglu.cn) API 凭证</div>
+            <div className="text-xs text-blue-700 font-medium">彩虹云 (u.cccyun.cc) API 凭证</div>
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <label className="block text-xs font-medium text-gray-700 mb-1">App ID</label>
@@ -2144,7 +2145,7 @@ function SiteSettings() {
                   value={cfg.juhe_app_id || ''}
                   onChange={e => set('juhe_app_id', e.target.value)}
                   className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
-                  placeholder="聚合云 App ID"
+                  placeholder="彩虹云 App ID"
                 />
               </div>
               <div>
@@ -2154,18 +2155,18 @@ function SiteSettings() {
                   value={cfg.juhe_app_key || ''}
                   onChange={e => set('juhe_app_key', e.target.value)}
                   className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
-                  placeholder="聚合云 App Key"
+                  placeholder="彩虹云 App Key"
                 />
               </div>
             </div>
             <p className="text-[11px] text-gray-400">填写后即可启用第三方登录; 留空时将回退使用服务器环境变量 JUHE_APP_ID / JUHE_APP_KEY</p>
           </div>
 
-          <div className="grid grid-cols-3 gap-2">
+          <div className="grid grid-cols-2 gap-2">
             {JUHE_TYPES.map(t => {
               const open = (cfg.open_login_types || '').split(',').includes(t.type);
               return (
-                <label key={t.type} className={`flex items-center gap-2 rounded-lg border p-2.5 cursor-pointer transition ${open ? 'border-blue-400 bg-blue-50' : 'border-gray-200 hover:border-gray-300'}`}>
+                <label key={t.type} className={`flex items-center gap-3 rounded-lg border p-2.5 cursor-pointer transition ${open ? 'border-blue-400 bg-blue-50' : 'border-gray-200 hover:border-gray-300'}`}>
                   <input
                     type="checkbox"
                     checked={open}
@@ -2177,8 +2178,10 @@ function SiteSettings() {
                     }}
                     className="h-4 w-4 shrink-0"
                   />
-                  <span className="text-lg">{t.icon}</span>
-                  <span className="text-sm text-gray-700 truncate">{t.label}</span>
+                  <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-white ring-1 ring-gray-100">
+                    <BrandIcon type={t.type} size={18} />
+                  </span>
+                  <span className="text-sm font-medium text-gray-700">{t.label}</span>
                 </label>
               );
             })}
