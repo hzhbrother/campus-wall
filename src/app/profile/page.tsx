@@ -495,7 +495,7 @@ function ProfilePageInner() {
   const counts = (user as any)?._count || { posts: 0, comments: 0, likes: 0, favorites: 0, likesReceived: 0 };
 
   // 判断是否为管理后台标签
-  const ADMIN_TABS: AdminTab[] = ['overview', 'posts', 'moderation', 'comments', 'users', 'avatars', 'verification', 'qualifications', 'template', 'appeals', 'notifications', 'settings', 'email', 'agreement', 'roles', 'badges', 'schools', 'orgs'];
+  const ADMIN_TABS: AdminTab[] = ['overview', 'posts', 'moderation', 'comments', 'users', 'avatars', 'verification', 'qualifications', 'template', 'appeals', 'notifications', 'settings', 'email', 'agreement', 'roles', 'badges', 'schools', 'orgs', 'quicklinks', 'shop', 'wishes'];
   const isAdminView = (v: View): v is AdminTab => ADMIN_TABS.includes(v as AdminTab);
 
   // ---- 管理后台视图 ----
