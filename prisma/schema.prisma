@@ -685,6 +685,9 @@ model ExchangeRecord {
   itemId      String
   pointsCost  Int                              // 兑换时花费的积分
   status      String   @default("PENDING")     // PENDING(待发放) | FULFILLED(已发放) | CANCELLED(已取消)
+  fulfillmentType String?                      // 发放方式: SELF_PICKUP | EXPRESS | VIRTUAL_CODE | ONLINE | CONTACT | OTHER
+  fulfillmentInfo String?                      // 发放详情 (快递单号/兑换码/自提地址等, JSON 字符串)
+  fulfilledAt DateTime?                        // 发放时间
   createdAt   DateTime @default(now())
 
   user        User       @relation(fields: [userId], references: [id], onDelete: Cascade)

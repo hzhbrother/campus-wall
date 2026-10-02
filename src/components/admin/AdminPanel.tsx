@@ -3807,6 +3807,8 @@ function ShopManager() {
   const [showForm, setShowForm] = useState(false);
   const [editing, setEditing] = useState<any>(null);
   const [err, setErr] = useState('');
+  const [fulfillTarget, setFulfillTarget] = useState<any>(null);
+  const [viewTarget, setViewTarget] = useState<any>(null);
 
   const load = () => {
     setLoading(true);
@@ -3945,12 +3947,14 @@ function ShopManager() {
                   <td className="px-4 py-2.5 text-center">{statusLabel(r.status)}</td>
                   <td className="px-4 py-2.5 text-center text-gray-400 text-xs">{new Date(r.createdAt).toLocaleDateString('zh-CN')}</td>
                   <td className="px-4 py-2.5 text-right">
-                    {r.status === 'PENDING' && (
+                    {r.status === 'PENDING' ? (
                       <>
-                        <button onClick={() => updateExchange(r.id, 'FULFILLED')} className="text-green-500 hover:underline mr-2">发放</button>
+                        <button onClick={() => setFulfillTarget(r)} className="text-green-500 hover:underline mr-2">发放</button>
                         <button onClick={() => updateExchange(r.id, 'CANCELLED')} className="text-red-400 hover:underline">取消</button>
                       </>
-                    )}
+                    ) : r.status === 'FULFILLED' ? (
+                      <button onClick={() => setViewTarget(r)} className="text-blue-500 hover:underline">查看发放</button>
+                    ) : null}
                   </td>
                 </tr>
               ))}
@@ -3959,6 +3963,112 @@ function ShopManager() {
           </table>
         </div>
       )}
+
+      {fulfillTarget && <FulfillModal record={fulfillTarget} onClose={() => setFulfillTarget(null)} onDone={() => { load(); setFulfillTarget(null); }} />}
+      {viewTarget && <FulfillDetailModal record={viewTarget} onClose={() => setViewTarget(null)} />}
+    </div>
+  );
+}
+
+// ---------- 发放弹窗 ----------
+const FULFILLMENT_TYPES = [
+  { value: 'SELF_PICKUP', label: '线下自提', icon: '🏪', desc: '用户到指定地点自取', fields: [{ key: 'address', label: '自提地址' }, { key: 'time', label: '自提时间' }, { key: 'contact', label: '联系电话' }] },
+  { value: 'EXPRESS', label: '快递邮寄', icon: '📦', desc: '通过快递寄送', fields: [{ key: 'company', label: '快递公司' }, { key: 'trackingNo', label: '快递单号' }] },
+  { value: 'VIRTUAL_CODE', label: '虚拟兑换码', icon: '🎫', desc: '发放兑换码给用户', fields: [{ key: 'code', label: '兑换码' }, { key: 'expireAt', label: '有效期(可选)' }] },
+  { value: 'ONLINE', label: '线上发放', icon: '⚡', desc: '直接到账(会员/积分/优惠券等)', fields: [{ key: 'account', label: '发放账户' }, { key: 'detail', label: '发放说明' }] },
+  { value: 'CONTACT', label: '联系管理员', icon: '💬', desc: '用户联系管理员领取', fields: [{ key: 'contact', label: '管理员联系方式' }, { key: 'note', label: '备注说明' }] },
+  { value: 'OTHER', label: '其他方式', icon: '📝', desc: '其他发放方式', fields: [{ key: 'detail', label: '发放说明' }] },
+];
+
+function FulfillModal({ record, onClose, onDone }: { record: any; onClose: () => void; onDone: () => void }) {
+  const [type, setType] = useState('');
+  const [fields, setFields] = useState<Record<string, string>>({});
+  const [saving, setSaving] = useState(false);
+  const [err, setErr] = useState('');
+
+  const currentType = FULFILLMENT_TYPES.find(t => t.value === type);
+
+  const doFulfill = async () => {
+    if (!type) { setErr('请选择发放方式'); return; }
+    const info = currentType ? Object.fromEntries(currentType.fields.map(f => [f.label, fields[f.key] || ''])) : {};
+    setSaving(true); setErr('');
+    try {
+      await api.patch(`/api/admin/shop/exchanges/${record.id}`, {
+        status: 'FULFILLED',
+        fulfillmentType: type,
+        fulfillmentInfo: JSON.stringify(info),
+      });
+      onDone();
+    } catch (e: any) { setErr(e.message); }
+    finally { setSaving(false); }
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" onClick={onClose}>
+      <div className="w-full max-w-lg rounded-2xl bg-white p-6 shadow-2xl max-h-[85vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
+        <h3 className="text-lg font-bold text-gray-900 mb-1">发放兑换商品</h3>
+        <p className="text-sm text-gray-500 mb-4">商品: <span className="font-semibold text-gray-700">{record.item?.name}</span> · 用户: {record.user?.nickname}</p>
+
+        <div className="space-y-4">
+          <div>
+            <label className="text-xs text-gray-500">选择发放方式</label>
+            <div className="mt-2 grid grid-cols-3 gap-2">
+              {FULFILLMENT_TYPES.map(t => (
+                <button key={t.value} onClick={() => { setType(t.value); setFields({}); }}
+                  className={`rounded-xl border p-3 text-center transition ${type === t.value ? 'border-amber-500 bg-amber-50' : 'border-gray-200 hover:border-gray-300'}`}>
+                  <div className="text-2xl mb-1">{t.icon}</div>
+                  <div className="text-xs font-medium text-gray-700">{t.label}</div>
+                  <div className="text-[10px] text-gray-400 mt-0.5">{t.desc}</div>
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {currentType && (
+            <div className="space-y-3 rounded-xl bg-gray-50 p-4">
+              {currentType.fields.map(f => (
+                <div key={f.key}>
+                  <label className="text-xs text-gray-500">{f.label}</label>
+                  <input value={fields[f.key] || ''} onChange={e => setFields({ ...fields, [f.key]: e.target.value })} className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm" placeholder={`请输入${f.label}`} />
+                </div>
+              ))}
+            </div>
+          )}
+
+          {err && <div className="text-sm text-red-500">{err}</div>}
+
+          <div className="flex gap-3">
+            <button onClick={onClose} className="flex-1 rounded-lg bg-gray-100 py-2.5 text-sm text-gray-700 hover:bg-gray-200">取消</button>
+            <button onClick={doFulfill} disabled={saving || !type} className="flex-1 rounded-lg bg-green-500 py-2.5 text-sm font-medium text-white hover:bg-green-600 disabled:opacity-50">
+              {saving ? '发放中...' : '确认发放'}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ---------- 发放详情弹窗 ----------
+function FulfillDetailModal({ record, onClose }: { record: any; onClose: () => void }) {
+  const typeLabel = FULFILLMENT_TYPES.find(t => t.value === record.fulfillmentType)?.label || '其他';
+  let info: Record<string, string> = {};
+  try { info = record.fulfillmentInfo ? JSON.parse(record.fulfillmentInfo) : {}; } catch {}
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" onClick={onClose}>
+      <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl" onClick={e => e.stopPropagation()}>
+        <h3 className="text-lg font-bold text-gray-900 mb-1">发放详情</h3>
+        <p className="text-sm text-gray-500 mb-4">{record.item?.name} · {record.user?.nickname}</p>
+        <div className="space-y-2 text-sm">
+          <div className="flex justify-between"><span className="text-gray-500">发放方式</span><span className="font-medium">{typeLabel}</span></div>
+          {record.fulfilledAt && <div className="flex justify-between"><span className="text-gray-500">发放时间</span><span>{new Date(record.fulfilledAt).toLocaleString('zh-CN')}</span></div>}
+          {Object.entries(info).filter(([_, v]) => v).map(([k, v]) => (
+            <div key={k} className="flex justify-between gap-2"><span className="text-gray-500 shrink-0">{k}</span><span className="text-right break-all">{v}</span></div>
+          ))}
+        </div>
+        <button onClick={onClose} className="mt-6 w-full rounded-lg bg-gray-100 py-2.5 text-sm text-gray-700 hover:bg-gray-200">关闭</button>
+      </div>
     </div>
   );
 }

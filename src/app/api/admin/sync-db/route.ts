@@ -44,8 +44,15 @@ const TABLES_SQL = [
     "itemId" TEXT NOT NULL,
     "pointsCost" INTEGER NOT NULL,
     status TEXT NOT NULL DEFAULT 'PENDING',
+    "fulfillmentType" TEXT,
+    "fulfillmentInfo" TEXT,
+    "fulfilledAt" TIMESTAMP(3),
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP
   )`,
+  // 兼容旧表: 补充新增列
+  `ALTER TABLE "ExchangeRecord" ADD COLUMN IF NOT EXISTS "fulfillmentType" TEXT`,
+  `ALTER TABLE "ExchangeRecord" ADD COLUMN IF NOT EXISTS "fulfillmentInfo" TEXT`,
+  `ALTER TABLE "ExchangeRecord" ADD COLUMN IF NOT EXISTS "fulfilledAt" TIMESTAMP(3)`,
   `CREATE TABLE IF NOT EXISTS "WishItem" (
     id TEXT PRIMARY KEY,
     "userId" TEXT NOT NULL,
