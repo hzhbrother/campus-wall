@@ -2340,7 +2340,7 @@ const DEFAULT_CONTACT_CONFIG: ContactConfig = {
   contacts: [{ id: '1', type: 'text', label: '企业微信', value: '请扫码加企业微信客服' }],
 };
 
-const WEEKDAYS = ['每天', '周一', '周二', '周三', '周四', '周五', '周六', '周日', '工作日', '周末'];
+const WEEKDAYS = ['每天', '周一', '周二', '周三', '周四', '周五', '周六', '周日', '工作日'];
 const HOURS = Array.from({ length: 24 }, (_, i) => `${String(i).padStart(2, '0')}:00`);
 const MINS = ['00', '15', '30', '45'];
 
