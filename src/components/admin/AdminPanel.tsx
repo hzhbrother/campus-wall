@@ -4056,6 +4056,7 @@ function ShopManager({ prefill, onPrefillUsed }: { prefill?: ShopPrefill | null;
   const [err, setErr] = useState('');
   const [fulfillTarget, setFulfillTarget] = useState<any>(null);
   const [viewTarget, setViewTarget] = useState<any>(null);
+  const [pendingWishId, setPendingWishId] = useState<string | null>(null);
 
   const load = () => {
     setLoading(true);
@@ -4073,6 +4074,7 @@ function ShopManager({ prefill, onPrefillUsed }: { prefill?: ShopPrefill | null;
   useEffect(() => {
     if (prefill) {
       setTab('items');
+      setPendingWishId(prefill.wishId || null);
       setEditing({
         name: prefill.name,
         description: prefill.description,
@@ -4086,14 +4088,20 @@ function ShopManager({ prefill, onPrefillUsed }: { prefill?: ShopPrefill | null;
     }
   }, [prefill]);
 
-  const openNew = () => { setEditing({ name: '', description: '', image: '', pointsCost: 100, stock: -1, isActive: true }); setShowForm(true); setErr(''); };
-  const openEdit = (item: any) => { setEditing({ ...item }); setShowForm(true); setErr(''); };
+  const openNew = () => { setPendingWishId(null); setEditing({ name: '', description: '', image: '', pointsCost: 100, stock: -1, isActive: true }); setShowForm(true); setErr(''); };
+  const openEdit = (item: any) => { setPendingWishId(null); setEditing({ ...item }); setShowForm(true); setErr(''); };
 
   const save = async () => {
     if (!editing.name.trim()) { setErr('请填写商品名称'); return; }
     try {
+      const isNew = !editing.id;
       if (editing.id) { await api.patch(`/api/admin/shop/items/${editing.id}`, editing); }
       else { await api.post('/api/admin/shop/items', editing); }
+      // 新建商品成功且来自许愿单采纳 → 标记许愿单为已采纳
+      if (isNew && pendingWishId) {
+        api.patch(`/api/admin/wishes/${pendingWishId}`, { status: 'ADOPTED' }).catch(() => {});
+        setPendingWishId(null);
+      }
       setShowForm(false); load();
     } catch (e: any) { setErr(e.message); }
   };
@@ -4389,14 +4397,15 @@ function WishesManager({ onAdopt }: { onAdopt?: (data: ShopPrefill) => void }) {
     }
   };
 
-  // 采纳: 标记状态 + 把许愿信息带到商品管理
-  const handleAdopt = async (w: any) => {
-    try {
-      await api.patch(`/api/admin/wishes/${w.id}`, { status: 'ADOPTED' });
-      setItems(prev => prev.map(i => i.id === w.id ? { ...i, status: 'ADOPTED' } : i));
-    } catch (e: any) { alert(e.message); return; }
+  // 采纳: 仅保证已查看, 把许愿信息带到商品管理; 真正创建商品成功后才标记已采纳
+  const handleAdopt = (w: any) => {
+    // 确保状态至少是已查看
+    if (w.status === 'PENDING') {
+      api.patch(`/api/admin/wishes/${w.id}`, { status: 'REVIEWED' }).catch(() => {});
+      setItems(prev => prev.map(i => i.id === w.id ? { ...i, status: 'REVIEWED' } : i));
+    }
     setDetail(null);
-    onAdopt?.({ name: w.itemName, description: w.description, image: w.image || undefined });
+    onAdopt?.({ wishId: w.id, name: w.itemName, description: w.description, image: w.image || undefined });
   };
 
   const statusBadge = (s: string) => {
@@ -4478,6 +4487,7 @@ function WishesManager({ onAdopt }: { onAdopt?: (data: ShopPrefill) => void }) {
 
 // ---------- 管理后台主组件 ----------
 export interface ShopPrefill {
+  wishId?: string;
   name: string;
   description: string;
   image?: string;
