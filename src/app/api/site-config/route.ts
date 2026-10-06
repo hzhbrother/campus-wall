@@ -14,6 +14,8 @@ const PUBLIC_KEYS = [
   'profile_bg',
   'max_accounts',
   'open_login_types',
+  // 联系我们
+  'contact_service_hours', 'contact_method', 'contact_qrcode', 'contact_note',
 ];
 
 export async function GET() {

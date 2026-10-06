@@ -2050,6 +2050,47 @@ function SiteSettings() {
           </div>
         </div>
 
+        {/* 联系我们 */}
+        <div className="rounded-xl border border-gray-100 p-4">
+          <h3 className="font-semibold text-gray-900 mb-3">💬 联系我们</h3>
+          <div className="space-y-3">
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">服务时间</label>
+                <input value={cfg.contact_service_hours || ''} onChange={e => set('contact_service_hours', e.target.value)} className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm" placeholder="每天 8:00 - 23:00" />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">联系方式</label>
+                <input value={cfg.contact_method || ''} onChange={e => set('contact_method', e.target.value)} className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm" placeholder="企业微信" />
+              </div>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">联系二维码（如企业微信二维码）</label>
+              <div className="flex items-center gap-3">
+                <div className="h-20 w-20 rounded-lg bg-gray-100 overflow-hidden flex items-center justify-center shrink-0">
+                  {cfg.contact_qrcode ? <img src={cfg.contact_qrcode} alt="" className="h-full w-full object-cover" /> : <span className="text-xs text-gray-400">无图片</span>}
+                </div>
+                <div className="flex-1 space-y-2">
+                  <label className="inline-block cursor-pointer rounded-lg bg-blue-50 px-3 py-1.5 text-sm text-blue-600 hover:bg-blue-100">
+                    上传图片
+                    <input type="file" accept="image/*" className="hidden" onChange={async e => {
+                      const f = e.target.files?.[0]; if (!f) return;
+                      try { const b64 = await compressImage(f, 512, 0.8); set('contact_qrcode', b64); } catch { alert('图片处理失败'); }
+                    }} />
+                  </label>
+                  {cfg.contact_qrcode && (
+                    <button onClick={() => set('contact_qrcode', '')} className="ml-2 text-sm text-red-500 hover:text-red-700">删除</button>
+                  )}
+                </div>
+              </div>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">备注说明</label>
+              <textarea value={cfg.contact_note || ''} onChange={e => set('contact_note', e.target.value)} rows={2} className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm" placeholder="请在服务时间内通过企业微信联系客服" />
+            </div>
+          </div>
+        </div>
+
         <div className="rounded-xl border border-gray-100 p-4">
           <h3 className="font-semibold text-gray-900 mb-3">🎨 个人中心</h3>
           <div>
