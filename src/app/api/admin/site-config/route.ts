@@ -15,7 +15,7 @@ const CONFIG_KEYS = [
   // 功能开关
   'allow_register', 'post_requires_approval', 'allow_anonymous', 'email_notify_enabled', 'comment_enabled', 'max_accounts',
   // 内容设置
-  'post_categories', 'daily_post_limit', 'sensitive_words', 'announcement_text',
+  'post_categories', 'review_categories', 'daily_post_limit', 'sensitive_words', 'announcement_text',
   // 协议内容
   'agreement_content', 'privacy_content',
   // 关于我们

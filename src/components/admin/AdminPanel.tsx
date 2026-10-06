@@ -1975,6 +1975,8 @@ function SiteSettings() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [msg, setMsg] = useState('');
+  const [editingCatIdx, setEditingCatIdx] = useState<number | null>(null);
+  const [editingCatName, setEditingCatName] = useState('');
 
   useEffect(() => {
     api.get('/api/admin/site-config').then(setCfg).catch(console.error).finally(() => setLoading(false));
@@ -2093,6 +2095,7 @@ function SiteSettings() {
                 {(cfg.post_categories || '').split(',').map(s => s.trim()).filter(Boolean).map((cat, idx, arr) => {
                   const reviewList = (cfg.review_categories || '').split(',').map(s => s.trim()).filter(Boolean);
                   const checked = reviewList.includes(cat);
+                  const isEditing = editingCatIdx === idx;
                   return (
                     <div key={idx} className="flex items-center gap-3 rounded-lg border border-gray-200 p-2.5">
                       <input
@@ -2104,16 +2107,71 @@ function SiteSettings() {
                             if (e.target.checked) { if (!list.includes(cat)) list.push(cat); }
                             else { const i = list.indexOf(cat); if (i >= 0) list.splice(i, 1); }
                             const newValue = list.join(',');
-                            // 勾选后立即自动保存到后端, 刷新页面后仍保持
                             api.patch('/api/admin/site-config', { review_categories: newValue }).catch(() => {});
                             return { ...prev, review_categories: newValue };
                           });
                         }}
                         className="h-4 w-4 shrink-0 accent-orange-500"
                       />
-                      <span className="flex-1 text-sm font-medium text-gray-800">{cat}</span>
-                      {checked && (
+                      {isEditing ? (
+                        <input
+                          autoFocus
+                          value={editingCatName}
+                          onChange={e => setEditingCatName(e.target.value)}
+                          onKeyDown={e => {
+                            if (e.key === 'Enter') {
+                              const val = editingCatName.trim();
+                              if (val && val !== cat) {
+                                setCfg(prev => {
+                                  const list = (prev.post_categories || '').split(',').map(s => s.trim()).filter(Boolean);
+                                  list[idx] = val;
+                                  // 同步更新审核列表里的旧名称
+                                  const rl = (prev.review_categories || '').split(',').map(s => s.trim()).filter(Boolean);
+                                  const ri = rl.indexOf(cat);
+                                  if (ri >= 0) rl[ri] = val;
+                                  const newCategories = list.join(',');
+                                  const newReview = rl.join(',');
+                                  api.patch('/api/admin/site-config', { post_categories: newCategories, review_categories: newReview }).catch(() => {});
+                                  return { ...prev, post_categories: newCategories, review_categories: newReview };
+                                });
+                              }
+                              setEditingCatIdx(null);
+                            } else if (e.key === 'Escape') {
+                              setEditingCatIdx(null);
+                            }
+                          }}
+                          onBlur={() => {
+                            const val = editingCatName.trim();
+                            if (val && val !== cat) {
+                              setCfg(prev => {
+                                const list = (prev.post_categories || '').split(',').map(s => s.trim()).filter(Boolean);
+                                list[idx] = val;
+                                const rl = (prev.review_categories || '').split(',').map(s => s.trim()).filter(Boolean);
+                                const ri = rl.indexOf(cat);
+                                if (ri >= 0) rl[ri] = val;
+                                const newCategories = list.join(',');
+                                const newReview = rl.join(',');
+                                api.patch('/api/admin/site-config', { post_categories: newCategories, review_categories: newReview }).catch(() => {});
+                                return { ...prev, post_categories: newCategories, review_categories: newReview };
+                              });
+                            }
+                            setEditingCatIdx(null);
+                          }}
+                          className="flex-1 rounded border border-orange-300 px-2 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-orange-400"
+                        />
+                      ) : (
+                        <span className="flex-1 text-sm font-medium text-gray-800">{cat}</span>
+                      )}
+                      {checked && !isEditing && (
                         <span className="flex h-5 items-center rounded-full bg-orange-100 px-2 text-xs font-bold text-orange-600">需审核</span>
+                      )}
+                      {!isEditing && (
+                        <button
+                          onClick={() => { setEditingCatIdx(idx); setEditingCatName(cat); }}
+                          className="text-xs text-blue-500 hover:text-blue-700 shrink-0"
+                        >
+                          编辑
+                        </button>
                       )}
                       <button
                         onClick={() => {
