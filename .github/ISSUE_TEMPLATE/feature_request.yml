@@ -95,8 +95,10 @@ body:
       description: 这个功能主要面向哪类用户？
       options:
         - 所有用户
-        - 普通用户
+        - 学生
+        - 教师
         - 管理员
+        - 超级管理员
         - 特定用户群体
     validations:
       required: true
