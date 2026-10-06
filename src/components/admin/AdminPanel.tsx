@@ -4005,10 +4005,15 @@ function ShopManager() {
     catch { alert('图片处理失败'); }
   };
 
+  const toggleActive = async (id: string, current: boolean) => {
+    try { await api.patch(`/api/admin/shop/items/${id}`, { isActive: !current }); load(); }
+    catch (e: any) { setErr(e.message); }
+  };
+
   const statusLabel = (s: string) => {
-    if (s === 'FULFILLED') return <span className="text-green-500">已发放</span>;
-    if (s === 'CANCELLED') return <span className="text-gray-400">已取消</span>;
-    return <span className="text-amber-500">待发放</span>;
+    if (s === 'FULFILLED') return <span className="rounded-full bg-green-50 px-2 py-0.5 text-xs text-green-600">已发放</span>;
+    if (s === 'CANCELLED') return <span className="rounded-full bg-gray-100 px-2 py-0.5 text-xs text-gray-400">已取消</span>;
+    return <span className="rounded-full bg-amber-50 px-2 py-0.5 text-xs text-amber-600">待发放</span>;
   };
 
   return (
@@ -4061,60 +4066,70 @@ function ShopManager() {
       )}
 
       {tab === 'items' ? (
-        <div className="overflow-hidden rounded-2xl bg-white shadow-sm">
-          <table className="w-full text-sm">
-            <thead className="bg-gray-50 text-gray-500">
-              <tr><th className="px-4 py-2.5 text-left">商品</th><th className="px-4 py-2.5 text-center">积分</th><th className="px-4 py-2.5 text-center">库存</th><th className="px-4 py-2.5 text-center">状态</th><th className="px-4 py-2.5 text-right">操作</th></tr>
-            </thead>
-            <tbody>
-              {items.map(it => (
-                <tr key={it.id} className="border-t border-gray-100">
-                  <td className="px-4 py-2.5 flex items-center gap-2">
-                    {it.image && <img src={it.image} alt="" className="h-10 w-10 rounded-lg object-cover" />}
-                    <div><div className="font-medium">{it.name}</div>{it.description && <div className="text-xs text-gray-400 truncate max-w-[200px]">{it.description}</div>}</div>
-                  </td>
-                  <td className="px-4 py-2.5 text-center text-amber-600 font-medium">{it.pointsCost}</td>
-                  <td className="px-4 py-2.5 text-center">{it.stock === -1 ? '不限' : it.stock}</td>
-                  <td className="px-4 py-2.5 text-center">{it.isActive ? <span className="text-green-500">上架</span> : <span className="text-gray-400">下架</span>}</td>
-                  <td className="px-4 py-2.5 text-right">
-                    <button onClick={() => openEdit(it)} className="text-blue-500 hover:underline mr-2">编辑</button>
-                    <button onClick={() => remove(it.id)} className="text-red-400 hover:underline">删除</button>
-                  </td>
-                </tr>
-              ))}
-              {items.length === 0 && <tr><td colSpan={5} className="px-4 py-8 text-center text-gray-400">暂无商品</td></tr>}
-            </tbody>
-          </table>
+        <div className="space-y-2">
+          {items.map(it => (
+            <div key={it.id} className="rounded-2xl bg-white p-4 shadow-sm">
+              <div className="flex items-start gap-3">
+                <div className="h-14 w-14 shrink-0 overflow-hidden rounded-xl bg-gray-100 flex items-center justify-center text-2xl">
+                  {it.image ? <img src={it.image} alt="" className="h-full w-full object-cover" /> : <span>🎁</span>}
+                </div>
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center gap-2">
+                    <span className="font-medium text-gray-900 truncate">{it.name}</span>
+                    {it.isActive
+                      ? <span className="shrink-0 rounded-full bg-green-50 px-2 py-0.5 text-xs text-green-600">上架</span>
+                      : <span className="shrink-0 rounded-full bg-gray-100 px-2 py-0.5 text-xs text-gray-400">下架</span>
+                    }
+                  </div>
+                  {it.description && <div className="mt-1 text-xs text-gray-400 line-clamp-1">{it.description}</div>}
+                  <div className="mt-1.5 flex items-center gap-3 text-xs text-gray-500">
+                    <span className="text-amber-600 font-medium">{it.pointsCost} 积分</span>
+                    <span>库存 {it.stock === -1 ? '不限' : it.stock}</span>
+                  </div>
+                </div>
+              </div>
+              <div className="mt-3 flex gap-2">
+                <button onClick={() => openEdit(it)} className="flex-1 rounded-lg bg-blue-50 py-1.5 text-sm text-blue-600 hover:bg-blue-100">编辑</button>
+                <button onClick={() => toggleActive(it.id, it.isActive)} className={`flex-1 rounded-lg py-1.5 text-sm ${it.isActive ? 'bg-gray-50 text-gray-600 hover:bg-gray-100' : 'bg-green-50 text-green-600 hover:bg-green-100'}`}>
+                  {it.isActive ? '下架' : '上架'}
+                </button>
+                <button onClick={() => remove(it.id)} className="flex-1 rounded-lg bg-red-50 py-1.5 text-sm text-red-500 hover:bg-red-100">删除</button>
+              </div>
+            </div>
+          ))}
+          {items.length === 0 && <div className="rounded-2xl bg-white p-8 text-center text-gray-400 shadow-sm">暂无商品</div>}
         </div>
       ) : (
-        <div className="overflow-hidden rounded-2xl bg-white shadow-sm">
-          <table className="w-full text-sm">
-            <thead className="bg-gray-50 text-gray-500">
-              <tr><th className="px-4 py-2.5 text-left">用户</th><th className="px-4 py-2.5 text-left">商品</th><th className="px-4 py-2.5 text-center">积分</th><th className="px-4 py-2.5 text-center">状态</th><th className="px-4 py-2.5 text-center">时间</th><th className="px-4 py-2.5 text-right">操作</th></tr>
-            </thead>
-            <tbody>
-              {exchanges.map(r => (
-                <tr key={r.id} className="border-t border-gray-100">
-                  <td className="px-4 py-2.5">{r.user?.nickname}</td>
-                  <td className="px-4 py-2.5">{r.item?.name}</td>
-                  <td className="px-4 py-2.5 text-center text-amber-600">{r.pointsCost}</td>
-                  <td className="px-4 py-2.5 text-center">{statusLabel(r.status)}</td>
-                  <td className="px-4 py-2.5 text-center text-gray-400 text-xs">{new Date(r.createdAt).toLocaleDateString('zh-CN')}</td>
-                  <td className="px-4 py-2.5 text-right">
-                    {r.status === 'PENDING' ? (
-                      <>
-                        <button onClick={() => setFulfillTarget(r)} className="text-green-500 hover:underline mr-2">发放</button>
-                        <button onClick={() => updateExchange(r.id, 'CANCELLED')} className="text-red-400 hover:underline">取消</button>
-                      </>
-                    ) : r.status === 'FULFILLED' ? (
-                      <button onClick={() => setViewTarget(r)} className="text-blue-500 hover:underline">查看发放</button>
-                    ) : null}
-                  </td>
-                </tr>
-              ))}
-              {exchanges.length === 0 && <tr><td colSpan={6} className="px-4 py-8 text-center text-gray-400">暂无兑换记录</td></tr>}
-            </tbody>
-          </table>
+        <div className="space-y-2">
+          {exchanges.map(r => (
+            <div key={r.id} className="rounded-2xl bg-white p-4 shadow-sm">
+              <div className="flex items-start gap-3">
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center gap-2">
+                    <span className="font-medium text-gray-900">{r.user?.nickname || '未知用户'}</span>
+                    {statusLabel(r.status)}
+                  </div>
+                  <div className="mt-1 text-sm text-gray-700">{r.item?.name || '已删除商品'}</div>
+                  <div className="mt-1.5 flex items-center gap-3 text-xs text-gray-400">
+                    <span className="text-amber-600 font-medium">{r.pointsCost} 积分</span>
+                    <span>{new Date(r.createdAt).toLocaleDateString('zh-CN')}</span>
+                  </div>
+                </div>
+              </div>
+              {r.status === 'PENDING' && (
+                <div className="mt-3 flex gap-2">
+                  <button onClick={() => setFulfillTarget(r)} className="flex-1 rounded-lg bg-green-50 py-1.5 text-sm text-green-600 hover:bg-green-100">发放</button>
+                  <button onClick={() => updateExchange(r.id, 'CANCELLED')} className="flex-1 rounded-lg bg-red-50 py-1.5 text-sm text-red-500 hover:bg-red-100">取消</button>
+                </div>
+              )}
+              {r.status === 'FULFILLED' && (
+                <div className="mt-3">
+                  <button onClick={() => setViewTarget(r)} className="w-full rounded-lg bg-blue-50 py-1.5 text-sm text-blue-600 hover:bg-blue-100">查看发放</button>
+                </div>
+              )}
+            </div>
+          ))}
+          {exchanges.length === 0 && <div className="rounded-2xl bg-white p-8 text-center text-gray-400 shadow-sm">暂无兑换记录</div>}
         </div>
       )}
 
