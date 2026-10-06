@@ -2403,7 +2403,7 @@ function AgreementManager() {
   const handleContactImage = async (id: string, e: React.ChangeEvent<HTMLInputElement>) => {
     const f = e.target.files?.[0]; if (!f) return;
     try {
-      const b64 = await compressImage(f, 512, 0.8);
+      const b64 = await compressImage(f, 300, 0.6);
       // 上传到服务器, 拿到 URL (避免 base64 存库导致页面卡顿)
       const res: any = await api.post('/api/admin/upload', { image: b64 });
       updateContactItem(id, 'value', res.url);
