@@ -71,12 +71,12 @@ export async function POST(req: NextRequest) {
       streak >= 3   ? 2  : 1;
 
     await prisma.checkInRecord.create({ data: { userId: me.id, date: today, points } });
-    await prisma.user.update({ where: { id: me.id }, data: { points: { increment: points } } });
+    const updated = await prisma.user.update({ where: { id: me.id }, data: { points: { increment: points } }, select: { points: true } });
 
     // 检查勋章
     const newBadges = await checkAndAwardBadges(me.id);
 
-    return NextResponse.json({ checkedIn: true, streak, points, newBadges });
+    return NextResponse.json({ checkedIn: true, streak, earnedPoints: points, totalPoints: updated.points, newBadges });
   } catch (e) {
     return errorResponse(e);
   }

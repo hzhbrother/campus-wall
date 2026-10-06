@@ -50,8 +50,8 @@ export function CheckInView({ onBack, onPointsChanged }: { onBack: () => void; o
       const res: any = await api.post('/api/users/me/checkin', {});
       setCheckedIn(true);
       setStreak(res.streak);
-      setPoints(res.points);
-      setMsg(`签到成功! 获得 ${res.points} 积分`);
+      setPoints(res.totalPoints);
+      setMsg(`签到成功! 获得 ${res.earnedPoints} 积分`);
       // 签到后把今天加进 monthSignedDays, 立即高亮
       if (today) setMonthSignedDays(prev => Array.from(new Set([...prev, today])));
       if (res.newBadges && res.newBadges.length > 0) {
