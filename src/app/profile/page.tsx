@@ -815,12 +815,9 @@ function ProfilePageInner() {
                   {item.label && <div className="text-sm font-medium text-gray-800 mb-1">{item.label}</div>}
                   {item.type === 'text' && <p className="text-sm text-gray-600 whitespace-pre-wrap">{item.value}</p>}
                   {item.type === 'image' && item.value && (
-                    <div className="flex justify-center">
-                      <a href={item.value} target="_blank" rel="noopener noreferrer" className="block">
-                        <img src={item.value} alt={item.label || '图片'} className="h-48 w-48 rounded-xl object-cover border border-gray-100 cursor-pointer hover:opacity-80 transition" />
-                        <p className="mt-1 text-center text-xs text-blue-500">点击查看大图 / 扫码</p>
-                      </a>
-                    </div>
+                    <a href={item.value} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1.5 text-sm text-blue-600 hover:underline break-all">
+                      🖼️ 点击查看{item.label || '图片'}
+                    </a>
                   )}
                   {item.type === 'link' && item.value && (
                     <a href={item.value} target="_blank" rel="noopener noreferrer" className="text-sm text-blue-600 hover:underline break-all">{item.value}</a>
