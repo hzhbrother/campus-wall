@@ -2475,7 +2475,7 @@ function AgreementManager() {
               {contact.contacts.map(item => (
                 <div key={item.id} className="rounded-lg border border-gray-200 p-3 space-y-2">
                   <div className="flex items-center gap-2">
-                    <select value={item.type} onChange={e => updateContactItem(item.id, 'type', e.target.value)} className="rounded-lg border border-gray-300 px-2 py-1.5 text-sm shrink-0">
+                    <select value={item.type} onChange={e => setContact(c => ({ ...c, contacts: c.contacts.map(it => it.id === item.id ? { ...it, type: e.target.value as ContactItem['type'], value: '' } : it) }))} className="rounded-lg border border-gray-300 px-2 py-1.5 text-sm shrink-0">
                       <option value="text">文字</option>
                       <option value="image">图片</option>
                       <option value="link">链接</option>
