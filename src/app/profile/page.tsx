@@ -798,7 +798,7 @@ function ProfilePageInner() {
             <div className="space-y-1">
               {timeSlots.map((slot, i) => (
                 <div key={i} className="text-sm text-gray-600 bg-gray-50 rounded-lg px-3 py-2">
-                  {slot.days} {slot.start} - {slot.end}
+                  {slot.days === '自定义' ? (slot.customLabel || '自定义') : slot.days} {slot.start} - {slot.end}
                 </div>
               ))}
             </div>

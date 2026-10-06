@@ -2331,7 +2331,7 @@ function SiteSettings() {
 }
 
 // ---------- 协议管理 (管理员) ----------
-interface ContactTimeSlot { days: string; start: string; end: string; }
+interface ContactTimeSlot { days: string; customLabel?: string; start: string; end: string; }
 interface ContactItem { id: string; type: 'text' | 'image' | 'link'; label: string; value: string; }
 interface ContactConfig { timeSlots: ContactTimeSlot[]; contacts: ContactItem[]; }
 
@@ -2340,7 +2340,7 @@ const DEFAULT_CONTACT_CONFIG: ContactConfig = {
   contacts: [{ id: '1', type: 'text', label: '企业微信', value: '请扫码加企业微信客服' }],
 };
 
-const WEEKDAYS = ['每天', '周一', '周二', '周三', '周四', '周五', '周六', '周日', '工作日'];
+const WEEKDAYS = ['每天', '周一', '周二', '周三', '周四', '周五', '周六', '周日', '工作日', '节假日', '自定义'];
 const HOURS = Array.from({ length: 24 }, (_, i) => `${String(i).padStart(2, '0')}:00`);
 const MINS = ['00', '15', '30', '45'];
 
@@ -2429,9 +2429,23 @@ function AgreementManager() {
             <div className="space-y-2">
               {contact.timeSlots.map((slot, i) => (
                 <div key={i} className="flex items-center gap-2 flex-wrap">
-                  <select value={slot.days} onChange={e => updateTimeSlot(i, 'days', e.target.value)} className="rounded-lg border border-gray-300 px-2 py-1.5 text-sm">
-                    {WEEKDAYS.map(d => <option key={d} value={d}>{d}</option>)}
-                  </select>
+                  {slot.days === '自定义' ? (
+                    <input
+                      value={slot.customLabel || ''}
+                      onChange={e => setContact(c => ({ ...c, timeSlots: c.timeSlots.map((s, idx) => idx === i ? { ...s, customLabel: e.target.value } : s) }))}
+                      placeholder="输入名称 (如: 国庆节、端午节)"
+                      className="rounded-lg border border-gray-300 px-2 py-1.5 text-sm w-32"
+                    />
+                  ) : (
+                    <select value={slot.days} onChange={e => updateTimeSlot(i, 'days', e.target.value)} className="rounded-lg border border-gray-300 px-2 py-1.5 text-sm">
+                      {WEEKDAYS.map(d => <option key={d} value={d}>{d}</option>)}
+                    </select>
+                  )}
+                  {(slot.days !== '自定义' || slot.customLabel) && (
+                    <select value={slot.days} onChange={e => updateTimeSlot(i, 'days', e.target.value)} className="rounded-lg border border-gray-300 px-2 py-1.5 text-sm">
+                      {WEEKDAYS.map(d => <option key={d} value={d}>{d === '自定义' ? '切换类型' : d}</option>)}
+                    </select>
+                  )}
                   <select value={slot.start.split(':')[0]} onChange={e => updateTimeSlot(i, 'start', `${e.target.value}:${slot.start.split(':')[1] || '00'}`)} className="rounded-lg border border-gray-300 px-2 py-1.5 text-sm">
                     {HOURS.map(h => <option key={h} value={h.split(':')[0]}>{h.split(':')[0]}</option>)}
                   </select>
