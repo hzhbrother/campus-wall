@@ -421,7 +421,7 @@ function ProfilePageInner() {
   const [verifyModalInitial, setVerifyModalInitial] = useState<'IDENTITY' | 'QUALIFICATION' | null>(null);
   const [showAvatarLightbox, setShowAvatarLightbox] = useState(false);
   const [profileBg, setProfileBg] = useState('');
-  const [contactCfg, setContactCfg] = useState<{ service_hours?: string; method?: string; qrcode?: string; note?: string }>({});
+  const [contactCfg, setContactCfg] = useState<any>(null);
 
   // 系统管理员/超级管理员, 或拥有自定义角色的用户均可进入管理后台
   const isAdmin = user?.role === 'ADMIN' || user?.role === 'SUPER_ADMIN' || !!user?.roleId;
@@ -436,17 +436,14 @@ function ProfilePageInner() {
     return (DEFAULT_ROLE_PERMISSIONS[user.role] || []).includes(code);
   }, [user]);
 
-  // 加载个人中心背景图 + 联系我们配置 (管理员可在站点设置中配置)
+  // 加载个人中心背景图 + 联系我们配置 (管理员可在协议管理中配置)
   useEffect(() => {
-    api.get<{ profile_bg?: string; contact_service_hours?: string; contact_method?: string; contact_qrcode?: string; contact_note?: string }>('/api/site-config')
+    api.get<{ profile_bg?: string; contact_config?: string }>('/api/site-config')
       .then(d => {
         if (d.profile_bg) setProfileBg(d.profile_bg);
-        setContactCfg({
-          service_hours: d.contact_service_hours,
-          method: d.contact_method,
-          qrcode: d.contact_qrcode,
-          note: d.contact_note,
-        });
+        if (d.contact_config) {
+          try { setContactCfg(JSON.parse(d.contact_config)); } catch {}
+        }
       })
       .catch(() => {});
   }, []);
@@ -779,27 +776,55 @@ function ProfilePageInner() {
 
   // ---- 联系我们视图 ----
   if (view === 'contact') {
-    const hours = contactCfg.service_hours || '每天 8:00 - 23:00';
-    const method = contactCfg.method || '企业微信';
-    const note = contactCfg.note || '请在服务时间内通过企业微信联系客服';
+    const timeSlots: any[] = contactCfg?.timeSlots || [{ days: '每天', start: '08:00', end: '23:00' }];
+    const contacts: any[] = contactCfg?.contacts || [{ type: 'text', label: '企业微信', value: '请扫码加企业微信客服' }];
     return (
       <div className="space-y-4">
         <button onClick={() => setView('home')} className="flex items-center gap-1 text-sm text-gray-500">
           <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="m15 18-6-6 6-6" strokeLinecap="round" strokeLinejoin="round"/></svg>
           返回
         </button>
-        <div className="rounded-2xl bg-white p-6 shadow-sm text-center space-y-4">
-          <div className="text-5xl">💬</div>
-          <h3 className="text-lg font-bold text-gray-900">联系我们</h3>
-          <div className="text-sm text-gray-600 space-y-2">
-            <p>🕐 服务时间: <span className="font-medium">{hours}</span></p>
-            <p className="pt-2">联系方式: <span className="font-medium text-green-600">{method}</span></p>
-            {contactCfg.qrcode && (
-              <div className="flex justify-center pt-2">
-                <img src={contactCfg.qrcode} alt="联系二维码" className="h-48 w-48 rounded-xl object-cover border border-gray-100" />
-              </div>
-            )}
-            <p className="text-xs text-gray-400 pt-1">{note}</p>
+        <div className="rounded-2xl bg-white p-6 shadow-sm space-y-5">
+          <div className="text-center space-y-2">
+            <div className="text-5xl">💬</div>
+            <h3 className="text-lg font-bold text-gray-900">联系我们</h3>
+          </div>
+
+          {/* 服务时间 */}
+          <div className="space-y-2">
+            <div className="text-sm font-medium text-gray-700 flex items-center gap-1">
+              <span>🕐</span> 服务时间
+            </div>
+            <div className="space-y-1">
+              {timeSlots.map((slot, i) => (
+                <div key={i} className="text-sm text-gray-600 bg-gray-50 rounded-lg px-3 py-2">
+                  {slot.days} {slot.start} - {slot.end}
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* 联系方式 */}
+          <div className="space-y-2">
+            <div className="text-sm font-medium text-gray-700 flex items-center gap-1">
+              <span>📱</span> 联系方式
+            </div>
+            <div className="space-y-3">
+              {contacts.map((item, i) => (
+                <div key={i} className="bg-gray-50 rounded-lg p-3">
+                  {item.label && <div className="text-sm font-medium text-gray-800 mb-1">{item.label}</div>}
+                  {item.type === 'text' && <p className="text-sm text-gray-600 whitespace-pre-wrap">{item.value}</p>}
+                  {item.type === 'link' && item.value && (
+                    <a href={item.value} target="_blank" rel="noopener noreferrer" className="text-sm text-blue-600 hover:underline break-all">{item.value}</a>
+                  )}
+                  {item.type === 'image' && item.value && (
+                    <div className="flex justify-center">
+                      <img src={item.value} alt={item.label || '联系二维码'} className="h-48 w-48 rounded-xl object-cover border border-gray-100" />
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
           </div>
         </div>
       </div>

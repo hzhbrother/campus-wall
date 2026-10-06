@@ -2050,47 +2050,6 @@ function SiteSettings() {
           </div>
         </div>
 
-        {/* 联系我们 */}
-        <div className="rounded-xl border border-gray-100 p-4">
-          <h3 className="font-semibold text-gray-900 mb-3">💬 联系我们</h3>
-          <div className="space-y-3">
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">服务时间</label>
-                <input value={cfg.contact_service_hours || ''} onChange={e => set('contact_service_hours', e.target.value)} className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm" placeholder="每天 8:00 - 23:00" />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">联系方式</label>
-                <input value={cfg.contact_method || ''} onChange={e => set('contact_method', e.target.value)} className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm" placeholder="企业微信" />
-              </div>
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">联系二维码（如企业微信二维码）</label>
-              <div className="flex items-center gap-3">
-                <div className="h-20 w-20 rounded-lg bg-gray-100 overflow-hidden flex items-center justify-center shrink-0">
-                  {cfg.contact_qrcode ? <img src={cfg.contact_qrcode} alt="" className="h-full w-full object-cover" /> : <span className="text-xs text-gray-400">无图片</span>}
-                </div>
-                <div className="flex-1 space-y-2">
-                  <label className="inline-block cursor-pointer rounded-lg bg-blue-50 px-3 py-1.5 text-sm text-blue-600 hover:bg-blue-100">
-                    上传图片
-                    <input type="file" accept="image/*" className="hidden" onChange={async e => {
-                      const f = e.target.files?.[0]; if (!f) return;
-                      try { const b64 = await compressImage(f, 512, 0.8); set('contact_qrcode', b64); } catch { alert('图片处理失败'); }
-                    }} />
-                  </label>
-                  {cfg.contact_qrcode && (
-                    <button onClick={() => set('contact_qrcode', '')} className="ml-2 text-sm text-red-500 hover:text-red-700">删除</button>
-                  )}
-                </div>
-              </div>
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">备注说明</label>
-              <textarea value={cfg.contact_note || ''} onChange={e => set('contact_note', e.target.value)} rows={2} className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm" placeholder="请在服务时间内通过企业微信联系客服" />
-            </div>
-          </div>
-        </div>
-
         <div className="rounded-xl border border-gray-100 p-4">
           <h3 className="font-semibold text-gray-900 mb-3">🎨 个人中心</h3>
           <div>
@@ -2372,10 +2331,36 @@ function SiteSettings() {
 }
 
 // ---------- 协议管理 (管理员) ----------
+interface ContactTimeSlot { days: string; start: string; end: string; }
+interface ContactItem { id: string; type: 'text' | 'image' | 'link'; label: string; value: string; }
+interface ContactConfig { timeSlots: ContactTimeSlot[]; contacts: ContactItem[]; }
+
+const DEFAULT_CONTACT_CONFIG: ContactConfig = {
+  timeSlots: [{ days: '每天', start: '08:00', end: '23:00' }],
+  contacts: [{ id: '1', type: 'text', label: '企业微信', value: '请扫码加企业微信客服' }],
+};
+
+const WEEKDAYS = ['每天', '周一', '周二', '周三', '周四', '周五', '周六', '周日', '工作日', '周末'];
+const HOURS = Array.from({ length: 24 }, (_, i) => `${String(i).padStart(2, '0')}:00`);
+const MINS = ['00', '15', '30', '45'];
+
+function parseContactConfig(raw?: string): ContactConfig {
+  if (!raw) return JSON.parse(JSON.stringify(DEFAULT_CONTACT_CONFIG));
+  try {
+    const obj = JSON.parse(raw);
+    return {
+      timeSlots: Array.isArray(obj.timeSlots) ? obj.timeSlots : DEFAULT_CONTACT_CONFIG.timeSlots,
+      contacts: Array.isArray(obj.contacts) ? obj.contacts : DEFAULT_CONTACT_CONFIG.contacts,
+    };
+  } catch { return JSON.parse(JSON.stringify(DEFAULT_CONTACT_CONFIG)); }
+}
+
 function AgreementManager() {
   const [agreement, setAgreement] = useState('');
   const [privacy, setPrivacy] = useState('');
   const [about, setAbout] = useState('');
+  // 联系我们
+  const [contact, setContact] = useState<ContactConfig>(JSON.parse(JSON.stringify(DEFAULT_CONTACT_CONFIG)));
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [msg, setMsg] = useState('');
@@ -2386,6 +2371,7 @@ function AgreementManager() {
         setAgreement(d.agreement_content || '');
         setPrivacy(d.privacy_content || '');
         setAbout(d.about_content || '');
+        setContact(parseContactConfig(d.contact_config));
       })
       .catch(console.error)
       .finally(() => setLoading(false));
@@ -2394,19 +2380,122 @@ function AgreementManager() {
   const save = async () => {
     setSaving(true); setMsg('');
     try {
-      await api.patch('/api/admin/site-config', { agreement_content: agreement, privacy_content: privacy, about_content: about });
+      await api.patch('/api/admin/site-config', {
+        agreement_content: agreement,
+        privacy_content: privacy,
+        about_content: about,
+        contact_config: JSON.stringify(contact),
+      });
       setMsg('保存成功');
     } catch (e: any) { setMsg(e.message); } finally { setSaving(false); }
+  };
+
+  // 时间段操作
+  const addTimeSlot = () => setContact(c => ({ ...c, timeSlots: [...c.timeSlots, { days: '每天', start: '08:00', end: '23:00' }] }));
+  const removeTimeSlot = (i: number) => setContact(c => ({ ...c, timeSlots: c.timeSlots.filter((_, idx) => idx !== i) }));
+  const updateTimeSlot = (i: number, field: keyof ContactTimeSlot, v: string) => setContact(c => ({ ...c, timeSlots: c.timeSlots.map((s, idx) => idx === i ? { ...s, [field]: v } : s) }));
+
+  // 联系方式操作
+  const addContactItem = () => setContact(c => ({ ...c, contacts: [...c.contacts, { id: String(Date.now()), type: 'text', label: '', value: '' }] }));
+  const removeContactItem = (id: string) => setContact(c => ({ ...c, contacts: c.contacts.filter(item => item.id !== id) }));
+  const updateContactItem = (id: string, field: keyof ContactItem, v: string) => setContact(c => ({ ...c, contacts: c.contacts.map(item => item.id === id ? { ...item, [field]: v } as ContactItem : item) }));
+
+  const handleContactImage = async (id: string, e: React.ChangeEvent<HTMLInputElement>) => {
+    const f = e.target.files?.[0]; if (!f) return;
+    try {
+      const b64 = await compressImage(f, 512, 0.8);
+      updateContactItem(id, 'value', b64);
+    } catch { alert('图片处理失败'); }
   };
 
   if (loading) return <p className="py-6 text-center text-gray-400">加载中…</p>;
 
   return (
     <div>
-      <SectionTitle title="协议管理" desc="编辑关于我们、用户协议与隐私政策内容，支持纯文本格式" />
+      <SectionTitle title="协议管理" desc="编辑关于我们、联系我们、用户协议与隐私政策内容" />
       {msg && <div className={`mb-3 text-sm ${msg.includes('成功') ? 'text-green-600' : 'text-red-500'}`}>{msg}</div>}
 
       <div className="space-y-5">
+        {/* 联系我们 */}
+        <div className="rounded-xl border border-gray-100 p-4">
+          <h3 className="font-semibold text-gray-900 mb-3">💬 联系我们</h3>
+
+          {/* 服务时间 */}
+          <div className="mb-4">
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-sm font-medium text-gray-700">服务时间</span>
+              <button onClick={addTimeSlot} className="text-xs text-blue-500 hover:text-blue-700">+ 添加时间段</button>
+            </div>
+            <div className="space-y-2">
+              {contact.timeSlots.map((slot, i) => (
+                <div key={i} className="flex items-center gap-2 flex-wrap">
+                  <select value={slot.days} onChange={e => updateTimeSlot(i, 'days', e.target.value)} className="rounded-lg border border-gray-300 px-2 py-1.5 text-sm">
+                    {WEEKDAYS.map(d => <option key={d} value={d}>{d}</option>)}
+                  </select>
+                  <select value={slot.start.split(':')[0]} onChange={e => updateTimeSlot(i, 'start', `${e.target.value}:${slot.start.split(':')[1] || '00'}`)} className="rounded-lg border border-gray-300 px-2 py-1.5 text-sm">
+                    {HOURS.map(h => <option key={h} value={h.split(':')[0]}>{h.split(':')[0]}</option>)}
+                  </select>
+                  <span className="text-gray-400">:</span>
+                  <select value={slot.start.split(':')[1] || '00'} onChange={e => updateTimeSlot(i, 'start', `${slot.start.split(':')[0]}:${e.target.value}`)} className="rounded-lg border border-gray-300 px-2 py-1.5 text-sm">
+                    {MINS.map(m => <option key={m} value={m}>{m}</option>)}
+                  </select>
+                  <span className="text-gray-400">至</span>
+                  <select value={slot.end.split(':')[0]} onChange={e => updateTimeSlot(i, 'end', `${e.target.value}:${slot.end.split(':')[1] || '00'}`)} className="rounded-lg border border-gray-300 px-2 py-1.5 text-sm">
+                    {HOURS.map(h => <option key={h} value={h.split(':')[0]}>{h.split(':')[0]}</option>)}
+                  </select>
+                  <span className="text-gray-400">:</span>
+                  <select value={slot.end.split(':')[1] || '00'} onChange={e => updateTimeSlot(i, 'end', `${slot.end.split(':')[0]}:${e.target.value}`)} className="rounded-lg border border-gray-300 px-2 py-1.5 text-sm">
+                    {MINS.map(m => <option key={m} value={m}>{m}</option>)}
+                  </select>
+                  <button onClick={() => removeTimeSlot(i)} className="text-xs text-red-500 hover:text-red-700 ml-1">删除</button>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* 联系方式 */}
+          <div>
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-sm font-medium text-gray-700">联系方式</span>
+              <button onClick={addContactItem} className="text-xs text-blue-500 hover:text-blue-700">+ 添加联系方式</button>
+            </div>
+            <div className="space-y-3">
+              {contact.contacts.map(item => (
+                <div key={item.id} className="rounded-lg border border-gray-200 p-3 space-y-2">
+                  <div className="flex items-center gap-2">
+                    <select value={item.type} onChange={e => updateContactItem(item.id, 'type', e.target.value)} className="rounded-lg border border-gray-300 px-2 py-1.5 text-sm">
+                      <option value="text">文字</option>
+                      <option value="image">图片</option>
+                      <option value="link">链接</option>
+                    </select>
+                    <input value={item.label} onChange={e => updateContactItem(item.id, 'label', e.target.value)} placeholder="标签 (如: 企业微信)" className="flex-1 rounded-lg border border-gray-300 px-3 py-1.5 text-sm" />
+                    <button onClick={() => removeContactItem(item.id)} className="text-xs text-red-500 hover:text-red-700 shrink-0">删除</button>
+                  </div>
+                  {item.type === 'text' && (
+                    <textarea value={item.value} onChange={e => updateContactItem(item.id, 'value', e.target.value)} placeholder="文字内容" rows={2} className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm" />
+                  )}
+                  {item.type === 'link' && (
+                    <input value={item.value} onChange={e => updateContactItem(item.id, 'value', e.target.value)} placeholder="链接地址 https://..." className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm" />
+                  )}
+                  {item.type === 'image' && (
+                    <div className="flex items-center gap-3">
+                      <div className="h-24 w-24 rounded-lg bg-gray-100 overflow-hidden flex items-center justify-center shrink-0">
+                        {item.value ? <img src={item.value} alt="" className="h-full w-full object-cover" /> : <span className="text-xs text-gray-400">无图片</span>}
+                      </div>
+                      <label className="inline-block cursor-pointer rounded-lg bg-blue-50 px-3 py-1.5 text-sm text-blue-600 hover:bg-blue-100">
+                        上传图片
+                        <input type="file" accept="image/*" className="hidden" onChange={e => handleContactImage(item.id, e)} />
+                      </label>
+                      {item.value && <button onClick={() => updateContactItem(item.id, 'value', '')} className="text-sm text-red-500 hover:text-red-700">清除</button>}
+                    </div>
+                  )}
+                </div>
+              ))}
+              {contact.contacts.length === 0 && <p className="text-sm text-gray-400">暂无联系方式，点击右上角添加</p>}
+            </div>
+          </div>
+        </div>
+
         <div className="rounded-xl border border-gray-100 p-4">
           <div className="flex items-center justify-between mb-2">
             <h3 className="font-semibold text-gray-900">ℹ️ 关于我们</h3>
