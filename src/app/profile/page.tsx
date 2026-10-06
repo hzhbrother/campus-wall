@@ -552,7 +552,7 @@ function ProfilePageInner() {
           </div>
           {/* 内容区 */}
           <div className="flex-1 min-w-0 rounded-2xl bg-white p-5 shadow-sm">
-            <AdminPanel tab={tab} isSuper={isSuper} />
+            <AdminPanel tab={tab} isSuper={isSuper} onSwitchTab={(t) => { setAdminTab(t); setView(t); }} />
           </div>
         </div>
       </div>

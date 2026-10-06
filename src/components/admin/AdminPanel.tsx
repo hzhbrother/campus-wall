@@ -4046,7 +4046,7 @@ function QuickLinksManager() {
 }
 
 // ---------- 积分商城管理 ----------
-function ShopManager() {
+function ShopManager({ prefill, onPrefillUsed }: { prefill?: ShopPrefill | null; onPrefillUsed?: () => void }) {
   const [tab, setTab] = useState<'items' | 'exchanges'>('items');
   const [items, setItems] = useState<any[]>([]);
   const [exchanges, setExchanges] = useState<any[]>([]);
@@ -4068,6 +4068,23 @@ function ShopManager() {
     setLoading(false);
   };
   useEffect(() => { load(); }, []);
+
+  // 从许愿单采纳带过来的预填数据, 自动打开新增表单
+  useEffect(() => {
+    if (prefill) {
+      setTab('items');
+      setEditing({
+        name: prefill.name,
+        description: prefill.description,
+        image: prefill.image || '',
+        pointsCost: 100,
+        stock: -1,
+        isActive: true,
+      });
+      setShowForm(true);
+      onPrefillUsed?.();
+    }
+  }, [prefill]);
 
   const openNew = () => { setEditing({ name: '', description: '', image: '', pointsCost: 100, stock: -1, isActive: true }); setShowForm(true); setErr(''); };
   const openEdit = (item: any) => { setEditing({ ...item }); setShowForm(true); setErr(''); };
@@ -4336,10 +4353,11 @@ function FulfillDetailModal({ record, onClose }: { record: any; onClose: () => v
 }
 
 // ---------- 许愿单审核 ----------
-function WishesManager() {
+function WishesManager({ onAdopt }: { onAdopt?: (data: ShopPrefill) => void }) {
   const [items, setItems] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState('');
+  const [detail, setDetail] = useState<any>(null); // 当前查看的许愿详情
 
   const load = () => {
     api.get<{ items: any[] }>('/api/admin/wishes')
@@ -4360,6 +4378,27 @@ function WishesManager() {
     catch (e: any) { alert(e.message); }
   };
 
+  // 打开详情浮窗时自动标记为已查看
+  const openDetail = async (w: any) => {
+    setDetail(w);
+    if (w.status === 'PENDING') {
+      try {
+        await api.patch(`/api/admin/wishes/${w.id}`, { status: 'REVIEWED' });
+        setItems(prev => prev.map(i => i.id === w.id ? { ...i, status: 'REVIEWED' } : i));
+      } catch {}
+    }
+  };
+
+  // 采纳: 标记状态 + 把许愿信息带到商品管理
+  const handleAdopt = async (w: any) => {
+    try {
+      await api.patch(`/api/admin/wishes/${w.id}`, { status: 'ADOPTED' });
+      setItems(prev => prev.map(i => i.id === w.id ? { ...i, status: 'ADOPTED' } : i));
+    } catch (e: any) { alert(e.message); return; }
+    setDetail(null);
+    onAdopt?.({ name: w.itemName, description: w.description, image: w.image || undefined });
+  };
+
   const statusBadge = (s: string) => {
     if (s === 'ADOPTED') return <span className="rounded-full bg-green-100 px-2 py-0.5 text-xs text-green-600">已采纳</span>;
     if (s === 'REVIEWED') return <span className="rounded-full bg-blue-100 px-2 py-0.5 text-xs text-blue-600">已查看</span>;
@@ -4368,12 +4407,12 @@ function WishesManager() {
 
   return (
     <div className="space-y-4">
-      <SectionTitle title="许愿单审核" desc="查看用户许愿, 标记已查看或采纳" />
+      <SectionTitle title="许愿单审核" desc="点击许愿查看详情, 采纳后可直接创建商品" />
       {err && <div className="text-sm text-red-500">{err}</div>}
       {loading ? <p className="text-sm text-gray-400">加载中…</p> : (
         <div className="space-y-3">
           {items.map(w => (
-            <div key={w.id} className="rounded-2xl bg-white shadow-sm p-4">
+            <div key={w.id} className="rounded-2xl bg-white shadow-sm p-4 cursor-pointer hover:bg-gray-50 transition" onClick={() => openDetail(w)}>
               <div className="flex gap-3">
                 {w.image && <img src={w.image} alt="" className="h-16 w-16 rounded-lg object-cover shrink-0" />}
                 <div className="flex-1 min-w-0">
@@ -4389,10 +4428,13 @@ function WishesManager() {
                   </div>
                 </div>
               </div>
-              <div className="flex gap-2 mt-3">
-                {w.status !== 'REVIEWED' && <button onClick={() => setStatus(w.id, 'REVIEWED')} className="rounded-lg bg-blue-50 px-3 py-1.5 text-xs text-blue-500 hover:bg-blue-100">标记已查看</button>}
-                {w.status !== 'ADOPTED' && <button onClick={() => setStatus(w.id, 'ADOPTED')} className="rounded-lg bg-green-50 px-3 py-1.5 text-xs text-green-600 hover:bg-green-100">采纳</button>}
-                {w.status !== 'PENDING' && <button onClick={() => setStatus(w.id, 'PENDING')} className="rounded-lg bg-gray-50 px-3 py-1.5 text-xs text-gray-500 hover:bg-gray-100">重置</button>}
+              <div className="flex gap-2 mt-3" onClick={e => e.stopPropagation()}>
+                {w.status !== 'ADOPTED' && (
+                  <button onClick={() => handleAdopt(w)} className="rounded-lg bg-green-50 px-3 py-1.5 text-xs text-green-600 hover:bg-green-100">采纳并创建商品</button>
+                )}
+                {w.status !== 'PENDING' && (
+                  <button onClick={() => setStatus(w.id, 'PENDING')} className="rounded-lg bg-gray-50 px-3 py-1.5 text-xs text-gray-500 hover:bg-gray-100">重置</button>
+                )}
                 <button onClick={() => remove(w.id)} className="rounded-lg bg-red-50 px-3 py-1.5 text-xs text-red-400 hover:bg-red-100 ml-auto">删除</button>
               </div>
             </div>
@@ -4400,12 +4442,59 @@ function WishesManager() {
           {items.length === 0 && <div className="rounded-2xl bg-white shadow-sm p-10 text-center text-gray-400">暂无许愿</div>}
         </div>
       )}
+
+      {/* 详情浮窗 */}
+      {detail && (
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/40 p-4" onClick={() => setDetail(null)}>
+          <div className="w-full max-w-lg rounded-2xl bg-white p-5 shadow-xl max-h-[80vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
+            <div className="flex items-start justify-between mb-3">
+              <h3 className="text-lg font-bold text-gray-900">{detail.itemName}</h3>
+              <button onClick={() => setDetail(null)} className="text-gray-400 hover:text-gray-600 text-xl leading-none">×</button>
+            </div>
+            {detail.image && (
+              <img src={detail.image} alt="" className="w-full rounded-xl mb-3 max-h-60 object-contain bg-gray-50" />
+            )}
+            <div className="mb-3">
+              <div className="text-xs text-gray-400 mb-1">许愿内容</div>
+              <p className="text-sm text-gray-700 whitespace-pre-wrap">{detail.description}</p>
+            </div>
+            <div className="flex items-center gap-2 text-xs text-gray-400 mb-4">
+              <span>{detail.user?.nickname}</span>
+              {detail.user?.email && <span>· {detail.user.email}</span>}
+              <span>· {new Date(detail.createdAt).toLocaleString('zh-CN')}</span>
+            </div>
+            <div className="flex gap-2">
+              {detail.status !== 'ADOPTED' && (
+                <button onClick={() => handleAdopt(detail)} className="flex-1 rounded-lg bg-green-500 px-4 py-2 text-sm text-white hover:bg-green-600">采纳并创建商品</button>
+              )}
+              <button onClick={() => setDetail(null)} className="flex-1 rounded-lg bg-gray-100 px-4 py-2 text-sm hover:bg-gray-200">关闭</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
 
 // ---------- 管理后台主组件 ----------
-export function AdminPanel({ tab, isSuper }: { tab: AdminTab; isSuper: boolean }) {
+export interface ShopPrefill {
+  name: string;
+  description: string;
+  image?: string;
+}
+
+export function AdminPanel({ tab, isSuper, onSwitchTab }: {
+  tab: AdminTab;
+  isSuper: boolean;
+  onSwitchTab?: (t: AdminTab) => void;
+}) {
+  const [shopPrefill, setShopPrefill] = useState<ShopPrefill | null>(null);
+
+  const handleAdoptWish = (data: ShopPrefill) => {
+    setShopPrefill(data);
+    onSwitchTab?.('shop');
+  };
+
   switch (tab) {
     case 'overview': return <OverviewTab />;
     case 'posts': return <PostsTab />;
@@ -4426,8 +4515,8 @@ export function AdminPanel({ tab, isSuper }: { tab: AdminTab; isSuper: boolean }
     case 'schools': return <SchoolsManager />;
     case 'orgs': return <OrgsManager />;
     case 'quicklinks': return <QuickLinksManager />;
-    case 'shop': return <ShopManager />;
-    case 'wishes': return <WishesManager />;
+    case 'shop': return <ShopManager prefill={shopPrefill} onPrefillUsed={() => setShopPrefill(null)} />;
+    case 'wishes': return <WishesManager onAdopt={handleAdoptWish} />;
     default: return <OverviewTab />;
   }
 }
