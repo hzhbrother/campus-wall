@@ -3877,6 +3877,16 @@ function AvatarReviewTab() {
 }
 
 // ---------- 快捷通道管理 ----------
+const QUICK_LINK_PLATFORMS = [
+  { key: 'browser', label: '浏览器' },
+  { key: 'wechat', label: '微信' },
+  { key: 'qq', label: 'QQ' },
+  { key: 'weibo', label: '微博' },
+  { key: 'douyin', label: '抖音' },
+  { key: 'dingtalk', label: '钉钉' },
+  { key: 'alipay', label: '支付宝' },
+];
+
 function QuickLinksManager() {
   const [items, setItems] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -3892,16 +3902,17 @@ function QuickLinksManager() {
   };
   useEffect(() => { load(); }, []);
 
-  const openNew = () => { setEditing({ title: '', url: '', icon: '', sortOrder: 0, isActive: true }); setShowForm(true); setErr(''); };
-  const openEdit = (item: any) => { setEditing({ ...item }); setShowForm(true); setErr(''); };
+  const openNew = () => { setEditing({ title: '', url: '', icon: '', sortOrder: 0, isActive: true, allowedPlatforms: '' }); setShowForm(true); setErr(''); };
+  const openEdit = (item: any) => { setEditing({ ...item, allowedPlatforms: item.allowedPlatforms || '' }); setShowForm(true); setErr(''); };
 
   const save = async () => {
     if (!editing.title.trim() || !editing.url.trim()) { setErr('请填写名称和链接'); return; }
     try {
-      if (editing.id) {
-        await api.patch(`/api/admin/quick-links/${editing.id}`, editing);
+      const payload = { ...editing };
+      if (payload.id) {
+        await api.patch(`/api/admin/quick-links/${payload.id}`, payload);
       } else {
-        await api.post('/api/admin/quick-links', editing);
+        await api.post('/api/admin/quick-links', payload);
       }
       setShowForm(false); load();
     } catch (e: any) { setErr(e.message); }
@@ -3922,6 +3933,14 @@ function QuickLinksManager() {
   const toggleActive = async (id: string, current: boolean) => {
     try { await api.patch(`/api/admin/quick-links/${id}`, { isActive: !current }); load(); }
     catch (e: any) { setErr(e.message); }
+  };
+
+  const togglePlatform = (key: string) => {
+    const list = (editing.allowedPlatforms || '').split(',').map(s => s.trim()).filter(Boolean);
+    const i = list.indexOf(key);
+    if (i >= 0) list.splice(i, 1);
+    else list.push(key);
+    setEditing({ ...editing, allowedPlatforms: list.join(',') });
   };
 
   return (
@@ -3956,6 +3975,23 @@ function QuickLinksManager() {
               </div>
             </div>
           </div>
+
+          {/* 允许进入的平台 */}
+          <div>
+            <div className="text-sm font-medium text-gray-700 mb-2">限制进入方式 <span className="text-xs text-gray-400 font-normal">(不选则不限制)</span></div>
+            <div className="flex flex-wrap gap-2">
+              {QUICK_LINK_PLATFORMS.map(p => {
+                const checked = (editing.allowedPlatforms || '').split(',').includes(p.key);
+                return (
+                  <label key={p.key} className={`flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-sm cursor-pointer transition ${checked ? 'border-blue-400 bg-blue-50 text-blue-600' : 'border-gray-200 text-gray-600 hover:bg-gray-50'}`}>
+                    <input type="checkbox" checked={checked} onChange={() => togglePlatform(p.key)} className="accent-blue-500" />
+                    {p.label}
+                  </label>
+                );
+              })}
+            </div>
+          </div>
+
           <div className="flex gap-2">
             <button onClick={save} className="rounded-lg bg-blue-500 px-4 py-2 text-sm text-white hover:bg-blue-600">保存</button>
             <button onClick={() => setShowForm(false)} className="rounded-lg bg-gray-100 px-4 py-2 text-sm hover:bg-gray-200">取消</button>
@@ -3974,12 +4010,17 @@ function QuickLinksManager() {
                 </div>
                 {/* 信息 */}
                 <div className="min-w-0 flex-1">
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-2 flex-wrap">
                     <span className="font-medium text-gray-900 truncate">{it.title}</span>
                     {it.isActive
                       ? <span className="shrink-0 rounded-full bg-green-50 px-2 py-0.5 text-xs text-green-600">启用</span>
                       : <span className="shrink-0 rounded-full bg-gray-100 px-2 py-0.5 text-xs text-gray-400">禁用</span>
                     }
+                    {it.allowedPlatforms && (
+                      <span className="shrink-0 rounded-full bg-amber-50 px-2 py-0.5 text-xs text-amber-600">
+                        {it.allowedPlatforms.split(',').map(k => QUICK_LINK_PLATFORMS.find(p => p.key === k)?.label || k).join('、')}
+                      </span>
+                    )}
                   </div>
                   <div className="mt-1 text-xs text-gray-400 truncate">{it.url}</div>
                   <div className="mt-1 text-xs text-gray-400">点击 {it.clickCount} 次 · 排序 {it.sortOrder}</div>

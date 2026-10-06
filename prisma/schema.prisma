@@ -653,15 +653,16 @@ model WishItem {
 // ---- 快捷通道 ----
 
 model QuickLink {
-  id          String   @id @default(cuid())
-  title       String                         // 显示名称
-  url         String                         // 跳转链接
-  icon        String?                         // 图标 (base64 图片 或 URL)
-  sortOrder   Int      @default(0)            // 排序 (小的在前)
-  clickCount  Int      @default(0)            // 点击人次
-  isActive    Boolean  @default(true)         // 是否启用
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  id               String   @id @default(cuid())
+  title            String                         // 显示名称
+  url              String                         // 跳转链接
+  icon             String?                         // 图标 (base64 图片 或 URL)
+  sortOrder        Int      @default(0)            // 排序 (小的在前)
+  clickCount       Int      @default(0)            // 点击人次
+  isActive         Boolean  @default(true)         // 是否启用
+  allowedPlatforms String?                         // 允许进入的平台 (逗号分隔, 空=不限制)
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
 }
 
 // ---- 积分商城商品 ----

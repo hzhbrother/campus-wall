@@ -10,6 +10,7 @@ interface QuickLink {
   url: string;
   icon: string | null;
   clickCount: number;
+  allowedPlatforms?: string | null;
 }
 
 // 图标背景渐变色板 (循环使用)
@@ -24,9 +25,33 @@ const ICON_GRADIENTS = [
   'from-lime-400 to-green-500',
 ];
 
+const PLATFORM_LABELS: Record<string, string> = {
+  browser: '浏览器',
+  wechat: '微信',
+  qq: 'QQ',
+  weibo: '微博',
+  douyin: '抖音',
+  dingtalk: '钉钉',
+  alipay: '支付宝',
+};
+
+// 根据 User-Agent 检测当前所在平台
+function detectPlatform(): string {
+  if (typeof navigator === 'undefined') return 'browser';
+  const ua = navigator.userAgent.toLowerCase();
+  if (ua.includes('micromessenger')) return 'wechat';
+  if (ua.includes('qq/') || ua.includes(' qq')) return 'qq';
+  if (ua.includes('weibo')) return 'weibo';
+  if (ua.includes('aweme') || ua.includes('douyin')) return 'douyin';
+  if (ua.includes('dingtalk')) return 'dingtalk';
+  if (ua.includes('alipay') || ua.includes('alipayclient')) return 'alipay';
+  return 'browser';
+}
+
 export default function QuickLinksPage() {
   const [links, setLinks] = useState<QuickLink[]>([]);
   const [loading, setLoading] = useState(true);
+  const [restrictedMsg, setRestrictedMsg] = useState('');
 
   useEffect(() => {
     api.get<{ items: QuickLink[] }>('/api/quick-links')
@@ -35,8 +60,20 @@ export default function QuickLinksPage() {
       .finally(() => setLoading(false));
   }, []);
 
-  const handleClick = (link: QuickLink) => {
+  const handleClick = (link: QuickLink): boolean => {
+    // 检查平台限制
+    if (link.allowedPlatforms) {
+      const allowed = link.allowedPlatforms.split(',').map(s => s.trim()).filter(Boolean);
+      const current = detectPlatform();
+      if (allowed.length > 0 && !allowed.includes(current)) {
+        const names = allowed.map(k => PLATFORM_LABELS[k] || k).join('、');
+        setRestrictedMsg(`「${link.title}」仅限通过 ${names} 访问，当前环境不支持。`);
+        setTimeout(() => setRestrictedMsg(''), 3000);
+        return false; // 阻止跳转
+      }
+    }
     api.post(`/api/quick-links/${link.id}/click`, {}).catch(() => {});
+    return true;
   };
 
   if (loading) {
@@ -57,6 +94,11 @@ export default function QuickLinksPage() {
       </div>
 
       <div className="px-4 pt-5">
+        {restrictedMsg && (
+          <div className="mb-4 rounded-xl bg-amber-50 border border-amber-200 px-4 py-3 text-sm text-amber-700">
+            {restrictedMsg}
+          </div>
+        )}
         {links.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-16 text-gray-400">
             <div className="text-5xl mb-3">🔗</div>
@@ -69,7 +111,7 @@ export default function QuickLinksPage() {
                 key={link.id}
                 href={link.url}
                 target="_blank"
-                onClick={() => handleClick(link)}
+                onClick={e => { if (!handleClick(link)) e.preventDefault(); }}
                 className="group flex flex-col items-center gap-2"
               >
                 <div className={`relative h-14 w-14 rounded-2xl bg-gradient-to-br ${ICON_GRADIENTS[idx % ICON_GRADIENTS.length]} flex items-center justify-center text-white text-2xl shadow-md overflow-hidden transition group-hover:scale-110 group-hover:shadow-lg`}>

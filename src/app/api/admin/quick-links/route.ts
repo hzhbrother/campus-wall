@@ -12,6 +12,7 @@ const CreateSchema = z.object({
   icon: z.string().optional().or(z.literal('')),
   sortOrder: z.number().int().default(0),
   isActive: z.boolean().default(true),
+  allowedPlatforms: z.string().optional().or(z.literal('')),
 });
 
 export async function GET(req: NextRequest) {
@@ -33,6 +34,7 @@ export async function POST(req: NextRequest) {
         icon: dto.icon || null,
         sortOrder: dto.sortOrder,
         isActive: dto.isActive,
+        allowedPlatforms: dto.allowedPlatforms || null,
       },
     });
     return NextResponse.json({ success: true, item });

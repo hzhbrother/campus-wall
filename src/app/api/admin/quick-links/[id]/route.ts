@@ -12,6 +12,7 @@ const UpdateSchema = z.object({
   icon: z.string().optional().or(z.literal('')),
   sortOrder: z.number().int().optional(),
   isActive: z.boolean().optional(),
+  allowedPlatforms: z.string().optional().or(z.literal('')),
 });
 
 export async function PATCH(req: NextRequest, { params }: { params: { id: string } }) {
@@ -20,6 +21,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
     const dto = UpdateSchema.parse(await req.json());
     const data: any = { ...dto };
     if (dto.icon === '') data.icon = null;
+    if (dto.allowedPlatforms === '') data.allowedPlatforms = null;
     const item = await prisma.quickLink.update({ where: { id: params.id }, data });
     return NextResponse.json({ success: true, item });
   } catch (e) { return errorResponse(e); }
