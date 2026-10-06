@@ -2332,7 +2332,7 @@ function SiteSettings() {
 
 // ---------- 协议管理 (管理员) ----------
 interface ContactTimeSlot { days: string; customLabel?: string; start: string; end: string; }
-interface ContactItem { id: string; type: 'text' | 'image' | 'link'; label: string; value: string; }
+interface ContactItem { id: string; type: 'text' | 'image' | 'link' | 'phone' | 'email' | 'qqgroup' | 'wechatgroup' | 'address' | 'video'; label: string; value: string; }
 interface ContactConfig { timeSlots: ContactTimeSlot[]; contacts: ContactItem[]; }
 
 const DEFAULT_CONTACT_CONFIG: ContactConfig = {
@@ -2478,11 +2478,17 @@ function AgreementManager() {
                 <div key={item.id} className="rounded-lg border border-gray-200 p-3 space-y-2">
                   <div className="flex items-center gap-2">
                     <select value={item.type} onChange={e => updateContactItem(item.id, 'type', e.target.value)} className="rounded-lg border border-gray-300 px-2 py-1.5 text-sm">
-                      <option value="text">文字</option>
-                      <option value="image">图片</option>
-                      <option value="link">链接</option>
+                      <option value="text">📝 文字</option>
+                      <option value="image">🖼️ 图片/二维码</option>
+                      <option value="link">🔗 链接</option>
+                      <option value="phone">📞 电话</option>
+                      <option value="email">✉️ 邮箱</option>
+                      <option value="qqgroup">👥 QQ群</option>
+                      <option value="wechatgroup">💬 微信群</option>
+                      <option value="address">📍 地址</option>
+                      <option value="video">🎬 视频号</option>
                     </select>
-                    <input value={item.label} onChange={e => updateContactItem(item.id, 'label', e.target.value)} placeholder="标签 (如: 企业微信)" className="flex-1 rounded-lg border border-gray-300 px-3 py-1.5 text-sm" />
+                    <input value={item.label} onChange={e => updateContactItem(item.id, 'label', e.target.value)} placeholder="标签 (如: 客服电话)" className="flex-1 rounded-lg border border-gray-300 px-3 py-1.5 text-sm" />
                     <button onClick={() => removeContactItem(item.id)} className="text-xs text-red-500 hover:text-red-700 shrink-0">删除</button>
                   </div>
                   {item.type === 'text' && (
@@ -2491,17 +2497,32 @@ function AgreementManager() {
                   {item.type === 'link' && (
                     <input value={item.value} onChange={e => updateContactItem(item.id, 'value', e.target.value)} placeholder="链接地址 https://..." className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm" />
                   )}
-                  {item.type === 'image' && (
+                  {item.type === 'phone' && (
+                    <input value={item.value} onChange={e => updateContactItem(item.id, 'value', e.target.value)} placeholder="电话号码 (如: 13800138000)" className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm" />
+                  )}
+                  {item.type === 'email' && (
+                    <input value={item.value} onChange={e => updateContactItem(item.id, 'value', e.target.value)} placeholder="邮箱地址 (如: admin@example.com)" className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm" />
+                  )}
+                  {item.type === 'qqgroup' && (
+                    <input value={item.value} onChange={e => updateContactItem(item.id, 'value', e.target.value)} placeholder="QQ群号 (如: 123456789)" className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm" />
+                  )}
+                  {item.type === 'wechatgroup' && (
                     <div className="flex items-center gap-3">
                       <div className="h-24 w-24 rounded-lg bg-gray-100 overflow-hidden flex items-center justify-center shrink-0">
                         {item.value ? <img src={item.value} alt="" className="h-full w-full object-cover" /> : <span className="text-xs text-gray-400">无图片</span>}
                       </div>
                       <label className="inline-block cursor-pointer rounded-lg bg-blue-50 px-3 py-1.5 text-sm text-blue-600 hover:bg-blue-100">
-                        上传图片
+                        上传群二维码
                         <input type="file" accept="image/*" className="hidden" onChange={e => handleContactImage(item.id, e)} />
                       </label>
                       {item.value && <button onClick={() => updateContactItem(item.id, 'value', '')} className="text-sm text-red-500 hover:text-red-700">清除</button>}
                     </div>
+                  )}
+                  {item.type === 'address' && (
+                    <textarea value={item.value} onChange={e => updateContactItem(item.id, 'value', e.target.value)} placeholder="地址 (如: 北京市朝阳区xx路xx号)" rows={2} className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm" />
+                  )}
+                  {item.type === 'video' && (
+                    <input value={item.value} onChange={e => updateContactItem(item.id, 'value', e.target.value)} placeholder="视频号链接 (如: https://channels.weixin.qq.com/...)" className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm" />
                   )}
                 </div>
               ))}

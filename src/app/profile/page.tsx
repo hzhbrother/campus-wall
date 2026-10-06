@@ -814,13 +814,45 @@ function ProfilePageInner() {
                 <div key={i} className="bg-gray-50 rounded-lg p-3">
                   {item.label && <div className="text-sm font-medium text-gray-800 mb-1">{item.label}</div>}
                   {item.type === 'text' && <p className="text-sm text-gray-600 whitespace-pre-wrap">{item.value}</p>}
+                  {item.type === 'image' && item.value && (
+                    <div className="flex justify-center">
+                      <img src={item.value} alt={item.label || '图片'} className="h-48 w-48 rounded-xl object-cover border border-gray-100" />
+                    </div>
+                  )}
                   {item.type === 'link' && item.value && (
                     <a href={item.value} target="_blank" rel="noopener noreferrer" className="text-sm text-blue-600 hover:underline break-all">{item.value}</a>
                   )}
-                  {item.type === 'image' && item.value && (
-                    <div className="flex justify-center">
-                      <img src={item.value} alt={item.label || '联系二维码'} className="h-48 w-48 rounded-xl object-cover border border-gray-100" />
+                  {item.type === 'phone' && item.value && (
+                    <a href={`tel:${item.value}`} className="inline-flex items-center gap-1.5 text-sm text-blue-600 hover:underline">
+                      📞 {item.value}
+                    </a>
+                  )}
+                  {item.type === 'email' && item.value && (
+                    <a href={`mailto:${item.value}`} className="inline-flex items-center gap-1.5 text-sm text-blue-600 hover:underline break-all">
+                      ✉️ {item.value}
+                    </a>
+                  )}
+                  {item.type === 'qqgroup' && item.value && (
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm text-gray-600">群号: {item.value}</span>
+                      <button onClick={() => { navigator.clipboard?.writeText(item.value); alert('群号已复制'); }} className="text-xs text-blue-500 hover:text-blue-700">复制</button>
+                      <a href={`https://qm.qq.com/cgi-bin/qm/qr?k=${encodeURIComponent(item.value)}`} target="_blank" rel="noopener noreferrer" className="text-xs text-green-600 hover:underline">加入</a>
                     </div>
+                  )}
+                  {item.type === 'wechatgroup' && item.value && (
+                    <div className="flex justify-center">
+                      <img src={item.value} alt={item.label || '微信群二维码'} className="h-48 w-48 rounded-xl object-cover border border-gray-100" />
+                    </div>
+                  )}
+                  {item.type === 'address' && item.value && (
+                    <a href={`https://uri.amap.com/marker?position=&name=${encodeURIComponent(item.value)}`} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1.5 text-sm text-blue-600 hover:underline">
+                      📍 {item.value}
+                    </a>
+                  )}
+                  {item.type === 'video' && item.value && (
+                    <a href={item.value} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1.5 text-sm text-blue-600 hover:underline break-all">
+                      🎬 点击观看
+                    </a>
                   )}
                 </div>
               ))}
