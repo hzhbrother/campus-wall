@@ -23,6 +23,7 @@ const TABLES_SQL = [
     "sortOrder" INTEGER NOT NULL DEFAULT 0,
     "clickCount" INTEGER NOT NULL DEFAULT 0,
     "isActive" BOOLEAN NOT NULL DEFAULT true,
+    "allowedPlatforms" TEXT,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" TIMESTAMP(3) NOT NULL
   )`,
@@ -49,6 +50,7 @@ const TABLES_SQL = [
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP
   )`,
   // 兼容旧表: 补充新增列
+  `ALTER TABLE "QuickLink" ADD COLUMN IF NOT EXISTS "allowedPlatforms" TEXT`,
   `ALTER TABLE "ExchangeRecord" ADD COLUMN IF NOT EXISTS "fulfillmentType" TEXT`,
   `ALTER TABLE "ExchangeRecord" ADD COLUMN IF NOT EXISTS "fulfillmentInfo" TEXT`,
   `ALTER TABLE "ExchangeRecord" ADD COLUMN IF NOT EXISTS "fulfilledAt" TIMESTAMP(3)`,
