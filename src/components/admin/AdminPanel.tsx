@@ -2428,40 +2428,38 @@ function AgreementManager() {
             </div>
             <div className="space-y-2">
               {contact.timeSlots.map((slot, i) => (
-                <div key={i} className="flex items-center gap-2 flex-wrap">
-                  {slot.days === '自定义' ? (
+                <div key={i} className="rounded-lg border border-gray-100 p-3 space-y-2">
+                  <div className="flex items-center gap-2">
+                    <select value={slot.days} onChange={e => updateTimeSlot(i, 'days', e.target.value)} className="rounded-lg border border-gray-300 px-2 py-1.5 text-sm flex-1">
+                      {WEEKDAYS.map(d => <option key={d} value={d}>{d}</option>)}
+                    </select>
+                    <button onClick={() => removeTimeSlot(i)} className="text-xs text-red-500 hover:text-red-700 shrink-0">删除</button>
+                  </div>
+                  {slot.days === '自定义' && (
                     <input
                       value={slot.customLabel || ''}
                       onChange={e => setContact(c => ({ ...c, timeSlots: c.timeSlots.map((s, idx) => idx === i ? { ...s, customLabel: e.target.value } : s) }))}
                       placeholder="输入名称 (如: 国庆节、端午节)"
-                      className="rounded-lg border border-gray-300 px-2 py-1.5 text-sm w-32"
+                      className="w-full rounded-lg border border-gray-300 px-2 py-1.5 text-sm"
                     />
-                  ) : (
-                    <select value={slot.days} onChange={e => updateTimeSlot(i, 'days', e.target.value)} className="rounded-lg border border-gray-300 px-2 py-1.5 text-sm">
-                      {WEEKDAYS.map(d => <option key={d} value={d}>{d}</option>)}
-                    </select>
                   )}
-                  {(slot.days !== '自定义' || slot.customLabel) && (
-                    <select value={slot.days} onChange={e => updateTimeSlot(i, 'days', e.target.value)} className="rounded-lg border border-gray-300 px-2 py-1.5 text-sm">
-                      {WEEKDAYS.map(d => <option key={d} value={d}>{d === '自定义' ? '切换类型' : d}</option>)}
+                  <div className="flex items-center gap-1.5 flex-wrap">
+                    <select value={slot.start.split(':')[0]} onChange={e => updateTimeSlot(i, 'start', `${e.target.value}:${slot.start.split(':')[1] || '00'}`)} className="rounded-lg border border-gray-300 px-2 py-1.5 text-sm">
+                      {HOURS.map(h => <option key={h} value={h.split(':')[0]}>{h.split(':')[0]}</option>)}
                     </select>
-                  )}
-                  <select value={slot.start.split(':')[0]} onChange={e => updateTimeSlot(i, 'start', `${e.target.value}:${slot.start.split(':')[1] || '00'}`)} className="rounded-lg border border-gray-300 px-2 py-1.5 text-sm">
-                    {HOURS.map(h => <option key={h} value={h.split(':')[0]}>{h.split(':')[0]}</option>)}
-                  </select>
-                  <span className="text-gray-400">:</span>
-                  <select value={slot.start.split(':')[1] || '00'} onChange={e => updateTimeSlot(i, 'start', `${slot.start.split(':')[0]}:${e.target.value}`)} className="rounded-lg border border-gray-300 px-2 py-1.5 text-sm">
-                    {MINS.map(m => <option key={m} value={m}>{m}</option>)}
-                  </select>
-                  <span className="text-gray-400">至</span>
-                  <select value={slot.end.split(':')[0]} onChange={e => updateTimeSlot(i, 'end', `${e.target.value}:${slot.end.split(':')[1] || '00'}`)} className="rounded-lg border border-gray-300 px-2 py-1.5 text-sm">
-                    {HOURS.map(h => <option key={h} value={h.split(':')[0]}>{h.split(':')[0]}</option>)}
-                  </select>
-                  <span className="text-gray-400">:</span>
-                  <select value={slot.end.split(':')[1] || '00'} onChange={e => updateTimeSlot(i, 'end', `${slot.end.split(':')[0]}:${e.target.value}`)} className="rounded-lg border border-gray-300 px-2 py-1.5 text-sm">
-                    {MINS.map(m => <option key={m} value={m}>{m}</option>)}
-                  </select>
-                  <button onClick={() => removeTimeSlot(i)} className="text-xs text-red-500 hover:text-red-700 ml-1">删除</button>
+                    <span className="text-gray-400">:</span>
+                    <select value={slot.start.split(':')[1] || '00'} onChange={e => updateTimeSlot(i, 'start', `${slot.start.split(':')[0]}:${e.target.value}`)} className="rounded-lg border border-gray-300 px-2 py-1.5 text-sm">
+                      {MINS.map(m => <option key={m} value={m}>{m}</option>)}
+                    </select>
+                    <span className="text-gray-400 mx-1">至</span>
+                    <select value={slot.end.split(':')[0]} onChange={e => updateTimeSlot(i, 'end', `${e.target.value}:${slot.end.split(':')[1] || '00'}`)} className="rounded-lg border border-gray-300 px-2 py-1.5 text-sm">
+                      {HOURS.map(h => <option key={h} value={h.split(':')[0]}>{h.split(':')[0]}</option>)}
+                    </select>
+                    <span className="text-gray-400">:</span>
+                    <select value={slot.end.split(':')[1] || '00'} onChange={e => updateTimeSlot(i, 'end', `${slot.end.split(':')[0]}:${e.target.value}`)} className="rounded-lg border border-gray-300 px-2 py-1.5 text-sm">
+                      {MINS.map(m => <option key={m} value={m}>{m}</option>)}
+                    </select>
+                  </div>
                 </div>
               ))}
             </div>
