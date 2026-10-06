@@ -35,20 +35,18 @@ export default function HomePage() {
     }
   }, [category, q]);
 
-  // 全量刷新: 帖子 + 热榜 + 分类 + 公告
+  // 全量刷新: 帖子 + 热榜 + 分类 + 公告 (分类/公告合并到一个 meta 请求, 减少 HTTP 往返)
   const refreshAll = useCallback(() => {
     load();
     api.get<{ items: PostListItem[] }>('/api/posts?sort=hot&pageSize=5')
       .then(d => setHotItems(d.items))
       .catch(() => {});
-    api.get<{ categories: string[]; reviewCategories: string[] }>('/api/posts/categories')
+    api.get<{ categories: string[]; reviewCategories: string[]; announcement: string }>('/api/posts/meta')
       .then(d => {
         setCategories(d.categories.length ? d.categories : DEFAULT_CATEGORIES);
         setReviewCategories(d.reviewCategories || []);
+        if (d.announcement) setAnnouncement(d.announcement);
       })
-      .catch(() => {});
-    api.get<Record<string, string>>('/api/site-config')
-      .then(d => { if (d.announcement_text) setAnnouncement(d.announcement_text); })
       .catch(() => {});
   }, [load]);
 

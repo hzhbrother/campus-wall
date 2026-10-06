@@ -1,11 +1,17 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
-  // 允许加载外部图片占位 (头像等)
+  poweredByHeader: false,
+  compress: true,
+  swcMinify: true,
   images: {
     remotePatterns: [
       { protocol: 'https', hostname: '**' },
     ],
+    formats: ['image/avif', 'image/webp'],
+  },
+  experimental: {
+    optimizePackageImports: ['lucide-react'],
   },
 };
 
