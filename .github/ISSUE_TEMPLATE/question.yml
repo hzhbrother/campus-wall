@@ -1,7 +1,7 @@
 name: '❓ 提问 / Question'
 description: '遇到问题需要帮助？在这里提问，我们会尽快为您解答！'
 title: '[Question]: '
-labels: ['提问', '需要帮助']
+labels: ['question', '需要帮助']
 assignees: []
 body:
   - type: markdown

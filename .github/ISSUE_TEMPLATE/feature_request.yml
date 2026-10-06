@@ -1,7 +1,7 @@
 name: ✨ 功能建议
 description: 为校园墙系统提出新功能或改进建议
 title: '[Feature]: '
-labels: ['改进', '功能建议']
+labels: ['enhancement', '功能建议']
 assignees: []
 body:
   - type: markdown
