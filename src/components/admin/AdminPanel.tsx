@@ -2103,7 +2103,10 @@ function SiteSettings() {
                             const list = (prev.review_categories || '').split(',').map(s => s.trim()).filter(Boolean);
                             if (e.target.checked) { if (!list.includes(cat)) list.push(cat); }
                             else { const i = list.indexOf(cat); if (i >= 0) list.splice(i, 1); }
-                            return { ...prev, review_categories: list.join(',') };
+                            const newValue = list.join(',');
+                            // 勾选后立即自动保存到后端, 刷新页面后仍保持
+                            api.patch('/api/admin/site-config', { review_categories: newValue }).catch(() => {});
+                            return { ...prev, review_categories: newValue };
                           });
                         }}
                         className="h-4 w-4 shrink-0 accent-orange-500"
@@ -2171,7 +2174,7 @@ function SiteSettings() {
                   添加
                 </button>
               </div>
-              <p className="text-xs text-gray-400 mt-2">勾选需要审核的分类即可，管理员可随时调整。</p>
+              <p className="text-xs text-gray-400 mt-2">勾选后自动保存，刷新页面仍保持选中状态。</p>
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div>
