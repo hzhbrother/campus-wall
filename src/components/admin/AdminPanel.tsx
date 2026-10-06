@@ -3867,6 +3867,11 @@ function QuickLinksManager() {
     catch { alert('图片处理失败'); }
   };
 
+  const toggleActive = async (id: string, current: boolean) => {
+    try { await api.patch(`/api/admin/quick-links/${id}`, { isActive: !current }); load(); }
+    catch (e: any) { setErr(e.message); }
+  };
+
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
@@ -3907,30 +3912,40 @@ function QuickLinksManager() {
       )}
 
       {loading ? <p className="text-sm text-gray-400">加载中…</p> : (
-        <div className="overflow-hidden rounded-2xl bg-white shadow-sm">
-          <table className="w-full text-sm">
-            <thead className="bg-gray-50 text-gray-500">
-              <tr><th className="px-4 py-2.5 text-left">名称</th><th className="px-4 py-2.5 text-left">链接</th><th className="px-4 py-2.5 text-center">点击</th><th className="px-4 py-2.5 text-center">状态</th><th className="px-4 py-2.5 text-right">操作</th></tr>
-            </thead>
-            <tbody>
-              {items.map(it => (
-                <tr key={it.id} className="border-t border-gray-100">
-                  <td className="px-4 py-2.5 flex items-center gap-2">
-                    {it.icon && <img src={it.icon} alt="" className="h-7 w-7 rounded-lg object-cover" />}
-                    <span>{it.title}</span>
-                  </td>
-                  <td className="px-4 py-2.5 text-gray-500 truncate max-w-[200px]">{it.url}</td>
-                  <td className="px-4 py-2.5 text-center">{it.clickCount}</td>
-                  <td className="px-4 py-2.5 text-center">{it.isActive ? <span className="text-green-500">启用</span> : <span className="text-gray-400">禁用</span>}</td>
-                  <td className="px-4 py-2.5 text-right">
-                    <button onClick={() => openEdit(it)} className="text-blue-500 hover:underline mr-2">编辑</button>
-                    <button onClick={() => remove(it.id)} className="text-red-400 hover:underline">删除</button>
-                  </td>
-                </tr>
-              ))}
-              {items.length === 0 && <tr><td colSpan={5} className="px-4 py-8 text-center text-gray-400">暂无数据</td></tr>}
-            </tbody>
-          </table>
+        <div className="space-y-2">
+          {items.map(it => (
+            <div key={it.id} className="rounded-2xl bg-white p-4 shadow-sm">
+              <div className="flex items-start gap-3">
+                {/* 图标 */}
+                <div className="h-12 w-12 shrink-0 overflow-hidden rounded-xl bg-gray-100 flex items-center justify-center">
+                  {it.icon && <img src={it.icon} alt="" className="h-full w-full object-cover" />}
+                </div>
+                {/* 信息 */}
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center gap-2">
+                    <span className="font-medium text-gray-900 truncate">{it.title}</span>
+                    {it.isActive
+                      ? <span className="shrink-0 rounded-full bg-green-50 px-2 py-0.5 text-xs text-green-600">启用</span>
+                      : <span className="shrink-0 rounded-full bg-gray-100 px-2 py-0.5 text-xs text-gray-400">禁用</span>
+                    }
+                  </div>
+                  <div className="mt-1 text-xs text-gray-400 truncate">{it.url}</div>
+                  <div className="mt-1 text-xs text-gray-400">点击 {it.clickCount} 次 · 排序 {it.sortOrder}</div>
+                </div>
+              </div>
+              {/* 操作按钮 */}
+              <div className="mt-3 flex gap-2">
+                <button onClick={() => openEdit(it)} className="flex-1 rounded-lg bg-blue-50 py-1.5 text-sm text-blue-600 hover:bg-blue-100">编辑</button>
+                <button onClick={() => toggleActive(it.id, it.isActive)} className={`flex-1 rounded-lg py-1.5 text-sm hover:bg-gray-100 ${it.isActive ? 'bg-gray-50 text-gray-600' : 'bg-green-50 text-green-600'}`}>
+                  {it.isActive ? '禁用' : '启用'}
+                </button>
+                <button onClick={() => remove(it.id)} className="flex-1 rounded-lg bg-red-50 py-1.5 text-sm text-red-500 hover:bg-red-100">删除</button>
+              </div>
+            </div>
+          ))}
+          {items.length === 0 && (
+            <div className="rounded-2xl bg-white p-8 text-center text-gray-400 shadow-sm">暂无数据</div>
+          )}
         </div>
       )}
     </div>
