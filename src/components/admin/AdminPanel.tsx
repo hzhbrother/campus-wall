@@ -1980,7 +1980,7 @@ function SiteSettings() {
     api.get('/api/admin/site-config').then(setCfg).catch(console.error).finally(() => setLoading(false));
   }, []);
 
-  const set = (k: string, v: string) => setCfg({ ...cfg, [k]: v });
+  const set = (k: string, v: string) => setCfg(prev => ({ ...prev, [k]: v }));
   const bool = (k: string, def = true) => cfg[k] === undefined ? def : cfg[k] === 'true';
   const setBool = (k: string, v: boolean) => set(k, String(v));
 
@@ -2099,10 +2099,12 @@ function SiteSettings() {
                         type="checkbox"
                         checked={checked}
                         onChange={e => {
-                          const list = (cfg.review_categories || '').split(',').map(s => s.trim()).filter(Boolean);
-                          if (e.target.checked) { if (!list.includes(cat)) list.push(cat); }
-                          else { const i = list.indexOf(cat); if (i >= 0) list.splice(i, 1); }
-                          set('review_categories', list.join(','));
+                          setCfg(prev => {
+                            const list = (prev.review_categories || '').split(',').map(s => s.trim()).filter(Boolean);
+                            if (e.target.checked) { if (!list.includes(cat)) list.push(cat); }
+                            else { const i = list.indexOf(cat); if (i >= 0) list.splice(i, 1); }
+                            return { ...prev, review_categories: list.join(',') };
+                          });
                         }}
                         className="h-4 w-4 shrink-0 accent-orange-500"
                       />
@@ -2112,12 +2114,13 @@ function SiteSettings() {
                       )}
                       <button
                         onClick={() => {
-                          const newArr = arr.filter((_, i) => i !== idx);
-                          set('post_categories', newArr.join(','));
-                          // 同时从审核列表移除
-                          const rl = (cfg.review_categories || '').split(',').map(s => s.trim()).filter(Boolean);
-                          const ri = rl.indexOf(cat);
-                          if (ri >= 0) { rl.splice(ri, 1); set('review_categories', rl.join(',')); }
+                          setCfg(prev => {
+                            const newArr = (prev.post_categories || '').split(',').map(s => s.trim()).filter(Boolean).filter((_, i) => i !== idx);
+                            const rl = (prev.review_categories || '').split(',').map(s => s.trim()).filter(Boolean);
+                            const ri = rl.indexOf(cat);
+                            if (ri >= 0) rl.splice(ri, 1);
+                            return { ...prev, post_categories: newArr.join(','), review_categories: rl.join(',') };
+                          });
                         }}
                         className="text-xs text-red-500 hover:text-red-700 shrink-0"
                       >
@@ -2142,10 +2145,11 @@ function SiteSettings() {
                     if (e.key === 'Enter') {
                       const val = (e.target as HTMLInputElement).value.trim();
                       if (!val) return;
-                      const list = (cfg.post_categories || '').split(',').map(s => s.trim()).filter(Boolean);
-                      if (!list.includes(val)) {
-                        set('post_categories', [...list, val].join(','));
-                      }
+                      setCfg(prev => {
+                        const list = (prev.post_categories || '').split(',').map(s => s.trim()).filter(Boolean);
+                        if (!list.includes(val)) list.push(val);
+                        return { ...prev, post_categories: list.join(',') };
+                      });
                       (e.target as HTMLInputElement).value = '';
                     }
                   }}
@@ -2155,10 +2159,11 @@ function SiteSettings() {
                     const input = document.getElementById('new-category-input') as HTMLInputElement;
                     const val = input?.value.trim();
                     if (!val) return;
-                    const list = (cfg.post_categories || '').split(',').map(s => s.trim()).filter(Boolean);
-                    if (!list.includes(val)) {
-                      set('post_categories', [...list, val].join(','));
-                    }
+                    setCfg(prev => {
+                      const list = (prev.post_categories || '').split(',').map(s => s.trim()).filter(Boolean);
+                      if (!list.includes(val)) list.push(val);
+                      return { ...prev, post_categories: list.join(',') };
+                    });
                     if (input) input.value = '';
                   }}
                   className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700"
@@ -2166,7 +2171,7 @@ function SiteSettings() {
                   添加
                 </button>
               </div>
-              <p className="text-xs text-gray-400 mt-2">提示：默认「招聘兼职」「商业推广」需要审核，管理员可自行调整。</p>
+              <p className="text-xs text-gray-400 mt-2">勾选需要审核的分类即可，管理员可随时调整。</p>
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div>

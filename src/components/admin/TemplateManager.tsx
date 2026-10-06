@@ -34,8 +34,9 @@ export default function TemplateManager() {
   const [templates, setTemplates] = useState<Tpl[]>([]);
   const [loading, setLoading] = useState(true);
   const [creating, setCreating] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
 
-  // 新建模板表单
+  // 新建/编辑模板表单
   const [tplName, setTplName] = useState('');
   const [tplType, setTplType] = useState<'STUDENT' | 'TEACHER' | 'QUALIFICATION'>('STUDENT');
   const [image, setImage] = useState<string>('');
@@ -130,7 +131,17 @@ export default function TemplateManager() {
   };
 
   const resetForm = () => {
-    setCreating(false); setTplName(''); setTplType('STUDENT'); setImage(''); setFields([]);
+    setCreating(false); setEditingId(null); setTplName(''); setTplType('STUDENT'); setImage(''); setFields([]);
+    setCurBox(null); setDrawing(null); setShowNameDialog(false);
+  };
+
+  const openEdit = (t: Tpl) => {
+    setEditingId(t.id);
+    setCreating(false);
+    setTplName(t.name);
+    setTplType(t.type);
+    setImage(t.image);
+    setFields([...t.fields]);
     setCurBox(null); setDrawing(null); setShowNameDialog(false);
   };
 
@@ -139,7 +150,11 @@ export default function TemplateManager() {
     if (!image) { alert('请上传样图'); return; }
     if (fields.length === 0) { alert('请至少框选一个字段'); return; }
     try {
-      await api.post('/api/admin/verification-templates', { name: tplName.trim(), type: tplType, image, fields });
+      if (editingId) {
+        await api.patch(`/api/admin/verification-templates/${editingId}`, { name: tplName.trim(), type: tplType, image, fields });
+      } else {
+        await api.post('/api/admin/verification-templates', { name: tplName.trim(), type: tplType, image, fields });
+      }
       resetForm();
       await load();
     } catch (e: any) { alert(e.message || '保存失败'); }
@@ -174,7 +189,7 @@ export default function TemplateManager() {
           <h3 className="text-base font-semibold">识别模板管理</h3>
           <p className="text-xs text-gray-500 mt-0.5">上传一张校园卡样图, 框选需要识别的字段, AI 将按此模板提取用户上传照片中的对应信息</p>
         </div>
-        {!creating && (
+        {!creating && !editingId && (
           <button onClick={() => setCreating(true)} className="px-3 py-1.5 text-sm bg-amber-500 text-white rounded-lg hover:bg-amber-600">
             + 新建模板
           </button>
@@ -182,7 +197,7 @@ export default function TemplateManager() {
       </div>
 
       {/* 模板列表 */}
-      {!creating && (
+      {!creating && !editingId && (
         loading ? <div className="text-sm text-gray-500">加载中...</div> :
         templates.length === 0 ? (
           <div className="text-sm text-gray-500 bg-gray-50 rounded-xl p-6 text-center">
@@ -207,6 +222,7 @@ export default function TemplateManager() {
                   </div>
                 </div>
                 <div className="mt-3 flex gap-2 pl-[5.5rem]">
+                  <button onClick={() => openEdit(t)} className="flex-1 rounded-lg bg-blue-50 py-1.5 text-sm text-blue-600 hover:bg-blue-100">编辑</button>
                   {t.isActive ? (
                     <button onClick={() => deactivate(t.id)} className="flex-1 rounded-lg bg-gray-50 py-1.5 text-sm text-gray-600 hover:bg-gray-100">停用</button>
                   ) : (
@@ -220,8 +236,8 @@ export default function TemplateManager() {
         )
       )}
 
-      {/* 新建模板 */}
-      {creating && (
+      {/* 新建/编辑模板 */}
+      {(creating || editingId) && (
         <div className="space-y-4">
           <div className="flex gap-3 items-center flex-wrap">
             <input
@@ -244,7 +260,7 @@ export default function TemplateManager() {
               <input type="file" accept="image/*" onChange={onUpload} className="hidden" />
             </label>
             <button onClick={resetForm} className="px-3 py-2 text-sm text-gray-600">取消</button>
-            <button onClick={save} className="px-3 py-2 text-sm bg-amber-500 text-white rounded-lg hover:bg-amber-600">保存模板</button>
+            <button onClick={save} className="px-3 py-2 text-sm bg-amber-500 text-white rounded-lg hover:bg-amber-600">{editingId ? '更新模板' : '保存模板'}</button>
           </div>
 
           {image && (
