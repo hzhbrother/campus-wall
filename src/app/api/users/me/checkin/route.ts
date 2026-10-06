@@ -73,8 +73,13 @@ export async function POST(req: NextRequest) {
     await prisma.checkInRecord.create({ data: { userId: me.id, date: today, points } });
     const updated = await prisma.user.update({ where: { id: me.id }, data: { points: { increment: points } }, select: { points: true } });
 
-    // 检查勋章
-    const newBadges = await checkAndAwardBadges(me.id);
+    // 检查勋章 (出错不影响签到结果)
+    let newBadges: any[] = [];
+    try {
+      newBadges = await checkAndAwardBadges(me.id);
+    } catch (e) {
+      console.error('checkAndAwardBadges error:', e);
+    }
 
     return NextResponse.json({ checkedIn: true, streak, earnedPoints: points, totalPoints: updated.points, newBadges });
   } catch (e) {

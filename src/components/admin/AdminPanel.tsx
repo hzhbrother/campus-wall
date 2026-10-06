@@ -2404,8 +2404,10 @@ function AgreementManager() {
     const f = e.target.files?.[0]; if (!f) return;
     try {
       const b64 = await compressImage(f, 512, 0.8);
-      updateContactItem(id, 'value', b64);
-    } catch { alert('图片处理失败'); }
+      // 上传到服务器, 拿到 URL (避免 base64 存库导致页面卡顿)
+      const res: any = await api.post('/api/admin/upload', { image: b64 });
+      updateContactItem(id, 'value', res.url);
+    } catch { alert('图片上传失败'); }
   };
 
   if (loading) return <p className="py-6 text-center text-gray-400">加载中…</p>;
