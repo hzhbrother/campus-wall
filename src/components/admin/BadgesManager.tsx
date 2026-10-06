@@ -97,50 +97,44 @@ export function BadgesManager() {
           <p className="text-sm">还没有徽章, 点击右上角新建</p>
         </div>
       ) : (
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="border-b border-gray-100 text-left text-xs text-gray-400">
-                <th className="py-2 pr-3">徽章</th>
-                <th className="py-2 pr-3">描述</th>
-                <th className="py-2 pr-3">条件</th>
-                <th className="py-2 pr-3">阈值</th>
-                <th className="py-2 pr-3">状态</th>
-                <th className="py-2 pr-3">操作</th>
-              </tr>
-            </thead>
-            <tbody>
-              {items.map(b => (
-                <tr key={b.id} className="border-b border-gray-50">
-                  <td className="py-3 pr-3">
-                    <div className="flex items-center gap-2">
-                      {b.imageUrl ? (
-                        <img src={b.imageUrl} alt={b.name} className="h-8 w-8 rounded-full object-cover" />
-                      ) : (
-                        <span className="text-2xl">{b.icon || '🏅'}</span>
-                      )}
-                      <span className="font-medium text-gray-800">{b.name}</span>
-                    </div>
-                  </td>
-                  <td className="py-3 pr-3 text-gray-500">{b.description || '-'}</td>
-                  <td className="py-3 pr-3">
+        <div className="space-y-2">
+          {items.map(b => (
+            <div key={b.id} className="rounded-2xl bg-white p-4 shadow-sm">
+              <div className="flex items-start gap-3">
+                <div className="h-12 w-12 shrink-0 overflow-hidden rounded-full bg-gray-100 flex items-center justify-center text-2xl">
+                  {b.imageUrl ? (
+                    <img src={b.imageUrl} alt={b.name} className="h-full w-full object-cover" />
+                  ) : (
+                    <span>{b.icon || '🏅'}</span>
+                  )}
+                </div>
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center gap-2">
+                    <span className="font-medium text-gray-900 truncate">{b.name}</span>
+                    {b.isActive
+                      ? <span className="shrink-0 rounded-full bg-green-50 px-2 py-0.5 text-xs text-green-600">启用</span>
+                      : <span className="shrink-0 rounded-full bg-gray-100 px-2 py-0.5 text-xs text-gray-400">停用</span>
+                    }
+                  </div>
+                  {b.description && <div className="mt-1 text-xs text-gray-400 line-clamp-1">{b.description}</div>}
+                  <div className="mt-1.5 flex items-center gap-2 flex-wrap">
                     <span className="rounded bg-gray-100 px-2 py-0.5 text-xs text-gray-600">{CONDITION_LABELS[b.conditionType] || b.conditionType}</span>
-                  </td>
-                  <td className="py-3 pr-3 text-gray-700">{b.threshold}</td>
-                  <td className="py-3 pr-3">
-                    <button onClick={() => toggleActive(b)} className={`rounded-full px-2 py-0.5 text-xs ${b.isActive ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-400'}`}>
-                      {b.isActive ? '启用' : '停用'}
-                    </button>
-                  </td>
-                  <td className="py-3 pr-3">
-                    <button onClick={() => setGrantBadge(b)} className="text-amber-600 hover:underline mr-3">授予</button>
-                    <button onClick={() => { setEditing(b); setShowForm(true); }} className="text-blue-500 hover:underline mr-3">编辑</button>
-                    <button onClick={() => remove(b.id)} className="text-red-400 hover:underline">删除</button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+                    <span className="text-xs text-gray-500">阈值 {b.threshold}</span>
+                  </div>
+                </div>
+              </div>
+              <div className="mt-3 flex gap-2">
+                <button onClick={() => { setEditing(b); setShowForm(true); }} className="flex-1 rounded-lg bg-blue-50 py-1.5 text-sm text-blue-600 hover:bg-blue-100">编辑</button>
+                <button onClick={() => toggleActive(b)} className={`flex-1 rounded-lg py-1.5 text-sm ${b.isActive ? 'bg-gray-50 text-gray-600 hover:bg-gray-100' : 'bg-green-50 text-green-600 hover:bg-green-100'}`}>
+                  {b.isActive ? '停用' : '启用'}
+                </button>
+                {b.conditionType === 'MANUAL' && (
+                  <button onClick={() => setGrantBadge(b)} className="flex-1 rounded-lg bg-amber-50 py-1.5 text-sm text-amber-600 hover:bg-amber-100">授予</button>
+                )}
+                <button onClick={() => remove(b.id)} className="flex-1 rounded-lg bg-red-50 py-1.5 text-sm text-red-500 hover:bg-red-100">删除</button>
+              </div>
+            </div>
+          ))}
         </div>
       )}
 

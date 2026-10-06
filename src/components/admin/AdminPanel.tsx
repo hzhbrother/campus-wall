@@ -3049,58 +3049,44 @@ function RolesManager() {
       </div>
       {msg && <div className="mb-3 rounded-lg bg-blue-50 px-3 py-2 text-sm text-blue-700">{msg}</div>}
       {loading ? <div className="text-gray-400">加载中…</div> : (
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="border-b text-left text-gray-500">
-                <th className="py-2 px-2 w-10">
-                  <input
-                    type="checkbox"
-                    checked={allCustomSelected}
-                    onChange={toggleSelectAll}
-                    className="rounded border-gray-300"
-                    title="全选自定义角色"
-                  />
-                </th>
-                <th className="py-2 px-2">角色名称</th>
-                <th className="py-2 px-2">类型</th>
-                <th className="py-2 px-2">用户数</th>
-                <th className="py-2 px-2">权限数</th>
-                <th className="py-2 px-2">操作</th>
-              </tr>
-            </thead>
-            <tbody>
-              {roles.map(r => (
-                <tr key={r.id} className="border-b hover:bg-gray-50">
-                  <td className="py-2 px-2">
-                    {r.isSystem ? (
-                      <span className="text-gray-300" title="系统角色不可删除">—</span>
-                    ) : (
-                      <input
-                        type="checkbox"
-                        checked={selected.has(r.id)}
-                        onChange={() => toggleSelect(r.id)}
-                        className="rounded border-gray-300"
-                      />
-                    )}
-                  </td>
-                  <td className="py-2 px-2 font-medium">{r.name}</td>
-                  <td className="py-2 px-2">
+        <div className="space-y-2">
+          {roles.map(r => (
+            <div key={r.id} className="rounded-2xl bg-white p-4 shadow-sm">
+              <div className="flex items-start gap-3">
+                <div className="pt-1">
+                  {r.isSystem ? (
+                    <span className="text-gray-300 text-sm">—</span>
+                  ) : (
+                    <input
+                      type="checkbox"
+                      checked={selected.has(r.id)}
+                      onChange={() => toggleSelect(r.id)}
+                      className="rounded border-gray-300"
+                    />
+                  )}
+                </div>
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="font-medium text-gray-900">{r.name}</span>
                     {r.isSystem
-                      ? <span className="rounded bg-gray-100 px-2 py-0.5 text-xs text-gray-600">系统</span>
-                      : <span className="rounded bg-blue-50 px-2 py-0.5 text-xs text-blue-600">自定义</span>}
-                    {r.isDefault && <span className="ml-1 rounded bg-green-50 px-2 py-0.5 text-xs text-green-600">默认</span>}
-                  </td>
-                  <td className="py-2 px-2">{r.userCount}</td>
-                  <td className="py-2 px-2">{r.permissions.length}</td>
-                  <td className="py-2 px-2 space-x-2">
-                    <button onClick={() => setEditing(r)} className="text-blue-600 hover:underline">编辑</button>
-                    {!r.isSystem && <button onClick={() => handleDelete(r)} className="text-red-500 hover:underline">删除</button>}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+                      ? <span className="shrink-0 rounded-full bg-gray-100 px-2 py-0.5 text-xs text-gray-600">系统</span>
+                      : <span className="shrink-0 rounded-full bg-blue-50 px-2 py-0.5 text-xs text-blue-600">自定义</span>
+                    }
+                    {r.isDefault && <span className="shrink-0 rounded-full bg-green-50 px-2 py-0.5 text-xs text-green-600">默认</span>}
+                  </div>
+                  <div className="mt-1.5 text-xs text-gray-500">
+                    {r.userCount} 个用户 · {r.permissions.length} 项权限
+                  </div>
+                </div>
+              </div>
+              <div className="mt-3 flex gap-2 pl-7">
+                <button onClick={() => setEditing(r)} className="flex-1 rounded-lg bg-blue-50 py-1.5 text-sm text-blue-600 hover:bg-blue-100">编辑</button>
+                {!r.isSystem && (
+                  <button onClick={() => handleDelete(r)} className="flex-1 rounded-lg bg-red-50 py-1.5 text-sm text-red-500 hover:bg-red-100">删除</button>
+                )}
+              </div>
+            </div>
+          ))}
         </div>
       )}
       {selected.size > 0 && (

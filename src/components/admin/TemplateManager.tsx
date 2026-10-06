@@ -189,28 +189,30 @@ export default function TemplateManager() {
             暂无模板, 点击右上角「新建模板」创建第一个识别模板
           </div>
         ) : (
-          <div className="space-y-3">
+          <div className="space-y-2">
             {templates.map((t) => (
-              <div key={t.id} className="border border-gray-200 rounded-xl p-3 flex gap-3 items-center">
-                <img src={t.image} alt="" className="w-24 h-16 object-cover rounded border" />
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <span className="font-medium">{t.name}</span>
-                    <span className="text-xs bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded">{TYPE_LABELS[t.type] || t.type}</span>
-                    {t.isActive && <span className="text-xs bg-green-100 text-green-700 px-1.5 py-0.5 rounded">已激活</span>}
+              <div key={t.id} className="rounded-2xl bg-white p-4 shadow-sm">
+                <div className="flex items-start gap-3">
+                  <img src={t.image} alt="" className="h-14 w-20 shrink-0 rounded-lg object-cover border border-gray-200" />
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="font-medium text-gray-900 truncate">{t.name}</span>
+                      <span className="shrink-0 rounded-full bg-blue-50 px-2 py-0.5 text-xs text-blue-600">{TYPE_LABELS[t.type] || t.type}</span>
+                      {t.isActive && <span className="shrink-0 rounded-full bg-green-50 px-2 py-0.5 text-xs text-green-600">已激活</span>}
+                    </div>
+                    <div className="mt-1 text-xs text-gray-500">
+                      {t.fields.length} 个字段: {t.fields.map(f => f.name).join('、')}
+                    </div>
+                    <div className="mt-0.5 text-xs text-gray-400">{new Date(t.createdAt).toLocaleString('zh-CN')}</div>
                   </div>
-                  <div className="text-xs text-gray-500 mt-1">
-                    {t.fields.length} 个字段: {t.fields.map(f => f.name).join('、')}
-                  </div>
-                  <div className="text-xs text-gray-400 mt-0.5">{new Date(t.createdAt).toLocaleString('zh-CN')}</div>
                 </div>
-                <div className="flex gap-2">
+                <div className="mt-3 flex gap-2 pl-[5.5rem]">
                   {t.isActive ? (
-                    <button onClick={() => deactivate(t.id)} className="text-xs px-2.5 py-1 bg-gray-200 text-gray-700 rounded hover:bg-gray-300">停用</button>
+                    <button onClick={() => deactivate(t.id)} className="flex-1 rounded-lg bg-gray-50 py-1.5 text-sm text-gray-600 hover:bg-gray-100">停用</button>
                   ) : (
-                    <button onClick={() => activate(t.id)} className="text-xs px-2.5 py-1 bg-green-500 text-white rounded hover:bg-green-600">激活</button>
+                    <button onClick={() => activate(t.id)} className="flex-1 rounded-lg bg-green-50 py-1.5 text-sm text-green-600 hover:bg-green-100">激活</button>
                   )}
-                  <button onClick={() => remove(t.id)} className="text-xs px-2.5 py-1 bg-red-50 text-red-600 rounded hover:bg-red-100">删除</button>
+                  <button onClick={() => remove(t.id)} className="flex-1 rounded-lg bg-red-50 py-1.5 text-sm text-red-500 hover:bg-red-100">删除</button>
                 </div>
               </div>
             ))}
