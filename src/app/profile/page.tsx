@@ -415,6 +415,7 @@ function ProfilePageInner() {
   const [showPrivacyModal, setShowPrivacyModal] = useState(false);
   const [showVerifyModal, setShowVerifyModal] = useState(false);
   const [showJoinOrg, setShowJoinOrg] = useState(false);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [joinOrgDismissed, setJoinOrgDismissed] = useState(false);
 
   // 未认证每日提醒 (localStorage 存上次提醒日期)
@@ -743,6 +744,14 @@ function ProfilePageInner() {
         {/* 第三方账号绑定 */}
         <AccountBindingsCard userId={user.id} />
 
+        {/* 注销账号 */}
+        <button
+          onClick={() => setShowDeleteModal(true)}
+          className="w-full rounded-2xl bg-white py-3.5 text-sm text-red-500 shadow-sm hover:bg-gray-50"
+        >
+          注销账号
+        </button>
+
         {/* 修改密码弹窗 */}
         {showPwdModal && <ChangePasswordModal onClose={() => setShowPwdModal(false)} />}
 
@@ -751,6 +760,14 @@ function ProfilePageInner() {
 
         {/* 隐私设置弹窗 */}
         {showPrivacyModal && <PrivacySettingsModal onClose={() => setShowPrivacyModal(false)} onSaved={() => refreshUser?.()} />}
+
+        {/* 注销账号弹窗 */}
+        {showDeleteModal && (
+          <DeleteAccountModal
+            onClose={() => setShowDeleteModal(false)}
+            onDeleted={() => { logout(); router.push('/'); }}
+          />
+        )}
       </div>
     );
   }
@@ -1123,6 +1140,69 @@ export default function ProfilePage() {
 }
 
 // ---------- 修改密码弹窗 ----------
+// ---------- 注销账号弹窗 ----------
+const DELETE_CONFIRM_TEXT = '我已确认注销该账号';
+
+function DeleteAccountModal({ onClose, onDeleted }: { onClose: () => void; onDeleted: () => void }) {
+  const [confirmText, setConfirmText] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [msg, setMsg] = useState('');
+
+  const canSubmit = confirmText === DELETE_CONFIRM_TEXT;
+
+  const submit = async () => {
+    if (!canSubmit) { setMsg('请输入正确的确认文字'); return; }
+    setBusy(true); setMsg('');
+    try {
+      await api.del('/api/users/me/delete');
+      setMsg('账号已注销');
+      setTimeout(onDeleted, 1200);
+    } catch (e: any) { setMsg(e.message || '注销失败'); } finally { setBusy(false); }
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" onClick={onClose}>
+      <div className="w-full max-w-sm rounded-2xl bg-white p-5" onClick={e => e.stopPropagation()}>
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="text-lg font-bold text-gray-900">注销账号</h3>
+          <button onClick={onClose} className="text-gray-400">✕</button>
+        </div>
+
+        {/* 风险提示 */}
+        <div className="mb-4 space-y-2 text-sm text-gray-500">
+          <p>⚠️ 注销后以下数据将被清除且无法恢复：</p>
+          <ul className="list-disc pl-5 space-y-1">
+            <li>个人信息（昵称、头像、联系方式）</li>
+            <li>第三方账号绑定</li>
+            <li>签到记录、收藏、关注关系</li>
+          </ul>
+          <p className="text-gray-400">您发布的帖子和评论将保留，但作者显示为「已注销用户」。</p>
+        </div>
+
+        {msg && <p className={`mb-3 text-sm ${msg.includes('成功') || msg.includes('已注销') ? 'text-green-600' : 'text-red-500'}`}>{msg}</p>}
+
+        <div className="space-y-2">
+          <p className="text-sm text-gray-700">请输入 <span className="font-medium text-red-500">{DELETE_CONFIRM_TEXT}</span> 以确认注销：</p>
+          <input
+            type="text"
+            value={confirmText}
+            onChange={e => setConfirmText(e.target.value)}
+            placeholder="请输入确认文字"
+            className="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm"
+          />
+        </div>
+
+        <div className="mt-4 flex gap-2">
+          <button onClick={submit} disabled={busy || !canSubmit} className="flex-1 rounded-lg bg-red-500 py-2.5 text-sm font-medium text-white disabled:opacity-40">
+            {busy ? '注销中…' : '确认注销'}
+          </button>
+          <button onClick={onClose} className="flex-1 rounded-lg bg-gray-100 py-2.5 text-sm text-gray-700">取消</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function ChangePasswordModal({ onClose }: { onClose: () => void }) {
   const [oldPwd, setOldPwd] = useState('');
   const [newPwd, setNewPwd] = useState('');

@@ -44,7 +44,7 @@ export async function getUserFromRequest(req: Request | NextRequest): Promise<Re
   const payload = verifyToken(token);
   if (!payload) return null;
   const user = await prisma.user.findUnique({ where: { id: payload.sub } });
-  if (!user || user.status === UserStatus.BANNED) return null;
+  if (!user || user.status === UserStatus.BANNED || user.status === UserStatus.DELETED) return null;
   // 管理员/超级管理员默认已认证 (无需走认证流程)
   const autoVerified = user.role === UserRole.ADMIN || user.role === UserRole.SUPER_ADMIN;
   return {

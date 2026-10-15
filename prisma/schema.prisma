@@ -26,6 +26,7 @@ enum UserStatus {
   NORMAL     // 正常访问
   GRADUATED  // 毕业生
   BANNED     // 封禁
+  DELETED    // 已注销
 }
 
 enum AccountProvider {
