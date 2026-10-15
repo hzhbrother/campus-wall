@@ -14,13 +14,14 @@ const CreateSchema = z.object({
   stock: z.number().int().default(-1),
   isActive: z.boolean().default(true),
   // 兑换门槛
-  pointsThreshold: z.number().int().min(0).nullable().optional(),
+  daysThreshold: z.number().int().min(0).nullable().optional(),
   coinThreshold: z.number().int().min(0).nullable().optional(),
-  thresholdMode: z.enum(['NONE', 'POINTS', 'COINS', 'ALL', 'ANY']).default('NONE'),
-  // 兑换人群限制
-  allowedGrades: z.array(z.string()).default([]),
-  allowedClasses: z.array(z.string()).default([]),
-  allowedRoles: z.array(z.string()).default([]),
+  thresholdMode: z.enum(['NONE', 'DAYS', 'COINS', 'ALL', 'ANY']).default('NONE'),
+  // 兑换人群限制 (动态条件列表)
+  accessRules: z.array(z.object({
+    type: z.enum(['GRADE', 'CLASS', 'ROLE', 'VERIFIED']),
+    value: z.string(),
+  })).default([]),
 });
 
 export async function GET(req: NextRequest) {
@@ -43,12 +44,10 @@ export async function POST(req: NextRequest) {
         pointsCost: dto.pointsCost,
         stock: dto.stock,
         isActive: dto.isActive,
-        pointsThreshold: dto.pointsThreshold ?? null,
+        daysThreshold: dto.daysThreshold ?? null,
         coinThreshold: dto.coinThreshold ?? null,
         thresholdMode: dto.thresholdMode,
-        allowedGrades: dto.allowedGrades,
-        allowedClasses: dto.allowedClasses,
-        allowedRoles: dto.allowedRoles,
+        accessRules: dto.accessRules,
       },
     });
     return NextResponse.json({ success: true, item });
