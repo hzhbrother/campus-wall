@@ -4244,13 +4244,19 @@ function ShopManager({ prefill, onPrefillUsed }: { prefill?: ShopPrefill | null;
         pointsCost: 100,
         stock: -1,
         isActive: true,
+        pointsThreshold: null,
+        coinThreshold: null,
+        thresholdMode: 'NONE',
+        allowedGrades: [],
+        allowedClasses: [],
+        allowedRoles: [],
       });
       setShowForm(true);
       onPrefillUsed?.();
     }
   }, [prefill]);
 
-  const openNew = () => { setPendingWishId(null); setEditing({ name: '', description: '', image: '', pointsCost: 100, stock: -1, isActive: true }); setShowForm(true); setErr(''); };
+  const openNew = () => { setPendingWishId(null); setEditing({ name: '', description: '', image: '', pointsCost: 100, stock: -1, isActive: true, pointsThreshold: null, coinThreshold: null, thresholdMode: 'NONE', allowedGrades: [], allowedClasses: [], allowedRoles: [] }); setShowForm(true); setErr(''); };
   const openEdit = (item: any) => { setPendingWishId(null); setEditing({ ...item }); setShowForm(true); setErr(''); };
 
   const save = async () => {
@@ -4310,34 +4316,105 @@ function ShopManager({ prefill, onPrefillUsed }: { prefill?: ShopPrefill | null;
       </div>
 
       {showForm && tab === 'items' && (
-        <div className="rounded-2xl bg-white p-5 shadow-sm space-y-3">
-          <div className="flex gap-4">
-            <div className="space-y-2">
-              <div className="h-24 w-24 rounded-xl bg-gray-100 overflow-hidden flex items-center justify-center">
-                {editing.image ? <img src={editing.image} alt="" className="h-full w-full object-cover" /> : <span className="text-3xl text-gray-300">🎁</span>}
-              </div>
-              <label className="block text-center text-xs text-blue-500 cursor-pointer">
-                上传图片<input type="file" accept="image/*" onChange={handleImage} className="hidden" />
-              </label>
-            </div>
-            <div className="flex-1 space-y-3">
-              <input value={editing.name} onChange={e => setEditing({ ...editing, name: e.target.value })} placeholder="商品名称" className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm" />
-              <textarea value={editing.description || ''} onChange={e => setEditing({ ...editing, description: e.target.value })} placeholder="商品描述" rows={2} className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm" />
-              <div className="flex gap-3">
-                <div className="flex-1">
-                  <label className="text-xs text-gray-500">所需积分</label>
-                  <input type="number" value={editing.pointsCost} onChange={e => setEditing({ ...editing, pointsCost: Number(e.target.value) })} className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm" />
+        <div className="rounded-2xl bg-white p-5 shadow-sm space-y-4">
+          {/* 区块1: 商品基础信息 */}
+          <div>
+            <h3 className="text-sm font-semibold text-gray-700 mb-3">📦 商品信息</h3>
+            <div className="flex gap-4">
+              <div className="space-y-2">
+                <div className="h-24 w-24 rounded-xl bg-gray-100 overflow-hidden flex items-center justify-center">
+                  {editing.image ? <img src={editing.image} alt="" className="h-full w-full object-cover" /> : <span className="text-3xl text-gray-300">🎁</span>}
                 </div>
-                <div className="flex-1">
-                  <label className="text-xs text-gray-500">库存 (-1不限)</label>
-                  <input type="number" value={editing.stock} onChange={e => setEditing({ ...editing, stock: Number(e.target.value) })} className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm" />
-                </div>
-                <label className="flex items-end gap-1 text-sm text-gray-600">
-                  <input type="checkbox" checked={editing.isActive} onChange={e => setEditing({ ...editing, isActive: e.target.checked })} /> 上架
+                <label className="block text-center text-xs text-blue-500 cursor-pointer">
+                  上传图片<input type="file" accept="image/*" onChange={handleImage} className="hidden" />
                 </label>
+              </div>
+              <div className="flex-1 space-y-3">
+                <input value={editing.name} onChange={e => setEditing({ ...editing, name: e.target.value })} placeholder="商品名称" className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm" />
+                <textarea value={editing.description || ''} onChange={e => setEditing({ ...editing, description: e.target.value })} placeholder="商品描述" rows={2} className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm" />
+                <div className="flex gap-3">
+                  <div className="flex-1">
+                    <label className="text-xs text-gray-500">所需积分</label>
+                    <input type="number" value={editing.pointsCost} onChange={e => setEditing({ ...editing, pointsCost: Number(e.target.value) })} className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm" />
+                  </div>
+                  <div className="flex-1">
+                    <label className="text-xs text-gray-500">库存 (-1不限)</label>
+                    <input type="number" value={editing.stock} onChange={e => setEditing({ ...editing, stock: Number(e.target.value) })} className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm" />
+                  </div>
+                  <label className="flex items-end gap-1 text-sm text-gray-600">
+                    <input type="checkbox" checked={editing.isActive} onChange={e => setEditing({ ...editing, isActive: e.target.checked })} /> 上架
+                  </label>
+                </div>
               </div>
             </div>
           </div>
+
+          {/* 区块2: 兑换门槛 */}
+          <div className="border-t border-gray-100 pt-4">
+            <h3 className="text-sm font-semibold text-gray-700 mb-3">🔒 兑换门槛</h3>
+            <div className="space-y-3">
+              <div className="flex gap-3">
+                <div className="flex-1">
+                  <label className="text-xs text-gray-500">点数要求 (累计积分, 留空不限制)</label>
+                  <input type="number" value={editing.pointsThreshold ?? ''} onChange={e => setEditing({ ...editing, pointsThreshold: e.target.value === '' ? null : Number(e.target.value) })} placeholder="不限制" className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm" />
+                </div>
+                <div className="flex-1">
+                  <label className="text-xs text-gray-500">金币要求 (留空不限制)</label>
+                  <input type="number" value={editing.coinThreshold ?? ''} onChange={e => setEditing({ ...editing, coinThreshold: e.target.value === '' ? null : Number(e.target.value) })} placeholder="不限制" className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm" />
+                </div>
+              </div>
+              <div>
+                <label className="text-xs text-gray-500 block mb-1">条件关系</label>
+                <div className="flex gap-2">
+                  {(['NONE', 'ALL', 'ANY'] as const).map(m => (
+                    <label key={m} className={`flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-sm cursor-pointer ${editing.thresholdMode === m ? 'border-amber-500 bg-amber-50 text-amber-700' : 'border-gray-200 text-gray-600'}`}>
+                      <input type="radio" checked={editing.thresholdMode === m} onChange={() => setEditing({ ...editing, thresholdMode: m })} className="hidden" />
+                      {m === 'NONE' ? '无门槛' : m === 'ALL' ? '同时满足' : '满足其一'}
+                    </label>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* 区块3: 兑换人群限制 */}
+          <div className="border-t border-gray-100 pt-4">
+            <h3 className="text-sm font-semibold text-gray-700 mb-3">👥 兑换人群限制 <span className="text-xs font-normal text-gray-400">(不选=全部用户)</span></h3>
+            <div className="space-y-3">
+              <div>
+                <label className="text-xs text-gray-500 block mb-1">指定年级 (逗号分隔, 如: 高一,高二)</label>
+                <input value={(editing.allowedGrades || []).join(',')} onChange={e => setEditing({ ...editing, allowedGrades: e.target.value.split(',').map(s => s.trim()).filter(Boolean) })} placeholder="全部年级" className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm" />
+              </div>
+              <div>
+                <label className="text-xs text-gray-500 block mb-1">指定班级 (逗号分隔, 如: 1班,2班)</label>
+                <input value={(editing.allowedClasses || []).join(',')} onChange={e => setEditing({ ...editing, allowedClasses: e.target.value.split(',').map(s => s.trim()).filter(Boolean) })} placeholder="全部班级" className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm" />
+              </div>
+              <div>
+                <label className="text-xs text-gray-500 block mb-1">身份标签</label>
+                <div className="flex flex-wrap gap-2">
+                  {[
+                    { v: 'ADMIN', l: '管理员' },
+                    { v: 'TEACHER', l: '教师' },
+                    { v: 'VERIFIED', l: '认证用户' },
+                    { v: 'QUALIFIED', l: '资质认证' },
+                    { v: 'STUDENT', l: '学生' },
+                  ].map(opt => {
+                    const checked = (editing.allowedRoles || []).includes(opt.v);
+                    return (
+                      <label key={opt.v} className={`flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-sm cursor-pointer ${checked ? 'border-amber-500 bg-amber-50 text-amber-700' : 'border-gray-200 text-gray-600'}`}>
+                        <input type="checkbox" checked={checked} onChange={e => {
+                          const cur = editing.allowedRoles || [];
+                          setEditing({ ...editing, allowedRoles: e.target.checked ? [...cur, opt.v] : cur.filter(r => r !== opt.v) });
+                        }} className="hidden" />
+                        {opt.l}
+                      </label>
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
+          </div>
+
           <div className="flex gap-2">
             <button onClick={save} className="rounded-lg bg-amber-500 px-4 py-2 text-sm text-white hover:bg-amber-600">保存</button>
             <button onClick={() => setShowForm(false)} className="rounded-lg bg-gray-100 px-4 py-2 text-sm hover:bg-gray-200">取消</button>

@@ -36,6 +36,7 @@ export interface AuthUser {
   createdAt?: string;
   bannedUntil?: string | null;
   points?: number;
+  coins?: number;
   userNumber?: number | null;
   schoolId?: string | null;
   organizationId?: string | null;

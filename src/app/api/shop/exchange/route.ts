@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { requireUser } from '@/lib/server-auth';
 import { errorResponse } from '@/lib/api-response';
+import { checkExchangeEligibility } from '@/lib/shop-eligibility';
 
 export const dynamic = 'force-dynamic';
 
@@ -17,7 +18,12 @@ export async function POST(req: NextRequest) {
 
     const user = await prisma.user.findUnique({ where: { id: me.id } });
     if (!user) throw new Error('用户不存在');
-    if (user.points < item.pointsCost) throw new Error(`积分不足, 需要 ${item.pointsCost} 积分`);
+
+    // 校验兑换门槛和人群限制
+    const eligibility = checkExchangeEligibility(item, user);
+    if (!eligibility.eligible) {
+      throw new Error(eligibility.reasons[0] || '不满足兑换条件');
+    }
 
     const record = await prisma.$transaction(async (tx) => {
       // 扣积分

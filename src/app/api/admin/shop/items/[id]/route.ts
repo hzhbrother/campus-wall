@@ -13,6 +13,14 @@ const UpdateSchema = z.object({
   pointsCost: z.number().int().min(1).optional(),
   stock: z.number().int().optional(),
   isActive: z.boolean().optional(),
+  // 兑换门槛
+  pointsThreshold: z.number().int().min(0).nullable().optional(),
+  coinThreshold: z.number().int().min(0).nullable().optional(),
+  thresholdMode: z.enum(['NONE', 'ALL', 'ANY']).optional(),
+  // 兑换人群限制
+  allowedGrades: z.array(z.string()).optional(),
+  allowedClasses: z.array(z.string()).optional(),
+  allowedRoles: z.array(z.string()).optional(),
 });
 
 export async function PATCH(req: NextRequest, { params }: { params: { id: string } }) {
@@ -22,6 +30,9 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
     const data: any = { ...dto };
     if (dto.description === '') data.description = null;
     if (dto.image === '') data.image = null;
+    // 显式传 null 表示清除门槛
+    if (dto.pointsThreshold === undefined) delete data.pointsThreshold;
+    if (dto.coinThreshold === undefined) delete data.coinThreshold;
     const item = await prisma.shopItem.update({ where: { id: params.id }, data });
     return NextResponse.json({ success: true, item });
   } catch (e) { return errorResponse(e); }
