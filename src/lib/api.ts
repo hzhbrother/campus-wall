@@ -26,14 +26,11 @@ async function request<T>(path: string, opts: RequestInit = {}): Promise<T> {
   const t = token();
   if (t) headers['Authorization'] = `Bearer ${t}`;
 
-  // GET 请求加时间戳参数, 强制绕过浏览器/CDN 缓存
-  let finalPath = path;
-  if (!opts.method || opts.method === 'GET') {
-    const sep = path.includes('?') ? '&' : '?';
-    finalPath = `${path}${sep}_t=${Date.now()}`;
-  }
+  // GET 请求默认不加时间戳, 让浏览器/CDN 缓存生效 (服务端已设置 Cache-Control)
+  // 对需要强制刷新的接口, 在调用处手动传 _t 参数
+  const finalPath = path;
 
-  const res = await fetch(`${BASE}${finalPath}`, { ...opts, headers, cache: 'no-store' });
+  const res = await fetch(`${BASE}${finalPath}`, { ...opts, headers });
   const text = await res.text();
   const data = text ? JSON.parse(text) : null;
 

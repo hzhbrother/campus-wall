@@ -49,7 +49,7 @@ export function PostCard({ post }: { post: PostListItem }) {
               <div className="h-10 w-10 overflow-hidden rounded-full bg-gradient-to-br from-indigo-400 to-purple-500 flex items-center justify-center text-white font-medium">
                 {post.author.avatar ? (
                   // eslint-disable-next-line @next/next/no-img-element
-                  <img src={post.author.avatar} alt="" className="h-full w-full object-cover" />
+                  <img src={post.author.avatar} alt="" loading="lazy" className="h-full w-full object-cover" />
                 ) : (
                   (post.author.nickname || 'U')[0].toUpperCase()
                 )}

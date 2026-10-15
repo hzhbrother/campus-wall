@@ -109,7 +109,7 @@ export default function PostDetailPage({ params }: { params: { id: string } }) {
           <div className="grid grid-cols-3 gap-2 mb-4">
             {post.images.map((url, i) => (
               // eslint-disable-next-line @next/next/no-img-element
-              <img key={i} src={url} alt="" className="w-full aspect-square object-cover rounded-lg" />
+              <img key={i} src={url} alt="" loading="lazy" className="w-full aspect-square object-cover rounded-lg" />
             ))}
           </div>
         )}

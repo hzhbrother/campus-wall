@@ -60,7 +60,10 @@ export async function GET(req: NextRequest) {
       // 管理员/超级管理员默认已认证
       author: { ...p.author, verified: p.author.verified || p.author.role === 'ADMIN' || p.author.role === 'SUPER_ADMIN' },
     }));
-    return NextResponse.json({ items, total, page, pageSize });
+    return NextResponse.json({ items, total, page, pageSize }, {
+      // 公开列表数据缓存 30 秒, SWR 60 秒, 减少数据库查询
+      headers: { 'Cache-Control': 'public, s-maxage=30, stale-while-revalidate=60' },
+    });
   } catch (e) {
     return errorResponse(e);
   }
