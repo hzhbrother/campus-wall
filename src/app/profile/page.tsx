@@ -56,8 +56,9 @@ function AccountBindingsCard({ userId }: { userId: string }) {
   useEffect(() => { load(); }, [load]);
 
   const handleBind = (type: string) => {
-    // 跳转到聚合登录绑定模式
-    window.location.href = `/api/auth/oauth/aggregated/${type}?bind=1`;
+    // 跳转到聚合登录绑定模式, 带上 token (浏览器跳转不携带 Authorization header)
+    const token = localStorage.getItem('cw_token') || '';
+    window.location.href = `/api/auth/oauth/aggregated/${type}?bind=1&token=${encodeURIComponent(token)}`;
   };
 
   const handleUnbind = async (provider: string) => {

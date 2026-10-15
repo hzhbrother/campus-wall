@@ -52,20 +52,17 @@ export async function GET(req: NextRequest, { params }: { params: { provider: st
       }
     }
     if (!user) {
-      const baseName = (profile.nickname || profile.providerUid).slice(0, 24);
-      let nickname = baseName;
-      let i = 0;
-      while (await prisma.user.findFirst({ where: { nickname } })) {
-        i += 1;
-        nickname = `${baseName.slice(0, 20)}_${i}`;
-      }
-      const userNumber = await generateUserNumber();
-      user = await prisma.user.create({
-        data: { email: profile.email || null, nickname, avatar: profile.avatar, userNumber },
-      });
-      await prisma.account.create({
-        data: { userId: user.id, provider, providerUid: profile.providerUid, rawProfile: profile.raw as any },
-      });
+      // 不自动注册, 跳转到账号绑定页面
+      const bindToken = signToken({
+        sub: 'bind',
+        provider,
+        social_uid: profile.providerUid,
+        nickname: profile.nickname,
+        avatar: profile.avatar,
+      } as any);
+      const res = NextResponse.redirect(`${origin}/oauth/bind?bind_token=${encodeURIComponent(bindToken)}`);
+      res.cookies.delete('oauth_state');
+      return res;
     }
 
     const token = signToken({ sub: user.id, email: user.email, role: user.role });

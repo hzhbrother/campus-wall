@@ -2,7 +2,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { UserStatus } from '@prisma/client';
 import { prisma } from '@/lib/prisma';
-import { signToken } from '@/lib/server-auth';
+import { signToken, verifyToken } from '@/lib/server-auth';
 import { getAggregatedUserInfo, getJuheTypeMeta } from '@/lib/aggregated-login';
 import { requestOrigin } from '@/lib/api-response';
 import { generateUserNumber } from '@/lib/user-number';
@@ -68,25 +68,20 @@ export async function GET(req: NextRequest) {
     }
 
     if (!user) {
-      const baseName = (info.nickname || info.social_uid).slice(0, 24);
-      let nickname = baseName;
-      let i = 0;
-      while (await prisma.user.findFirst({ where: { nickname } })) {
-        i += 1;
-        nickname = `${baseName.slice(0, 20)}_${i}`;
-      }
-      const userNumber = await generateUserNumber();
-      user = await prisma.user.create({
-        data: { nickname, avatar: info.faceimg || null, userNumber },
-      });
-      await prisma.account.create({
-        data: {
-          userId: user.id,
-          provider: meta.provider,
-          providerUid: info.social_uid,
-          rawProfile: { type, ...info } as any,
-        },
-      });
+      // 不自动注册, 跳转到账号绑定页面, 让用户选择绑定已有账号或注册新账号
+      const bindToken = signToken({
+        sub: 'bind',
+        provider: meta.provider,
+        social_uid: info.social_uid,
+        nickname: info.nickname,
+        avatar: info.faceimg,
+        type,
+      } as any);
+      const res = NextResponse.redirect(`${origin}/oauth/bind?bind_token=${encodeURIComponent(bindToken)}`);
+      res.cookies.delete('oauth_state');
+      res.cookies.delete('juhe_type');
+      res.cookies.delete('oauth_bind_uid');
+      return res;
     }
 
     const token = signToken({ sub: user.id, email: user.email, role: user.role });
