@@ -16,7 +16,7 @@ const CreateSchema = z.object({
   // 兑换门槛
   pointsThreshold: z.number().int().min(0).nullable().optional(),
   coinThreshold: z.number().int().min(0).nullable().optional(),
-  thresholdMode: z.enum(['NONE', 'ALL', 'ANY']).default('NONE'),
+  thresholdMode: z.enum(['NONE', 'POINTS', 'COINS', 'ALL', 'ANY']).default('NONE'),
   // 兑换人群限制
   allowedGrades: z.array(z.string()).default([]),
   allowedClasses: z.array(z.string()).default([]),

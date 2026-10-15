@@ -4316,10 +4316,10 @@ function ShopManager({ prefill, onPrefillUsed }: { prefill?: ShopPrefill | null;
       </div>
 
       {showForm && tab === 'items' && (
-        <div className="rounded-2xl bg-white p-5 shadow-sm space-y-4">
+        <div className="rounded-2xl bg-white p-5 shadow-sm space-y-5">
           {/* 区块1: 商品基础信息 */}
           <div>
-            <h3 className="text-sm font-semibold text-gray-700 mb-3">📦 商品信息</h3>
+            <h3 className="text-sm font-semibold text-gray-800 mb-3 flex items-center gap-1.5">📦 商品信息</h3>
             <div className="flex gap-4">
               <div className="space-y-2">
                 <div className="h-24 w-24 rounded-xl bg-gray-100 overflow-hidden flex items-center justify-center">
@@ -4334,15 +4334,15 @@ function ShopManager({ prefill, onPrefillUsed }: { prefill?: ShopPrefill | null;
                 <textarea value={editing.description || ''} onChange={e => setEditing({ ...editing, description: e.target.value })} placeholder="商品描述" rows={2} className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm" />
                 <div className="flex gap-3">
                   <div className="flex-1">
-                    <label className="text-xs text-gray-500">所需积分</label>
-                    <input type="number" value={editing.pointsCost} onChange={e => setEditing({ ...editing, pointsCost: Number(e.target.value) })} className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm" />
+                    <label className="text-xs text-gray-500">所需积分 <span className="text-gray-300">(兑换时扣除)</span></label>
+                    <input type="number" min={0} value={editing.pointsCost} onChange={e => setEditing({ ...editing, pointsCost: Number(e.target.value) })} className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm" />
                   </div>
                   <div className="flex-1">
-                    <label className="text-xs text-gray-500">库存 (-1不限)</label>
+                    <label className="text-xs text-gray-500">库存 <span className="text-gray-300">(-1不限)</span></label>
                     <input type="number" value={editing.stock} onChange={e => setEditing({ ...editing, stock: Number(e.target.value) })} className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm" />
                   </div>
-                  <label className="flex items-end gap-1 text-sm text-gray-600">
-                    <input type="checkbox" checked={editing.isActive} onChange={e => setEditing({ ...editing, isActive: e.target.checked })} /> 上架
+                  <label className="flex items-end gap-1.5 text-sm text-gray-600 pb-2">
+                    <input type="checkbox" checked={editing.isActive} onChange={e => setEditing({ ...editing, isActive: e.target.checked })} className="rounded" /> 上架
                   </label>
                 </div>
               </div>
@@ -4351,73 +4351,143 @@ function ShopManager({ prefill, onPrefillUsed }: { prefill?: ShopPrefill | null;
 
           {/* 区块2: 兑换门槛 */}
           <div className="border-t border-gray-100 pt-4">
-            <h3 className="text-sm font-semibold text-gray-700 mb-3">🔒 兑换门槛</h3>
-            <div className="space-y-3">
-              <div className="flex gap-3">
-                <div className="flex-1">
-                  <label className="text-xs text-gray-500">点数要求 (累计积分, 留空不限制)</label>
-                  <input type="number" value={editing.pointsThreshold ?? ''} onChange={e => setEditing({ ...editing, pointsThreshold: e.target.value === '' ? null : Number(e.target.value) })} placeholder="不限制" className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm" />
-                </div>
-                <div className="flex-1">
-                  <label className="text-xs text-gray-500">金币要求 (留空不限制)</label>
-                  <input type="number" value={editing.coinThreshold ?? ''} onChange={e => setEditing({ ...editing, coinThreshold: e.target.value === '' ? null : Number(e.target.value) })} placeholder="不限制" className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm" />
-                </div>
-              </div>
-              <div>
-                <label className="text-xs text-gray-500 block mb-1">条件关系</label>
-                <div className="flex gap-2">
-                  {(['NONE', 'ALL', 'ANY'] as const).map(m => (
-                    <label key={m} className={`flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-sm cursor-pointer ${editing.thresholdMode === m ? 'border-amber-500 bg-amber-50 text-amber-700' : 'border-gray-200 text-gray-600'}`}>
-                      <input type="radio" checked={editing.thresholdMode === m} onChange={() => setEditing({ ...editing, thresholdMode: m })} className="hidden" />
-                      {m === 'NONE' ? '无门槛' : m === 'ALL' ? '同时满足' : '满足其一'}
-                    </label>
-                  ))}
-                </div>
-              </div>
+            <h3 className="text-sm font-semibold text-gray-800 mb-1 flex items-center gap-1.5">🔒 兑换门槛</h3>
+            <p className="text-xs text-gray-400 mb-3">除所需积分外的额外条件，留空则不限制</p>
+            {/* 条件关系选择 */}
+            <div className="grid grid-cols-5 gap-2 mb-3">
+              {[
+                { v: 'NONE', l: '无门槛', desc: '所有人可兑' },
+                { v: 'POINTS', l: '仅积分', desc: '积分达标' },
+                { v: 'COINS', l: '仅金币', desc: '金币达标' },
+                { v: 'ALL', l: '积分+金币', desc: '同时满足' },
+                { v: 'ANY', l: '积分或金币', desc: '满足其一' },
+              ].map(m => (
+                <button
+                  key={m.v}
+                  type="button"
+                  onClick={() => setEditing({ ...editing, thresholdMode: m.v })}
+                  className={`rounded-lg border px-2 py-2 text-center transition ${editing.thresholdMode === m.v ? 'border-amber-500 bg-amber-50' : 'border-gray-200 hover:border-gray-300'}`}
+                >
+                  <div className={`text-sm font-medium ${editing.thresholdMode === m.v ? 'text-amber-700' : 'text-gray-700'}`}>{m.l}</div>
+                  <div className="text-[10px] text-gray-400 mt-0.5">{m.desc}</div>
+                </button>
+              ))}
             </div>
+            {/* 根据选择动态显示输入框 */}
+            {(editing.thresholdMode === 'POINTS' || editing.thresholdMode === 'ALL' || editing.thresholdMode === 'ANY') && (
+              <div className="mb-2">
+                <label className="text-xs text-gray-500">积分要求 <span className="text-gray-300">(用户累计积分需达到)</span></label>
+                <input
+                  type="number" min={0}
+                  value={editing.pointsThreshold ?? ''}
+                  onChange={e => setEditing({ ...editing, pointsThreshold: e.target.value === '' ? null : Number(e.target.value) })}
+                  placeholder="请输入积分数值"
+                  className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
+                />
+              </div>
+            )}
+            {(editing.thresholdMode === 'COINS' || editing.thresholdMode === 'ALL' || editing.thresholdMode === 'ANY') && (
+              <div>
+                <label className="text-xs text-gray-500">金币要求 <span className="text-gray-300">(用户持有金币需达到)</span></label>
+                <input
+                  type="number" min={0}
+                  value={editing.coinThreshold ?? ''}
+                  onChange={e => setEditing({ ...editing, coinThreshold: e.target.value === '' ? null : Number(e.target.value) })}
+                  placeholder="请输入金币数值"
+                  className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
+                />
+              </div>
+            )}
+            {editing.thresholdMode === 'NONE' && (
+              <p className="text-xs text-gray-400 bg-gray-50 rounded-lg px-3 py-2">无额外门槛，所有用户均可兑换</p>
+            )}
           </div>
 
           {/* 区块3: 兑换人群限制 */}
           <div className="border-t border-gray-100 pt-4">
-            <h3 className="text-sm font-semibold text-gray-700 mb-3">👥 兑换人群限制 <span className="text-xs font-normal text-gray-400">(不选=全部用户)</span></h3>
+            <h3 className="text-sm font-semibold text-gray-800 mb-1 flex items-center gap-1.5">👥 兑换人群限制</h3>
+            <p className="text-xs text-gray-400 mb-3">不设置则全部用户可见可兑换，可多选组合</p>
             <div className="space-y-3">
-              <div>
-                <label className="text-xs text-gray-500 block mb-1">指定年级 (逗号分隔, 如: 高一,高二)</label>
-                <input value={(editing.allowedGrades || []).join(',')} onChange={e => setEditing({ ...editing, allowedGrades: e.target.value.split(',').map(s => s.trim()).filter(Boolean) })} placeholder="全部年级" className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm" />
+              {/* 年级 */}
+              <div className="flex items-start gap-3">
+                <label className="flex items-center gap-2 pt-2 cursor-pointer shrink-0">
+                  <input
+                    type="checkbox"
+                    checked={(editing.allowedGrades || []).length > 0}
+                    onChange={e => setEditing({ ...editing, allowedGrades: e.target.checked ? (editing.allowedGrades?.length ? editing.allowedGrades : ['']) : [] })}
+                    className="rounded"
+                  />
+                  <span className="text-sm text-gray-700">按年级</span>
+                </label>
+                {(editing.allowedGrades || []).length > 0 && (
+                  <input
+                    value={editing.allowedGrades.join(',')}
+                    onChange={e => setEditing({ ...editing, allowedGrades: e.target.value.split(',').map(s => s.trim()).filter(Boolean) })}
+                    placeholder="如: 高一,高二,高三"
+                    className="flex-1 rounded-lg border border-gray-300 px-3 py-2 text-sm"
+                  />
+                )}
               </div>
-              <div>
-                <label className="text-xs text-gray-500 block mb-1">指定班级 (逗号分隔, 如: 1班,2班)</label>
-                <input value={(editing.allowedClasses || []).join(',')} onChange={e => setEditing({ ...editing, allowedClasses: e.target.value.split(',').map(s => s.trim()).filter(Boolean) })} placeholder="全部班级" className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm" />
+              {/* 班级 */}
+              <div className="flex items-start gap-3">
+                <label className="flex items-center gap-2 pt-2 cursor-pointer shrink-0">
+                  <input
+                    type="checkbox"
+                    checked={(editing.allowedClasses || []).length > 0}
+                    onChange={e => setEditing({ ...editing, allowedClasses: e.target.checked ? (editing.allowedClasses?.length ? editing.allowedClasses : ['']) : [] })}
+                    className="rounded"
+                  />
+                  <span className="text-sm text-gray-700">按班级</span>
+                </label>
+                {(editing.allowedClasses || []).length > 0 && (
+                  <input
+                    value={editing.allowedClasses.join(',')}
+                    onChange={e => setEditing({ ...editing, allowedClasses: e.target.value.split(',').map(s => s.trim()).filter(Boolean) })}
+                    placeholder="如: 1班,2班"
+                    className="flex-1 rounded-lg border border-gray-300 px-3 py-2 text-sm"
+                  />
+                )}
               </div>
-              <div>
-                <label className="text-xs text-gray-500 block mb-1">身份标签</label>
-                <div className="flex flex-wrap gap-2">
-                  {[
-                    { v: 'ADMIN', l: '管理员' },
-                    { v: 'TEACHER', l: '教师' },
-                    { v: 'VERIFIED', l: '认证用户' },
-                    { v: 'QUALIFIED', l: '资质认证' },
-                    { v: 'STUDENT', l: '学生' },
-                  ].map(opt => {
-                    const checked = (editing.allowedRoles || []).includes(opt.v);
-                    return (
-                      <label key={opt.v} className={`flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-sm cursor-pointer ${checked ? 'border-amber-500 bg-amber-50 text-amber-700' : 'border-gray-200 text-gray-600'}`}>
-                        <input type="checkbox" checked={checked} onChange={e => {
-                          const cur = editing.allowedRoles || [];
-                          setEditing({ ...editing, allowedRoles: e.target.checked ? [...cur, opt.v] : cur.filter(r => r !== opt.v) });
-                        }} className="hidden" />
-                        {opt.l}
-                      </label>
-                    );
-                  })}
-                </div>
+              {/* 身份标签 */}
+              <div className="flex items-start gap-3">
+                <label className="flex items-center gap-2 pt-2 cursor-pointer shrink-0">
+                  <input
+                    type="checkbox"
+                    checked={(editing.allowedRoles || []).length > 0}
+                    onChange={e => setEditing({ ...editing, allowedRoles: e.target.checked ? (editing.allowedRoles?.length ? editing.allowedRoles : []) : [] })}
+                    className="rounded"
+                  />
+                  <span className="text-sm text-gray-700">按身份</span>
+                </label>
+                {(editing.allowedRoles || []).length >= 0 && (
+                  <div className="flex-1 flex flex-wrap gap-2">
+                    {[
+                      { v: 'ADMIN', l: '管理员' },
+                      { v: 'TEACHER', l: '教师' },
+                      { v: 'VERIFIED', l: '认证用户' },
+                      { v: 'QUALIFIED', l: '资质认证' },
+                      { v: 'STUDENT', l: '学生' },
+                    ].map(opt => {
+                      const checked = (editing.allowedRoles || []).includes(opt.v);
+                      return (
+                        <label key={opt.v} className={`flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-sm cursor-pointer transition ${checked ? 'border-amber-500 bg-amber-50 text-amber-700' : 'border-gray-200 text-gray-600 hover:border-gray-300'}`}>
+                          <input type="checkbox" checked={checked} onChange={e => {
+                            const cur = editing.allowedRoles || [];
+                            setEditing({ ...editing, allowedRoles: e.target.checked ? [...cur, opt.v] : cur.filter(r => r !== opt.v) });
+                          }} className="hidden" />
+                          {opt.l}
+                        </label>
+                      );
+                    })}
+                  </div>
+                )}
               </div>
             </div>
           </div>
 
-          <div className="flex gap-2">
-            <button onClick={save} className="rounded-lg bg-amber-500 px-4 py-2 text-sm text-white hover:bg-amber-600">保存</button>
-            <button onClick={() => setShowForm(false)} className="rounded-lg bg-gray-100 px-4 py-2 text-sm hover:bg-gray-200">取消</button>
+          <div className="flex gap-2 pt-2">
+            <button onClick={save} className="rounded-lg bg-amber-500 px-5 py-2 text-sm text-white hover:bg-amber-600 transition">保存</button>
+            <button onClick={() => setShowForm(false)} className="rounded-lg bg-gray-100 px-5 py-2 text-sm text-gray-600 hover:bg-gray-200 transition">取消</button>
           </div>
         </div>
       )}
