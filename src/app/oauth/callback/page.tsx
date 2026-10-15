@@ -7,7 +7,7 @@ import { useAuth } from '@/lib/auth-context';
 function CallbackInner() {
   const params = useSearchParams();
   const router = useRouter();
-  const { applyToken } = useAuth();
+  const { applyToken, user } = useAuth();
   const [error, setError] = useState('');
 
   useEffect(() => {
@@ -25,8 +25,13 @@ function CallbackInner() {
     <div className="text-center py-16">
       {error ? (
         <div className="space-y-4">
-          <p className="text-red-500">登录失败: {decodeURIComponent(error)}</p>
-          <a href="/login" className="btn-primary no-underline">返回登录</a>
+          <p className="text-red-500">操作失败: {decodeURIComponent(error)}</p>
+          {/* 已登录说明是绑定场景, 返回上一页; 否则是登录场景, 返回登录页 */}
+          {user ? (
+            <button onClick={() => router.back()} className="btn-primary">返回上一页</button>
+          ) : (
+            <a href="/login" className="btn-primary no-underline">返回登录</a>
+          )}
         </div>
       ) : (
         <p className="text-slate-500">登录中, 请稍候…</p>
