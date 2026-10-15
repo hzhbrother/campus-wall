@@ -39,6 +39,7 @@ export default function HomeClient({ initial }: Props) {
   }, [category, q]);
 
   // 全量刷新: 帖子 + 热榜 + 分类 + 公告
+  // 注意: 不依赖 categories state, 避免 setCategories 触发 refreshAll 重建导致无限循环
   const refreshAll = useCallback(() => {
     load();
     api.get<{ items: PostListItem[] }>('/api/posts?sort=hot&pageSize=5')
@@ -46,12 +47,12 @@ export default function HomeClient({ initial }: Props) {
       .catch(() => {});
     api.get<{ categories: string[]; reviewCategories: string[]; announcement: string }>('/api/posts/meta')
       .then(d => {
-        setCategories(d.categories.length ? d.categories : categories);
+        setCategories(prev => d.categories.length ? d.categories : prev);
         setReviewCategories(d.reviewCategories || []);
         if (d.announcement) setAnnouncement(d.announcement);
       })
       .catch(() => {});
-  }, [load, categories]);
+  }, [load]);
 
   // 标签页激活时刷新 (skipInitial=true, 因为首屏已有 SSR 数据)
   usePageRefresh(refreshAll, [refreshAll], true);
