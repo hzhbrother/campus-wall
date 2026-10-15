@@ -677,13 +677,11 @@ model ShopItem {
   pointsCost  Int                              // 兑换所需积分
   stock       Int      @default(-1)            // 库存 (-1 = 不限)
   isActive    Boolean  @default(true)          // 是否上架
-  // ---- 兑换门槛 ----
-  daysThreshold  Int?                          // 墙龄门槛 (注册天数需达到, null=不限制)
-  coinThreshold  Int?                          // 金币门槛 (持有金币需达到, null=不限制)
-  thresholdMode  String   @default("NONE")    // NONE(无门槛) | DAYS(仅墙龄) | COINS(仅金币) | ALL(同时满足) | ANY(满足其一)
-  // ---- 兑换人群限制 (动态条件列表, JSON 数组) ----
-  // 每条: { type: 'GRADE'|'CLASS'|'ROLE'|'VERIFIED', value: string }
-  accessRules  Json     @default("[]")
+  // ---- 兑换条件 (统一为动态条件列表, 管理员一条条新增) ----
+  // 每条: { type: 'DAYS'|'COINS'|'GRADE'|'CLASS'|'ROLE'|'VERIFIED', value: string|number }
+  // conditionMode: ALL(全部满足) | ANY(满足任一)
+  conditions    Json     @default("[]")
+  conditionMode String   @default("ALL")
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 

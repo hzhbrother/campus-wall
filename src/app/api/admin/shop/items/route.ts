@@ -6,6 +6,11 @@ import { requirePermission } from '@/lib/server-auth';
 import { prisma } from '@/lib/prisma';
 import { errorResponse } from '@/lib/api-response';
 
+const ConditionSchema = z.object({
+  type: z.enum(['DAYS', 'COINS', 'GRADE', 'CLASS', 'ROLE', 'VERIFIED']),
+  value: z.union([z.string(), z.number()]),
+});
+
 const CreateSchema = z.object({
   name: z.string().min(1).max(50),
   description: z.string().max(500).optional().or(z.literal('')),
@@ -13,15 +18,9 @@ const CreateSchema = z.object({
   pointsCost: z.number().int().min(1),
   stock: z.number().int().default(-1),
   isActive: z.boolean().default(true),
-  // 兑换门槛
-  daysThreshold: z.number().int().min(0).nullable().optional(),
-  coinThreshold: z.number().int().min(0).nullable().optional(),
-  thresholdMode: z.enum(['NONE', 'DAYS', 'COINS', 'ALL', 'ANY']).default('NONE'),
-  // 兑换人群限制 (动态条件列表)
-  accessRules: z.array(z.object({
-    type: z.enum(['GRADE', 'CLASS', 'ROLE', 'VERIFIED']),
-    value: z.string(),
-  })).default([]),
+  // 兑换条件 (动态列表)
+  conditions: z.array(ConditionSchema).default([]),
+  conditionMode: z.enum(['ALL', 'ANY']).default('ALL'),
 });
 
 export async function GET(req: NextRequest) {
@@ -44,10 +43,8 @@ export async function POST(req: NextRequest) {
         pointsCost: dto.pointsCost,
         stock: dto.stock,
         isActive: dto.isActive,
-        daysThreshold: dto.daysThreshold ?? null,
-        coinThreshold: dto.coinThreshold ?? null,
-        thresholdMode: dto.thresholdMode,
-        accessRules: dto.accessRules,
+        conditions: dto.conditions,
+        conditionMode: dto.conditionMode,
       },
     });
     return NextResponse.json({ success: true, item });

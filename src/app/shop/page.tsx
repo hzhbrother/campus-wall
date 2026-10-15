@@ -5,6 +5,11 @@ import { api } from '@/lib/api';
 import { useAuth } from '@/lib/auth-context';
 import { WishFormModal } from '@/components/WishFormModal';
 
+interface ShopCondition {
+  type: 'DAYS' | 'COINS' | 'GRADE' | 'CLASS' | 'ROLE' | 'VERIFIED';
+  value: string | number;
+}
+
 interface ShopItem {
   id: string;
   name: string;
@@ -12,75 +17,83 @@ interface ShopItem {
   image: string | null;
   pointsCost: number;
   stock: number;
-  // 兑换门槛
-  pointsThreshold: number | null;
-  coinThreshold: number | null;
-  thresholdMode: string;  // NONE | ALL | ANY
-  // 人群限制
-  allowedGrades: string[];
-  allowedClasses: string[];
-  allowedRoles: string[];
+  conditions: ShopCondition[];
+  conditionMode: string;  // ALL | ANY
 }
 
-// 前端检查用户是否满足兑换条件, 返回未满足的原因列表
+const ROLE_LABELS: Record<string, string> = {
+  ADMIN: '管理员', TEACHER: '教师', SUPER_ADMIN: '超级管理员', STUDENT: '学生',
+};
+
+// 前端检查用户是否满足兑换条件
 function checkEligibility(item: ShopItem, user: any): string[] {
   const reasons: string[] = [];
   if (!user) return ['请先登录'];
-
-  const mode = item.thresholdMode || 'NONE';
-  const hasPoints = item.pointsThreshold != null;
-  const hasCoins = item.coinThreshold != null;
-
-  if (mode !== 'NONE' && (hasPoints || hasCoins)) {
-    const pointsOk = !hasPoints || (user.points || 0) >= item.pointsThreshold!;
-    const coinsOk = !hasCoins || (user.coins || 0) >= item.coinThreshold!;
-    if (mode === 'ALL') {
-      if (!pointsOk) reasons.push(`需要点数 ≥ ${item.pointsThreshold}`);
-      if (!coinsOk) reasons.push(`需要金币 ≥ ${item.coinThreshold}`);
-    } else if (mode === 'ANY') {
-      if (!pointsOk && !coinsOk) reasons.push(`需要点数 ≥ ${item.pointsThreshold} 或金币 ≥ ${item.coinThreshold}`);
-    }
-  }
-
-  // 人群限制
-  if (item.allowedGrades.length > 0) {
-    if (!user.grade || !item.allowedGrades.includes(user.grade)) {
-      reasons.push(`仅限 ${item.allowedGrades.join('/')} 兑换`);
-    }
-  }
-  if (item.allowedClasses.length > 0) {
-    if (!user.className || !item.allowedClasses.includes(user.className)) {
-      reasons.push(`仅限 ${item.allowedClasses.join('/')} 班级兑换`);
-    }
-  }
-  if (item.allowedRoles.length > 0) {
-    const tags = [user.role];
-    if (user.verified) tags.push('VERIFIED');
-    if (user.qualificationVerified) tags.push('QUALIFIED');
-    if (!item.allowedRoles.some(r => tags.includes(r))) {
-      const labels: Record<string, string> = { ADMIN: '管理员', TEACHER: '教师', VERIFIED: '认证用户', QUALIFIED: '资质认证', STUDENT: '学生' };
-      reasons.push(`仅限 ${item.allowedRoles.map(r => labels[r] || r).join('/')} 兑换`);
-    }
-  }
 
   // 积分是否足够
   if ((user.points || 0) < item.pointsCost) {
     reasons.push(`积分不足, 需 ${item.pointsCost} 积分`);
   }
 
+  const conditions = item.conditions || [];
+  if (conditions.length === 0) return reasons;
+
+  const mode = item.conditionMode || 'ALL';
+  const results: { ok: boolean; reason: string }[] = conditions.map(c => {
+    switch (c.type) {
+      case 'DAYS': {
+        const daysRegistered = user.createdAt
+          ? Math.floor((Date.now() - new Date(user.createdAt).getTime()) / (24 * 60 * 60 * 1000))
+          : 0;
+        const need = Number(c.value);
+        return { ok: daysRegistered >= need, reason: `墙龄≥${need}天` };
+      }
+      case 'COINS': {
+        const need = Number(c.value);
+        return { ok: (user.coins || 0) >= need, reason: `金币≥${need}` };
+      }
+      case 'GRADE':
+        return { ok: user.grade === String(c.value), reason: `仅限「${c.value}」` };
+      case 'CLASS':
+        return { ok: user.className === String(c.value), reason: `仅限「${c.value}」班` };
+      case 'ROLE':
+        return { ok: user.role === String(c.value), reason: `仅限${ROLE_LABELS[String(c.value)] || c.value}` };
+      case 'VERIFIED':
+        return { ok: !!user.verified, reason: '仅限认证用户' };
+      default:
+        return { ok: true, reason: '' };
+    }
+  });
+
+  if (mode === 'ALL') {
+    results.forEach(r => { if (!r.ok) reasons.push(r.reason); });
+  } else {
+    if (results.every(r => !r.ok)) {
+      reasons.push(`需满足: ${results.map(r => r.reason).join(' 或 ')}`);
+    }
+  }
+
   return reasons;
 }
 
-// 生成门槛提示文字 (用于商品卡片上展示)
+// 生成条件提示文字 (商品卡片展示)
 function thresholdLabel(item: ShopItem): string | null {
-  const parts: string[] = [];
-  if (item.pointsThreshold != null) parts.push(`点数≥${item.pointsThreshold}`);
-  if (item.coinThreshold != null) parts.push(`金币≥${item.coinThreshold}`);
-  if (parts.length === 0) return null;
-  const mode = item.thresholdMode || 'NONE';
-  if (mode === 'ALL') return parts.join(' 且 ');
-  if (mode === 'ANY') return parts.join(' 或 ');
-  return null;
+  const conditions = item.conditions || [];
+  if (conditions.length === 0) return null;
+  const labels = conditions.map(c => {
+    switch (c.type) {
+      case 'DAYS': return `墙龄≥${c.value}天`;
+      case 'COINS': return `金币≥${c.value}`;
+      case 'GRADE': return `${c.value}`;
+      case 'CLASS': return `${c.value}班`;
+      case 'ROLE': return ROLE_LABELS[String(c.value)] || c.value;
+      case 'VERIFIED': return '已认证';
+      default: return '';
+    }
+  }).filter(Boolean);
+  if (labels.length === 0) return null;
+  const sep = item.conditionMode === 'ANY' ? ' 或 ' : ' 且 ';
+  return labels.join(sep);
 }
 
 export default function ShopPage() {

@@ -4244,19 +4244,15 @@ function ShopManager({ prefill, onPrefillUsed }: { prefill?: ShopPrefill | null;
         pointsCost: 100,
         stock: -1,
         isActive: true,
-        pointsThreshold: null,
-        coinThreshold: null,
-        thresholdMode: 'NONE',
-        allowedGrades: [],
-        allowedClasses: [],
-        allowedRoles: [],
+        conditions: [],
+        conditionMode: 'ALL',
       });
       setShowForm(true);
       onPrefillUsed?.();
     }
   }, [prefill]);
 
-  const openNew = () => { setPendingWishId(null); setEditing({ name: '', description: '', image: '', pointsCost: 100, stock: -1, isActive: true, pointsThreshold: null, coinThreshold: null, thresholdMode: 'NONE', allowedGrades: [], allowedClasses: [], allowedRoles: [] }); setShowForm(true); setErr(''); };
+  const openNew = () => { setPendingWishId(null); setEditing({ name: '', description: '', image: '', pointsCost: 100, stock: -1, isActive: true, conditions: [], conditionMode: 'ALL' }); setShowForm(true); setErr(''); };
   const openEdit = (item: any) => { setPendingWishId(null); setEditing({ ...item }); setShowForm(true); setErr(''); };
 
   const save = async () => {
@@ -4349,139 +4345,141 @@ function ShopManager({ prefill, onPrefillUsed }: { prefill?: ShopPrefill | null;
             </div>
           </div>
 
-          {/* 区块2: 兑换门槛 */}
+          {/* 区块2: 兑换条件 (动态列表) */}
           <div className="border-t border-gray-100 pt-4">
-            <h3 className="text-sm font-semibold text-gray-800 mb-1 flex items-center gap-1.5">🔒 兑换门槛</h3>
-            <p className="text-xs text-gray-400 mb-3">除所需积分外的额外条件，留空则不限制</p>
-            {/* 条件关系选择 */}
-            <div className="grid grid-cols-5 gap-2 mb-3">
-              {[
-                { v: 'NONE', l: '无门槛', desc: '所有人可兑' },
-                { v: 'POINTS', l: '仅积分', desc: '积分达标' },
-                { v: 'COINS', l: '仅金币', desc: '金币达标' },
-                { v: 'ALL', l: '积分+金币', desc: '同时满足' },
-                { v: 'ANY', l: '积分或金币', desc: '满足其一' },
-              ].map(m => (
-                <button
-                  key={m.v}
-                  type="button"
-                  onClick={() => setEditing({ ...editing, thresholdMode: m.v })}
-                  className={`rounded-lg border px-2 py-2 text-center transition ${editing.thresholdMode === m.v ? 'border-amber-500 bg-amber-50' : 'border-gray-200 hover:border-gray-300'}`}
-                >
-                  <div className={`text-sm font-medium ${editing.thresholdMode === m.v ? 'text-amber-700' : 'text-gray-700'}`}>{m.l}</div>
-                  <div className="text-[10px] text-gray-400 mt-0.5">{m.desc}</div>
-                </button>
-              ))}
+            <div className="flex items-center justify-between mb-1">
+              <h3 className="text-sm font-semibold text-gray-800 flex items-center gap-1.5">🔒 兑换条件</h3>
+              <button
+                type="button"
+                onClick={() => setEditing({ ...editing, conditions: [...(editing.conditions || []), { type: 'DAYS', value: 30 }] })}
+                className="rounded-lg bg-amber-50 px-3 py-1.5 text-xs font-medium text-amber-600 hover:bg-amber-100 transition"
+              >
+                + 添加条件
+              </button>
             </div>
-            {/* 根据选择动态显示输入框 */}
-            {(editing.thresholdMode === 'POINTS' || editing.thresholdMode === 'ALL' || editing.thresholdMode === 'ANY') && (
-              <div className="mb-2">
-                <label className="text-xs text-gray-500">积分要求 <span className="text-gray-300">(用户累计积分需达到)</span></label>
-                <input
-                  type="number" min={0}
-                  value={editing.pointsThreshold ?? ''}
-                  onChange={e => setEditing({ ...editing, pointsThreshold: e.target.value === '' ? null : Number(e.target.value) })}
-                  placeholder="请输入积分数值"
-                  className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
-                />
-              </div>
-            )}
-            {(editing.thresholdMode === 'COINS' || editing.thresholdMode === 'ALL' || editing.thresholdMode === 'ANY') && (
-              <div>
-                <label className="text-xs text-gray-500">金币要求 <span className="text-gray-300">(用户持有金币需达到)</span></label>
-                <input
-                  type="number" min={0}
-                  value={editing.coinThreshold ?? ''}
-                  onChange={e => setEditing({ ...editing, coinThreshold: e.target.value === '' ? null : Number(e.target.value) })}
-                  placeholder="请输入金币数值"
-                  className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
-                />
-              </div>
-            )}
-            {editing.thresholdMode === 'NONE' && (
-              <p className="text-xs text-gray-400 bg-gray-50 rounded-lg px-3 py-2">无额外门槛，所有用户均可兑换</p>
-            )}
-          </div>
+            <p className="text-xs text-gray-400 mb-3">不添加条件则所有用户均可兑换；可添加多条，设置条件间关系</p>
 
-          {/* 区块3: 兑换人群限制 */}
-          <div className="border-t border-gray-100 pt-4">
-            <h3 className="text-sm font-semibold text-gray-800 mb-1 flex items-center gap-1.5">👥 兑换人群限制</h3>
-            <p className="text-xs text-gray-400 mb-3">不设置则全部用户可见可兑换，可多选组合</p>
-            <div className="space-y-3">
-              {/* 年级 */}
-              <div className="flex items-start gap-3">
-                <label className="flex items-center gap-2 pt-2 cursor-pointer shrink-0">
-                  <input
-                    type="checkbox"
-                    checked={(editing.allowedGrades || []).length > 0}
-                    onChange={e => setEditing({ ...editing, allowedGrades: e.target.checked ? (editing.allowedGrades?.length ? editing.allowedGrades : ['']) : [] })}
-                    className="rounded"
-                  />
-                  <span className="text-sm text-gray-700">按年级</span>
-                </label>
-                {(editing.allowedGrades || []).length > 0 && (
-                  <input
-                    value={editing.allowedGrades.join(',')}
-                    onChange={e => setEditing({ ...editing, allowedGrades: e.target.value.split(',').map(s => s.trim()).filter(Boolean) })}
-                    placeholder="如: 高一,高二,高三"
-                    className="flex-1 rounded-lg border border-gray-300 px-3 py-2 text-sm"
-                  />
-                )}
+            {/* 条件关系 */}
+            {(editing.conditions || []).length > 0 && (
+              <div className="flex items-center gap-3 mb-3">
+                <span className="text-xs text-gray-500">条件关系:</span>
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setEditing({ ...editing, conditionMode: 'ALL' })}
+                    className={`rounded-lg border px-3 py-1 text-xs ${editing.conditionMode === 'ALL' ? 'border-amber-500 bg-amber-50 text-amber-700' : 'border-gray-200 text-gray-600'}`}
+                  >
+                    全部满足
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setEditing({ ...editing, conditionMode: 'ANY' })}
+                    className={`rounded-lg border px-3 py-1 text-xs ${editing.conditionMode === 'ANY' ? 'border-amber-500 bg-amber-50 text-amber-700' : 'border-gray-200 text-gray-600'}`}
+                  >
+                    满足任一
+                  </button>
+                </div>
               </div>
-              {/* 班级 */}
-              <div className="flex items-start gap-3">
-                <label className="flex items-center gap-2 pt-2 cursor-pointer shrink-0">
-                  <input
-                    type="checkbox"
-                    checked={(editing.allowedClasses || []).length > 0}
-                    onChange={e => setEditing({ ...editing, allowedClasses: e.target.checked ? (editing.allowedClasses?.length ? editing.allowedClasses : ['']) : [] })}
-                    className="rounded"
-                  />
-                  <span className="text-sm text-gray-700">按班级</span>
-                </label>
-                {(editing.allowedClasses || []).length > 0 && (
-                  <input
-                    value={editing.allowedClasses.join(',')}
-                    onChange={e => setEditing({ ...editing, allowedClasses: e.target.value.split(',').map(s => s.trim()).filter(Boolean) })}
-                    placeholder="如: 1班,2班"
-                    className="flex-1 rounded-lg border border-gray-300 px-3 py-2 text-sm"
-                  />
-                )}
-              </div>
-              {/* 身份标签 */}
-              <div className="flex items-start gap-3">
-                <label className="flex items-center gap-2 pt-2 cursor-pointer shrink-0">
-                  <input
-                    type="checkbox"
-                    checked={(editing.allowedRoles || []).length > 0}
-                    onChange={e => setEditing({ ...editing, allowedRoles: e.target.checked ? (editing.allowedRoles?.length ? editing.allowedRoles : []) : [] })}
-                    className="rounded"
-                  />
-                  <span className="text-sm text-gray-700">按身份</span>
-                </label>
-                {(editing.allowedRoles || []).length >= 0 && (
-                  <div className="flex-1 flex flex-wrap gap-2">
-                    {[
-                      { v: 'ADMIN', l: '管理员' },
-                      { v: 'TEACHER', l: '教师' },
-                      { v: 'VERIFIED', l: '认证用户' },
-                      { v: 'QUALIFIED', l: '资质认证' },
-                      { v: 'STUDENT', l: '学生' },
-                    ].map(opt => {
-                      const checked = (editing.allowedRoles || []).includes(opt.v);
-                      return (
-                        <label key={opt.v} className={`flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-sm cursor-pointer transition ${checked ? 'border-amber-500 bg-amber-50 text-amber-700' : 'border-gray-200 text-gray-600 hover:border-gray-300'}`}>
-                          <input type="checkbox" checked={checked} onChange={e => {
-                            const cur = editing.allowedRoles || [];
-                            setEditing({ ...editing, allowedRoles: e.target.checked ? [...cur, opt.v] : cur.filter(r => r !== opt.v) });
-                          }} className="hidden" />
-                          {opt.l}
-                        </label>
-                      );
-                    })}
-                  </div>
-                )}
-              </div>
+            )}
+
+            {/* 条件列表 */}
+            <div className="space-y-2">
+              {(editing.conditions || []).length === 0 && (
+                <p className="text-xs text-gray-400 bg-gray-50 rounded-lg px-3 py-3 text-center">暂无条件，所有用户均可兑换</p>
+              )}
+              {(editing.conditions || []).map((cond: any, idx: number) => (
+                <div key={idx} className="flex items-center gap-2 rounded-lg border border-gray-200 p-2">
+                  <span className="shrink-0 flex h-6 w-6 items-center justify-center rounded-full bg-gray-100 text-xs text-gray-500">{idx + 1}</span>
+                  {/* 条件类型 */}
+                  <select
+                    value={cond.type}
+                    onChange={e => {
+                      const type = e.target.value as any;
+                      const newConds = [...(editing.conditions || [])];
+                      // 切换类型时给个默认值
+                      let defVal: any = '';
+                      if (type === 'DAYS') defVal = 30;
+                      else if (type === 'COINS') defVal = 100;
+                      else if (type === 'VERIFIED') defVal = 'true';
+                      else if (type === 'ROLE') defVal = 'STUDENT';
+                      newConds[idx] = { type, value: defVal };
+                      setEditing({ ...editing, conditions: newConds });
+                    }}
+                    className="w-28 shrink-0 rounded-lg border border-gray-300 px-2 py-1.5 text-sm"
+                  >
+                    <option value="DAYS">墙龄≥天数</option>
+                    <option value="COINS">金币≥数量</option>
+                    <option value="GRADE">指定年级</option>
+                    <option value="CLASS">指定班级</option>
+                    <option value="ROLE">指定身份</option>
+                    <option value="VERIFIED">已认证</option>
+                  </select>
+                  {/* 值输入: 根据类型动态渲染 */}
+                  {cond.type === 'DAYS' && (
+                    <div className="flex flex-1 items-center gap-1">
+                      <input type="number" min={0} value={cond.value} onChange={e => {
+                        const newConds = [...(editing.conditions || [])];
+                        newConds[idx] = { ...cond, value: Number(e.target.value) };
+                        setEditing({ ...editing, conditions: newConds });
+                      }} className="flex-1 rounded-lg border border-gray-300 px-2 py-1.5 text-sm" />
+                      <span className="text-xs text-gray-400">天</span>
+                    </div>
+                  )}
+                  {cond.type === 'COINS' && (
+                    <div className="flex flex-1 items-center gap-1">
+                      <input type="number" min={0} value={cond.value} onChange={e => {
+                        const newConds = [...(editing.conditions || [])];
+                        newConds[idx] = { ...cond, value: Number(e.target.value) };
+                        setEditing({ ...editing, conditions: newConds });
+                      }} className="flex-1 rounded-lg border border-gray-300 px-2 py-1.5 text-sm" />
+                      <span className="text-xs text-gray-400">金币</span>
+                    </div>
+                  )}
+                  {cond.type === 'GRADE' && (
+                    <input value={cond.value} onChange={e => {
+                      const newConds = [...(editing.conditions || [])];
+                      newConds[idx] = { ...cond, value: e.target.value };
+                      setEditing({ ...editing, conditions: newConds });
+                    }} placeholder="如: 高一" className="flex-1 rounded-lg border border-gray-300 px-2 py-1.5 text-sm" />
+                  )}
+                  {cond.type === 'CLASS' && (
+                    <input value={cond.value} onChange={e => {
+                      const newConds = [...(editing.conditions || [])];
+                      newConds[idx] = { ...cond, value: e.target.value };
+                      setEditing({ ...editing, conditions: newConds });
+                    }} placeholder="如: 1班" className="flex-1 rounded-lg border border-gray-300 px-2 py-1.5 text-sm" />
+                  )}
+                  {cond.type === 'ROLE' && (
+                    <select value={cond.value} onChange={e => {
+                      const newConds = [...(editing.conditions || [])];
+                      newConds[idx] = { ...cond, value: e.target.value };
+                      setEditing({ ...editing, conditions: newConds });
+                    }} className="flex-1 rounded-lg border border-gray-300 px-2 py-1.5 text-sm">
+                      <option value="STUDENT">学生</option>
+                      <option value="TEACHER">教师</option>
+                      <option value="ADMIN">管理员</option>
+                      <option value="SUPER_ADMIN">超级管理员</option>
+                    </select>
+                  )}
+                  {cond.type === 'VERIFIED' && (
+                    <span className="flex-1 text-sm text-gray-500">用户已完成实名认证</span>
+                  )}
+                  {/* 删除按钮 */}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const newConds = (editing.conditions || []).filter((_: any, i: number) => i !== idx);
+                      setEditing({ ...editing, conditions: newConds });
+                    }}
+                    className="shrink-0 rounded-lg p-1.5 text-gray-400 hover:bg-red-50 hover:text-red-500 transition"
+                    title="删除条件"
+                  >
+                    <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                      <path d="M18 6L6 18M6 6l12 12" strokeLinecap="round" />
+                    </svg>
+                  </button>
+                </div>
+              ))}
             </div>
           </div>
 

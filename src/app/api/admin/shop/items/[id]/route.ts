@@ -6,6 +6,11 @@ import { requirePermission } from '@/lib/server-auth';
 import { prisma } from '@/lib/prisma';
 import { errorResponse } from '@/lib/api-response';
 
+const ConditionSchema = z.object({
+  type: z.enum(['DAYS', 'COINS', 'GRADE', 'CLASS', 'ROLE', 'VERIFIED']),
+  value: z.union([z.string(), z.number()]),
+});
+
 const UpdateSchema = z.object({
   name: z.string().min(1).max(50).optional(),
   description: z.string().max(500).optional().or(z.literal('')),
@@ -13,15 +18,8 @@ const UpdateSchema = z.object({
   pointsCost: z.number().int().min(1).optional(),
   stock: z.number().int().optional(),
   isActive: z.boolean().optional(),
-  // 兑换门槛
-  daysThreshold: z.number().int().min(0).nullable().optional(),
-  coinThreshold: z.number().int().min(0).nullable().optional(),
-  thresholdMode: z.enum(['NONE', 'DAYS', 'COINS', 'ALL', 'ANY']).optional(),
-  // 兑换人群限制
-  accessRules: z.array(z.object({
-    type: z.enum(['GRADE', 'CLASS', 'ROLE', 'VERIFIED']),
-    value: z.string(),
-  })).optional(),
+  conditions: z.array(ConditionSchema).optional(),
+  conditionMode: z.enum(['ALL', 'ANY']).optional(),
 });
 
 export async function PATCH(req: NextRequest, { params }: { params: { id: string } }) {
@@ -31,8 +29,6 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
     const data: any = { ...dto };
     if (dto.description === '') data.description = null;
     if (dto.image === '') data.image = null;
-    if (dto.daysThreshold === undefined) delete data.daysThreshold;
-    if (dto.coinThreshold === undefined) delete data.coinThreshold;
     const item = await prisma.shopItem.update({ where: { id: params.id }, data });
     return NextResponse.json({ success: true, item });
   } catch (e) { return errorResponse(e); }
