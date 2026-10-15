@@ -13,11 +13,6 @@ const OAUTH_BASE = process.env.NEXT_PUBLIC_API_BASE || '';
 export default function LoginPage() {
   const { login, user, loading, savedAccounts, switchAccount } = useAuth();
   const router = useRouter();
-  // add=1 表示从「添加账号」入口进入, 已登录也不自动跳转, 让用户继续登录新账号
-  // 直接在初始化时读取, 避免 useEffect 竞态导致先跳转
-  const [isAddAccount] = useState(() =>
-    typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('add') === '1'
-  );
   const [account, setAccount] = useState('');
   const [password, setPassword] = useState('');
   const [showPwd, setShowPwd] = useState(false);
@@ -29,9 +24,12 @@ export default function LoginPage() {
   const [openTypes, setOpenTypes] = useState<string[]>([]);
 
   // 已登录则跳转首页 (add=1 时不跳, 让用户添加新账号)
+  // 在同一个 effect 内读取 add 参数, 避免 state 初始化的竞态
   useEffect(() => {
-    if (!loading && user && !isAddAccount) router.replace('/');
-  }, [user, loading, router, isAddAccount]);
+    if (loading) return;
+    const isAdd = new URLSearchParams(window.location.search).get('add') === '1';
+    if (user && !isAdd) router.replace('/');
+  }, [user, loading, router]);
 
   // 检测聚合登录是否可用 + 获取开放的登录方式
   useEffect(() => {
