@@ -14,10 +14,10 @@ export default function LoginPage() {
   const { login, user, loading, savedAccounts, switchAccount } = useAuth();
   const router = useRouter();
   // add=1 表示从「添加账号」入口进入, 已登录也不自动跳转, 让用户继续登录新账号
-  const [isAddAccount, setIsAddAccount] = useState(false);
-  useEffect(() => {
-    setIsAddAccount(new URLSearchParams(window.location.search).get('add') === '1');
-  }, []);
+  // 直接在初始化时读取, 避免 useEffect 竞态导致先跳转
+  const [isAddAccount] = useState(() =>
+    typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('add') === '1'
+  );
   const [account, setAccount] = useState('');
   const [password, setPassword] = useState('');
   const [showPwd, setShowPwd] = useState(false);
