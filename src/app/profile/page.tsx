@@ -186,8 +186,6 @@ function EditProfile({ user, onSaved, forcePhone = false, refreshUser }: { user:
 
   const save = async () => {
     setMsg(''); setPhoneError('');
-    const isVerified = user?.verified || user?.verificationStatus === 'APPROVED';
-    if (!isVerified && !realName.trim()) { setMsg('请输入真实姓名'); return; }
 
     const hasPhone = phoneNumber.trim().length > 0;
     const hasEmail = email.trim().length > 0;
@@ -209,11 +207,9 @@ function EditProfile({ user, onSaved, forcePhone = false, refreshUser }: { user:
 
     setSaving(true);
     try {
-      const isVerified = user?.verified || user?.verificationStatus === 'APPROVED';
       const payload: any = {
         nickname,
-        // 已认证用户真实姓名锁定, 不提交
-        ...(isVerified ? {} : { realName: realName.trim() }),
+        realName: realName.trim(),
         countryCode: hasPhone ? countryCode : '',
         phoneNumber: hasPhone ? phoneNumber : '',
         email: email.trim(),
@@ -316,12 +312,8 @@ function EditProfile({ user, onSaved, forcePhone = false, refreshUser }: { user:
         )}
       </div>
 
-      <Row label={<>真实姓名{user?.verified || user?.verificationStatus === 'APPROVED' ? <span className="ml-1 text-green-500 text-xs">✓已认证</span> : <span className="ml-1 text-red-500">*</span>}</>}>
-        {user?.verified || user?.verificationStatus === 'APPROVED' ? (
-          <span className="text-[15px] text-gray-900">{realName || '-'}</span>
-        ) : (
-          <input value={realName} onChange={e => setRealName(e.target.value)} className="w-32 text-right text-[15px] text-gray-900 outline-none" placeholder="请输入真实姓名" />
-        )}
+      <Row label="真实姓名">
+        <input value={realName} onChange={e => setRealName(e.target.value)} className="w-32 text-right text-[15px] text-gray-900 outline-none" placeholder="选填" />
       </Row>
 
       {/* 所属学校 / 团体 (互斥) */}
@@ -418,9 +410,7 @@ function ProfilePageInner() {
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [joinOrgDismissed, setJoinOrgDismissed] = useState(false);
 
-  // 未认证每日提醒 (localStorage 存上次提醒日期)
-  const [showAuthReminder, setShowAuthReminder] = useState(false);
-  const [verifyModalInitial, setVerifyModalInitial] = useState<'IDENTITY' | 'QUALIFICATION' | null>(null);
+  const [verifyModalInitial, setVerifyModalInitial] = useState<'QUALIFICATION' | null>(null);
   const [showAvatarLightbox, setShowAvatarLightbox] = useState(false);
   const [profileBg, setProfileBg] = useState('');
   const [contactCfg, setContactCfg] = useState<any>(null);
@@ -457,22 +447,6 @@ function ProfilePageInner() {
       setShowJoinOrg(true);
     }
   }, [loading, user, joinOrgDismissed]);
-
-  // 未认证每日提醒: 每天首次进入「我的」页面时弹一次
-  useEffect(() => {
-    if (loading || !user) return;
-    const isVerified = user.verificationStatus === 'APPROVED' || !!user.verified;
-    if (isVerified) return; // 已认证不弹
-    // 今天已提醒过 → 跳过
-    const today = new Date().toISOString().slice(0, 10);
-    const lastReminded = localStorage.getItem('auth_reminder_date');
-    if (lastReminded === today) return;
-    // 注册后不足 3 天不打扰
-    const created = user.createdAt ? new Date(user.createdAt).getTime() : Date.now();
-    const daysSinceReg = (Date.now() - created) / 86400000;
-    if (daysSinceReg < 1) return;
-    setShowAuthReminder(true);
-  }, [loading, user]);
 
   useEffect(() => {
     if (searchParams.get('edit') === '1') {
@@ -520,7 +494,6 @@ function ProfilePageInner() {
       { key: 'comments', label: '评论管理', perm: 'comment.view' },
       { key: 'users', label: '用户管理', perm: 'user.view' },
       { key: 'avatars', label: '头像审核', perm: 'user.view' },
-      { key: 'verification', label: '实名认证审核', perm: 'verification.review' },
       { key: 'qualifications', label: '资质/荣誉审核', perm: 'qualification.review' },
       { key: 'appeals', label: '申诉审核', perm: 'appeal.view' },
       { key: 'notifications', label: '通知发布', perm: 'notification.send' },
@@ -585,12 +558,9 @@ function ProfilePageInner() {
   }
 
   // ---- 首页视图 ----
-  const idApproved = user.verificationStatus === 'APPROVED' || !!user.verified;
   const menuItems = [
     { key: 'homepage', label: '我的主页', icon: '🏠' },
-    ...(idApproved
-      ? [{ key: 'qualification', label: '资质/荣誉认证', icon: '🏅' }]
-      : [{ key: 'verification', label: '身份认证', icon: '✅' }]),
+    { key: 'qualification', label: '资质/荣誉认证', icon: '🏅' },
     { key: 'violations', label: '违规与信用', icon: '📋' },
     { key: 'badges', label: '证书/徽章', icon: '🎖️' },
     { key: 'checkin', label: '签到积分', icon: '🪙' },
@@ -605,7 +575,6 @@ function ProfilePageInner() {
   const handleMenu = (key: string) => {
     if (key === 'homepage' && user) { router.push(`/users/${user.id}`); return; }
     if (key === 'admin') { setView('overview'); return; }
-    if (key === 'verification') { router.push('/verify'); return; }
     if (key === 'qualification') { setShowVerifyModal(true); return; }
     if (key === 'violations') { setView('violations'); return; }
     if (key === 'badges') { setView('my-badges'); return; }
@@ -952,7 +921,6 @@ function ProfilePageInner() {
               <>
                 <div className="flex items-center gap-1.5 flex-wrap">
                   <span className="text-lg font-bold text-white">{user.nickname}</span>
-                  <VerifiedBadge verified={!!user.verified} className="!bg-white/20 !text-white" />
                   {user.qualificationVerified && user.qualificationType && (
                     <span className="rounded-full bg-purple-400/80 px-1.5 py-0.5 text-xs text-white">🏅 {user.qualificationType}</span>
                   )}
@@ -960,7 +928,7 @@ function ProfilePageInner() {
                 <div className="text-sm text-white/80 mt-0.5">{user.email || '未绑定邮箱'}</div>
                 {user.userNumber != null && (
                   <div className="text-xs text-white/60 mt-0.5 tracking-wide">
-                    <span className="text-white/40">Nº</span> {formatUserCode(user.userNumber, !!user.verified)}
+                    <span className="text-white/40">Nº</span> {formatUserCode(user.userNumber)}
                   </div>
                 )}
                 <div className="mt-1.5 flex items-center gap-2">
@@ -1067,62 +1035,15 @@ function ProfilePageInner() {
         />
       )}
 
-      {/* 未认证每日提醒弹窗 */}
-      {showAuthReminder && (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 p-4">
-          <div className="w-full max-w-sm rounded-2xl bg-white p-6 shadow-xl">
-            {/* 大图标 */}
-            <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-orange-100">
-              <svg className="h-9 w-9 text-orange-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <path d="M12 9v4m0 4h.01M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" strokeLinecap="round" strokeLinejoin="round"/>
-              </svg>
-            </div>
-            <h3 className="text-center text-lg font-bold text-gray-800">建议完成身份认证</h3>
-            <p className="mt-2 text-center text-sm text-gray-500 leading-relaxed">
-              完成身份认证后可解锁发帖、评论、点赞、关注等功能, 同时享受更高的信任标识和权限。
-            </p>
-            {/* 权益受限说明 */}
-            <div className="mt-4 rounded-lg bg-orange-50 px-3 py-2 text-xs text-orange-700 space-y-1">
-              <div className="flex items-center gap-1.5"><span>🔒</span><span>未认证将限制发帖、评论、点赞</span></div>
-              <div className="flex items-center gap-1.5"><span>⚠️</span><span>无法申请徽章和资质认证</span></div>
-              <div className="flex items-center gap-1.5"><span>❓</span><span>社区信任标识不显示</span></div>
-            </div>
-            {/* 按钮 */}
-            <div className="mt-5 space-y-2">
-              <button
-                onClick={() => {
-                  localStorage.setItem('auth_reminder_date', new Date().toISOString().slice(0, 10));
-                  setShowAuthReminder(false);
-                  router.push('/verify');
-                }}
-                className="w-full rounded-xl bg-gradient-to-r from-blue-500 to-indigo-500 py-3 text-sm font-medium text-white shadow-sm hover:opacity-90"
-              >
-                立即认证
-              </button>
-              <button
-                onClick={() => {
-                  localStorage.setItem('auth_reminder_date', new Date().toISOString().slice(0, 10));
-                  setShowAuthReminder(false);
-                }}
-                className="w-full rounded-xl bg-gray-100 py-3 text-sm text-gray-600 hover:bg-gray-200"
-              >
-                我再想想
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* 实名认证弹窗 */}
+      {/* 资质/荣誉认证弹窗 (身份认证已取消) */}
       {showVerifyModal && user && (
         <VerificationModal
           user={user}
-          initialType={verifyModalInitial}
+          initialType={'QUALIFICATION'}
           onClose={() => { setShowVerifyModal(false); setVerifyModalInitial(null); }}
           onVerified={() => { refreshUser(); setShowVerifyModal(false); setVerifyModalInitial(null); }}
           onSubmitted={() => refreshUser()}
           onLater={() => {
-            // 用户点了「我再想想」: 关闭弹窗并在"认证"菜单入口提示
             setShowVerifyModal(false); setVerifyModalInitial(null);
           }}
         />

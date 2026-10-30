@@ -1,9 +1,7 @@
 // 用户编号生成与展示
 // 规则:
 // - 所有用户统一顺序编号, 从 1 开始
-// 展示:
-// - 未认证 (预备): XYS + 补零到 5 位, 如 XYS00001
-// - 已认证: XY + 补零到 5 位, 如 XY00001
+// - 身份认证已取消, 所有用户统一 XY 前缀
 
 import { prisma } from '@/lib/prisma';
 
@@ -21,12 +19,9 @@ export async function generateUserNumber(): Promise<number> {
 
 /**
  * 格式化用户编号为展示字符串
- * @param userNumber 顺序号
- * @param verified 是否已认证
  */
-export function formatUserCode(userNumber: number | null | undefined, verified: boolean): string {
+export function formatUserCode(userNumber: number | null | undefined): string {
   if (userNumber == null) return '';
-  const prefix = verified ? 'XY' : 'XYS';
   const padded = String(userNumber).padStart(5, '0');
-  return `${prefix}${padded}`;
+  return `XY${padded}`;
 }
