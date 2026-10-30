@@ -8,7 +8,6 @@ import { api } from '@/lib/api';
 import { compressImage } from '@/lib/image-compress';
 import { COUNTRY_CODES, getCountryByCode, validatePhone } from '@/lib/country-codes';
 import { usePageRefresh } from '@/lib/use-page-refresh';
-import { VerifiedBadge } from '@/components/VerifiedBadge';
 import { BadgesView } from '@/components/BadgesView';
 import { CheckInView } from '@/components/CheckInView';
 import { WishView } from '@/components/WishView';
