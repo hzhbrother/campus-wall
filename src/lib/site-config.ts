@@ -25,6 +25,11 @@ export async function getPostCategories(): Promise<string[]> {
   return v.split(',').map(s => s.trim()).filter(Boolean);
 }
 
+// 发帖是否强制实名认证: 默认 true (强制), 超级管理员可关闭
+export async function isRequireVerifiedForPost(): Promise<boolean> {
+  return await getSiteConfigBool('require_verified_for_post', true);
+}
+
 // 需要审核的分类: 管理员在站点配置 review_categories 中勾选的分类
 // 配置为空或 key 不存在时都表示不审核任何分类 (管理员完全控制, 无默认值)
 export async function getReviewCategories(): Promise<string[]> {

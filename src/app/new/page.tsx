@@ -58,15 +58,23 @@ export default function NewPostPage() {
   const [isAnonymous, setIsAnonymous] = useState(false);
   const [err, setErr] = useState('');
   const [busy, setBusy] = useState(false);
+  const [requireVerified, setRequireVerified] = useState(true); // 发帖是否强制实名 (默认强制, 管理员可关闭)
   const fileRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (!loading && !user) router.push('/login');
   }, [loading, user, router]);
 
-  // 发帖需实名认证 (管理员/超级管理员默认已认证)
+  // 读取站点配置: 发帖是否强制实名认证 (超级管理员可关闭)
+  useEffect(() => {
+    api.get<Record<string, string>>('/api/site-config')
+      .then(cfg => setRequireVerified(cfg.require_verified_for_post !== 'false'))
+      .catch(() => setRequireVerified(true));
+  }, []);
+
+  // 发帖认证判断: 开关开启时才检查; 关闭时所有登录用户可发帖
   const isAdmin = user?.role === 'ADMIN' || user?.role === 'SUPER_ADMIN';
-  const canPost = !!user?.verified || isAdmin;
+  const canPost = !requireVerified ? !!user : (!!user?.verified || isAdmin);
 
   // 加载分类 (从站点配置读取)
   const loadCats = () => {

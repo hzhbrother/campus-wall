@@ -176,25 +176,14 @@ export default function VerifyPage() {
 
   // ---- 提交认证 ----
   const handleSubmit = async () => {
-    if (!photoData) { setMessage('请先拍摄证件照片'); setMessageType('err'); return; }
-    if (photoType === 'FACE' && !faceName.trim()) { setMessage('请填写真实姓名'); setMessageType('err'); return; }
-    if (photoType === 'FACE' && !faceId.trim()) { setMessage('请填写学号/工号'); setMessageType('err'); return; }
+    if (!photoData) { setMessage('请先上传证件照片'); setMessageType('err'); return; }
 
     setSubmitting(true);
     setMessage('');
     setMessageType('info');
     try {
-      const payload: any = {
-        photo: photoData,
-        photoType,
-      };
-      if (photoType === 'CARD' && selectedTemplateId) {
-        payload.templateId = selectedTemplateId;
-      }
-      if (photoType === 'FACE') {
-        payload.faceName = faceName.trim();
-        payload.faceId = faceId.trim();
-      }
+      const payload: any = { photo: photoData, photoType: 'CARD' };
+      if (selectedTemplateId) payload.templateId = selectedTemplateId;
       const res = await api.post<{ message: string; verificationStatus: VerificationStatus }>(
         '/api/users/me/verification',
         payload,
