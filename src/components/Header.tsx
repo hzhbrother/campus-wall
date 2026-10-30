@@ -5,6 +5,7 @@ import { useEffect, useState } from 'react';
 import { useAuth } from '@/lib/auth-context';
 import { api } from '@/lib/api';
 import { usePageRefresh } from '@/lib/use-page-refresh';
+import pkg from '../../package.json';
 
 export function Header() {
   const { user, loading } = useAuth();
@@ -78,6 +79,7 @@ export function Header() {
             <img src={siteLogo} alt="" className="h-7 w-7 rounded object-contain" />
           ) : null}
           <span className="text-lg font-bold text-slate-900">{siteName}</span>
+          <span className="rounded bg-slate-100 px-1.5 py-0.5 text-[10px] font-normal text-slate-400">v{pkg.version}</span>
         </Link>
         <div className="flex items-center gap-3">
           {user && (
