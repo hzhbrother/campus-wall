@@ -67,14 +67,15 @@ export async function PATCH(req: NextRequest) {
   try {
     const me = await requireUser(req);
     const dto = UpdateSchema.parse(await req.json());
+    const newEmail = dto.email?.trim() || '';
 
-    // 如果邮箱发生变更, 必须验证验证码
-    if (dto.email !== undefined && dto.email !== me.email) {
+    // 如果邮箱发生变更, 必须验证验证码 (留空视为未填写, 不做变更)
+    if (newEmail && newEmail !== (me.email || '')) {
       if (!dto.emailCode) {
         return NextResponse.json({ message: '变更邮箱需要验证码' }, { status: 400 });
       }
       const purpose = me.email ? 'change-email' : 'bind-email';
-      const valid = await verifyEmailCode(dto.email, dto.emailCode, purpose);
+      const valid = await verifyEmailCode(newEmail, dto.emailCode, purpose);
       if (!valid) {
         return NextResponse.json({ message: '验证码错误或已过期' }, { status: 400 });
       }
@@ -102,9 +103,13 @@ export async function PATCH(req: NextRequest) {
       }
     }
 
-    // 移除 emailCode (不存入数据库)
+    // 移除 emailCode (不存入数据库); 邮箱留空时不修改原邮箱
     const { emailCode, ...rest } = dto;
     const data: any = { ...rest };
+    if (dto.email !== undefined) {
+      if (newEmail) data.email = newEmail;
+      else delete data.email;
+    }
 
     // 头像走 AI 三级审核: low 自动通过 / medium 人工审核 / high 自动驳回
     const newAvatar = dto.avatar;

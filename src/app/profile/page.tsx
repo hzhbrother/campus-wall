@@ -189,17 +189,15 @@ function EditProfile({ user, onSaved, forcePhone = false, refreshUser }: { user:
     const hasPhone = phoneNumber.trim().length > 0;
     const hasEmail = email.trim().length > 0;
 
-    // 邮箱必填
-    if (!hasEmail) { setMsg('请输入邮箱'); return; }
-    // 校验邮箱格式
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { setMsg('邮箱格式不正确'); return; }
+    // 邮箱选填: 填写了才校验格式
+    if (hasEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { setMsg('邮箱格式不正确'); return; }
     // 校验手机号格式 (选填, 填写了才校验)
     if (hasPhone) {
       const v = validatePhone(countryCode, phoneNumber);
       if (!v.ok) { setPhoneError(v.message || '请输入手机号'); return; }
     }
-    // 邮箱变更时必须验证
-    if (emailChanged && !emailCode.trim()) {
+    // 邮箱变更时必须验证 (仅在填写了新邮箱时)
+    if (hasEmail && emailChanged && !emailCode.trim()) {
       setMsg('邮箱已变更, 请输入验证码完成绑定');
       return;
     }
@@ -211,11 +209,11 @@ function EditProfile({ user, onSaved, forcePhone = false, refreshUser }: { user:
         realName: realName.trim(),
         countryCode: hasPhone ? countryCode : '',
         phoneNumber: hasPhone ? phoneNumber : '',
-        email: email.trim(),
         remark,
         schoolId, organizationId,
       };
-      if (emailChanged) payload.emailCode = emailCode.trim();
+      if (hasEmail) payload.email = email.trim();
+      if (hasEmail && emailChanged) payload.emailCode = emailCode.trim();
       // 头像: 如果有本地预览的新头像, 一并提交 (走审核流程)
       if (avatarDraft) payload.avatar = avatarDraft;
       await api.patch('/api/users/me', payload);
@@ -296,7 +294,7 @@ function EditProfile({ user, onSaved, forcePhone = false, refreshUser }: { user:
       {/* 邮箱 - 必填, 变更需验证 */}
       <div className="border-b border-gray-100 py-3.5">
         <div className="flex items-center justify-between">
-          <span className="text-[15px] text-gray-800">邮箱<span className="ml-1 text-red-500">*</span><span className="ml-1 text-xs text-gray-400">(用于找回密码/通知)</span></span>
+          <span className="text-[15px] text-gray-800">邮箱<span className="ml-1 text-xs text-gray-400">(选填, 用于找回密码/通知)</span></span>
           <div className="flex items-center gap-2">
             <input type="email" value={email} onChange={e => { setEmail(e.target.value); setEmailCode(''); setCodeSent(false); }} className="w-40 text-right text-[15px] text-gray-900 outline-none" placeholder="请输入邮箱" />
           </div>
