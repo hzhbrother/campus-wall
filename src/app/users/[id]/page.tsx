@@ -286,7 +286,7 @@ export default function UserProfilePage() {
               )}
             </div>
             {(() => {
-              const code = formatUserCode(profile.userNumber, profile.verified);
+              const code = formatUserCode(profile.userNumber);
               if (!code) return null;
               return (
                 <div className="mt-1 text-xs text-gray-400 tracking-wide">

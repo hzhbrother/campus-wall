@@ -73,6 +73,9 @@ export async function POST(req: NextRequest) {
     if (!me) return NextResponse.json({ message: '未登录' }, { status: 401 });
     if (isUserBanned(me)) return NextResponse.json({ message: '账号已被封禁, 暂不能发帖' }, { status: 403 });
 
+    // 管理员/超级管理员发帖直通审核
+    const isAdmin = me.role === UserRole.ADMIN || me.role === UserRole.SUPER_ADMIN;
+
     // 读取站点配置
     const [categories, allowAnonymous, reviewCategories, dailyLimit, sensitiveWords] = await Promise.all([
       getPostCategories(),
