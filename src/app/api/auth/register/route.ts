@@ -1,4 +1,4 @@
-// POST /api/auth/register  账号名注册 (邮箱必填 + 验证码)
+// POST /api/auth/register  账号名注册 (邮箱可选, 注册后可弹窗绑定)
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import bcrypt from 'bcryptjs';
@@ -13,8 +13,8 @@ import { generateUserNumber } from '@/lib/user-number';
 
 const Schema = z.object({
   nickname: z.string().min(2, '账号名至少2位').max(32),
-  email: z.string().email('邮箱格式不正确'),
-  emailCode: z.string().length(6, '验证码为6位数字'),
+  email: z.string().email('邮箱格式不正确').optional().or(z.literal('')),
+  emailCode: z.string().length(6, '验证码为6位数字').optional().or(z.literal('')),
   realName: z.string().max(32).optional().or(z.literal('')),
   grade: z.string().max(20).optional().or(z.literal('')),
   className: z.string().max(20).optional().or(z.literal('')),
@@ -34,20 +34,21 @@ export async function POST(req: NextRequest) {
     const exists = await prisma.user.findFirst({ where: { nickname: dto.nickname } });
     if (exists) return NextResponse.json({ message: '该账号名已被使用' }, { status: 409 });
 
-    // 邮箱唯一
-    const emailExists = await prisma.user.findFirst({ where: { email: dto.email } });
-    if (emailExists) return NextResponse.json({ message: '该邮箱已被注册' }, { status: 409 });
-
-    // 校验邮箱验证码
-    const valid = await verifyEmailCode(dto.email, dto.emailCode, 'register');
-    if (!valid) return NextResponse.json({ message: '验证码错误或已过期' }, { status: 400 });
+    // 邮箱可选: 如果填了邮箱则校验唯一性和验证码
+    if (dto.email?.trim()) {
+      const emailExists = await prisma.user.findFirst({ where: { email: dto.email } });
+      if (emailExists) return NextResponse.json({ message: '该邮箱已被注册' }, { status: 409 });
+      if (!dto.emailCode) return NextResponse.json({ message: '请输入邮箱验证码' }, { status: 400 });
+      const valid = await verifyEmailCode(dto.email, dto.emailCode, 'register');
+      if (!valid) return NextResponse.json({ message: '验证码错误或已过期' }, { status: 400 });
+    }
 
     const password = await bcrypt.hash(dto.password, 10);
     const userNumber = await generateUserNumber();
     const user = await prisma.user.create({
       data: {
         nickname: dto.nickname,
-        email: dto.email,
+        email: dto.email?.trim() || null,
         password,
         realName: dto.realName || null,
         grade: dto.grade || null,
@@ -62,7 +63,7 @@ export async function POST(req: NextRequest) {
 
     // 通知所有管理员: 有新用户注册
     const regTime = new Date().toLocaleString('zh-CN');
-    const notifContent = `新用户「${user.nickname}」于 ${regTime} 完成注册。\n邮箱: ${user.email}`;
+    const notifContent = `新用户「${user.nickname}」于 ${regTime} 完成注册。${user.email ? `\n邮箱: ${user.email}` : ''}`;
     await createNotification({
       targetRole: UserRole.SUPER_ADMIN,
       type: NotificationType.SYSTEM,
