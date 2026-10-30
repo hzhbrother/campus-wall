@@ -58,23 +58,11 @@ export default function NewPostPage() {
   const [isAnonymous, setIsAnonymous] = useState(false);
   const [err, setErr] = useState('');
   const [busy, setBusy] = useState(false);
-  const [requireVerified, setRequireVerified] = useState(true); // 发帖是否强制实名 (默认强制, 管理员可关闭)
   const fileRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (!loading && !user) router.push('/login');
   }, [loading, user, router]);
-
-  // 读取站点配置: 发帖是否强制实名认证 (超级管理员可关闭)
-  useEffect(() => {
-    api.get<Record<string, string>>('/api/site-config')
-      .then(cfg => setRequireVerified(cfg.require_verified_for_post !== 'false'))
-      .catch(() => setRequireVerified(true));
-  }, []);
-
-  // 发帖认证判断: 开关开启时才检查; 关闭时所有登录用户可发帖
-  const isAdmin = user?.role === 'ADMIN' || user?.role === 'SUPER_ADMIN';
-  const canPost = !requireVerified ? !!user : (!!user?.verified || isAdmin);
 
   // 加载分类 (从站点配置读取)
   const loadCats = () => {
@@ -138,36 +126,6 @@ export default function NewPostPage() {
   };
 
   if (loading) return <p className="text-center text-slate-400 py-10">加载中…</p>;
-
-  // 未认证引导
-  if (!canPost) {
-    const isPending = user?.verificationStatus === 'PENDING';
-    const isRejected = user?.verificationStatus === 'REJECTED';
-    return (
-      <div className="flex flex-col items-center justify-center px-6 py-16 text-center">
-        <div className="h-20 w-20 rounded-full bg-amber-50 flex items-center justify-center text-4xl mb-4">
-          {isPending ? '⏳' : isRejected ? '❌' : '🪪'}
-        </div>
-        <h2 className="text-lg font-bold text-gray-900 mb-2">
-          {isPending ? '认证审核中' : isRejected ? '认证未通过' : '发帖需实名认证'}
-        </h2>
-        <p className="text-sm text-gray-500 mb-1 max-w-xs leading-relaxed">
-          {isPending
-            ? '您的认证申请正在审核中, 通过后即可发帖, 请耐心等待。'
-            : isRejected
-              ? `认证被驳回${user?.verificationRejectReason ? `: ${user.verificationRejectReason}` : ''}, 请重新提交认证申请。`
-              : '为保障社区内容质量, 发帖前需完成实名认证 (上传校园卡照片)。'}
-        </p>
-        <p className="text-xs text-gray-400 mb-6">评论功能无需认证, 可正常使用</p>
-        <button
-          onClick={() => router.push('/profile')}
-          className="rounded-full bg-blue-600 px-8 py-3 text-sm font-medium text-white hover:bg-blue-700"
-        >
-          {isPending ? '查看认证状态' : isRejected ? '重新提交认证' : '去实名认证'}
-        </button>
-      </div>
-    );
-  }
 
   return (
     <div className="pb-36 -mx-4">

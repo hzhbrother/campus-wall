@@ -59,7 +59,7 @@ function checkEligibility(item: ShopItem, user: any): string[] {
       case 'ROLE':
         return { ok: user.role === String(c.value), reason: `仅限${ROLE_LABELS[String(c.value)] || c.value}` };
       case 'VERIFIED':
-        return { ok: !!user.verified, reason: '仅限认证用户' };
+        return { ok: true, reason: '' }; // 身份认证已取消, 条件默认通过
       default:
         return { ok: true, reason: '' };
     }

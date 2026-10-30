@@ -7,7 +7,7 @@ import { Prisma } from '@prisma/client';
 import { prisma } from '@/lib/prisma';
 import { getUserFromRequest } from '@/lib/server-auth';
 import { errorResponse } from '@/lib/api-response';
-import { getSiteConfigBool, getSiteConfigValue, getPostCategories, getReviewCategories, isRequireVerifiedForPost } from '@/lib/site-config';
+import { getSiteConfigBool, getSiteConfigValue, getPostCategories, getReviewCategories } from '@/lib/site-config';
 import { isUserBanned } from '@/lib/server-auth';
 import { createNotification } from '@/lib/notification-service';
 import { checkAndAwardBadges } from '@/lib/badge-service';
@@ -57,8 +57,6 @@ export async function GET(req: NextRequest) {
       images: [],  // 列表不返回 base64 图片, 只返回数量
       imageCount: p.images?.length || 0,
       favoriteCount: p._count?.favorites || 0,
-      // 管理员/超级管理员默认已认证
-      author: { ...p.author, verified: p.author.verified || p.author.role === 'ADMIN' || p.author.role === 'SUPER_ADMIN' },
     }));
     return NextResponse.json({ items, total, page, pageSize }, {
       // 公开列表数据缓存 30 秒, SWR 60 秒, 减少数据库查询
@@ -75,20 +73,14 @@ export async function POST(req: NextRequest) {
     if (!me) return NextResponse.json({ message: '未登录' }, { status: 401 });
     if (isUserBanned(me)) return NextResponse.json({ message: '账号已被封禁, 暂不能发帖' }, { status: 403 });
 
-    // 读取站点配置 (先读开关, 避免不必要的认证校验)
-    const [categories, allowAnonymous, reviewCategories, dailyLimit, sensitiveWords, requireVerified] = await Promise.all([
+    // 读取站点配置
+    const [categories, allowAnonymous, reviewCategories, dailyLimit, sensitiveWords] = await Promise.all([
       getPostCategories(),
       getSiteConfigBool('allow_anonymous', true),
       getReviewCategories(),
       getSiteConfigValue('daily_post_limit', '0'),
       getSiteConfigValue('sensitive_words', ''),
-      isRequireVerifiedForPost(),
     ]);
-
-    // 发帖强制实名认证 (管理员可在后台开关; 默认开启)
-    if (requireVerified && !me.verified) {
-      return NextResponse.json({ message: '请先完成实名认证后再发帖', status: 'UNVERIFIED' }, { status: 403 });
-    }
 
     // 内容与图片至少填一项 (允许纯图片发帖)
     const CreateSchema = z.object({
