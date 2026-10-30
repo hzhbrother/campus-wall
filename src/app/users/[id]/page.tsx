@@ -7,6 +7,7 @@ import { useAuth } from '@/lib/auth-context';
 import Link from 'next/link';
 import { usePageRefresh } from '@/lib/use-page-refresh';
 import { VerifiedBadge } from '@/components/VerifiedBadge';
+import { CategoryTag } from '@/components/CategoryTag';
 import { formatUserCode } from '@/lib/user-number';
 import { compressImage } from '@/lib/image-compress';
 
@@ -517,7 +518,7 @@ export default function UserProfilePage() {
               {posts.map(p => (
                 <Link key={p.id} href={`/post/${p.id}`} className="block rounded-xl bg-white p-3 hover:bg-gray-50 no-underline">
                   <div className="flex items-center justify-between">
-                    <span className="rounded bg-blue-50 px-1.5 py-0.5 text-xs text-blue-600">{p.category}</span>
+                    <CategoryTag category={p.category} />
                     <span className="text-xs text-gray-400">{new Date(p.createdAt).toLocaleDateString()}</span>
                   </div>
                   <h3 className="mt-1.5 font-medium text-gray-900 line-clamp-1">{p.title}</h3>

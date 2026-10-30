@@ -1,5 +1,6 @@
 import Link from 'next/link';
 import { VerifiedBadge } from './VerifiedBadge';
+import { CategoryTag } from './CategoryTag';
 
 export interface PostListItem {
   id: string;
@@ -17,17 +18,7 @@ export interface PostListItem {
   author: { id: string; nickname: string; avatar?: string | null; verified?: boolean };
 }
 
-const CATEGORY_COLOR: Record<string, string> = {
-  校园: 'bg-blue-500 text-white',
-  失物招领: 'bg-amber-500 text-white',
-  二手交易: 'bg-emerald-500 text-white',
-  表白墙: 'bg-pink-500 text-white',
-  寻物启事: 'bg-orange-500 text-white',
-  招聘兼职: 'bg-violet-500 text-white',
-  求助问答: 'bg-cyan-500 text-white',
-};
-
-function fmtDate(iso: string) {
+const fmtDate = (iso: string) => {
   try {
     const d = new Date(iso);
     const mm = String(d.getMonth() + 1).padStart(2, '0');
@@ -36,7 +27,7 @@ function fmtDate(iso: string) {
   } catch {
     return iso;
   }
-}
+};
 
 export function PostCard({ post }: { post: PostListItem }) {
   return (
@@ -65,9 +56,7 @@ export function PostCard({ post }: { post: PostListItem }) {
           </div>
           <div className="flex items-center gap-1.5">
             {post.pinned && <span className="rounded-md bg-red-500 px-2 py-0.5 text-xs font-medium text-white">置顶</span>}
-            <span className={`rounded-md px-2 py-0.5 text-xs font-medium ${CATEGORY_COLOR[post.category] || 'bg-slate-400 text-white'}`}>
-              #{post.category}
-            </span>
+            <CategoryTag category={post.category} />
           </div>
         </div>
 

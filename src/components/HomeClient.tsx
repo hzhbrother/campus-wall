@@ -7,6 +7,8 @@ import { api } from '@/lib/api';
 import { PostCard, PostListItem } from '@/components/PostCard';
 import { usePageRefresh } from '@/lib/use-page-refresh';
 import { HomeInitialData } from '@/lib/home-data';
+import { useCategoryColors } from '@/lib/use-category-colors';
+import { getCategoryColor, categoryTintStyle } from '@/lib/category-colors';
 
 interface Props {
   initial: HomeInitialData;
@@ -22,6 +24,7 @@ export default function HomeClient({ initial }: Props) {
   const [q, setQ] = useState('');
   const [searchOpen, setSearchOpen] = useState(false);
   const [loading, setLoading] = useState(false);
+  const categoryColors = useCategoryColors();
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -82,13 +85,15 @@ export default function HomeClient({ initial }: Props) {
         {categories.map((c) => {
           const needReview = reviewCategories.includes(c);
           const active = c === category;
+          const hex = getCategoryColor(c, categoryColors);
           return (
             <button
               key={c}
               onClick={() => setCategory(c === category ? '' : c)}
-              className={`relative shrink-0 px-3.5 py-1.5 rounded-full text-sm font-medium transition ${
-                active ? 'bg-slate-900 text-white' : 'bg-white text-slate-500'
-              }`}
+              className="relative shrink-0 px-3.5 py-1.5 rounded-full text-sm font-medium transition"
+              style={active
+                ? { backgroundColor: hex, color: '#fff' }
+                : categoryTintStyle(hex)}
             >
               {c}
               {needReview && (

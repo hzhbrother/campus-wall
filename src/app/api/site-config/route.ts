@@ -8,6 +8,7 @@ const PUBLIC_KEYS = [
   'site_name', 'site_desc', 'site_logo', 'site_url', 'site_icp', 'contact_email', 'site_keywords',
   'allow_register', 'allow_anonymous', 'comment_enabled',
   'post_categories',
+  'post_category_colors',
   'announcement_text',
   'agreement_content', 'privacy_content',
   'about_content',

@@ -7,6 +7,7 @@ import { useAuth } from '@/lib/auth-context';
 import { api } from '@/lib/api';
 import { usePageRefresh } from '@/lib/use-page-refresh';
 import { VerifiedBadge } from '@/components/VerifiedBadge';
+import { CategoryTag } from '@/components/CategoryTag';
 
 interface Author { id: string; nickname: string; avatar?: string | null; role?: string; verified?: boolean }
 interface Comment { id: string; content: string; createdAt: string; author: Author; parentId?: string | null }
@@ -98,7 +99,7 @@ export default function PostDetailPage({ params }: { params: { id: string } }) {
     <div className="space-y-4">
       <div className="card p-5">
         <div className="flex items-center gap-2 mb-2 text-sm">
-          <span className="tag bg-blue-50 text-blue-600">{post.category}</span>
+          <CategoryTag category={post.category} className="!px-2 !py-0.5" />
           {post.pinned && <span className="tag bg-red-50 text-red-600">置顶</span>}
           {post.status !== 'APPROVED' && <span className="tag bg-amber-50 text-amber-600">待审核</span>}
           <span className="text-slate-400 ml-auto">{new Date(post.createdAt).toLocaleString('zh-CN')}</span>

@@ -6,6 +6,7 @@ import { PERMISSIONS, PERMISSIONS_BY_GROUP, SUPER_ADMIN_ONLY_PERMISSIONS } from 
 import { JUHE_TYPES } from '@/lib/aggregated-login';
 import { BrandIcon } from '@/components/BrandIcons';
 import { compressImage } from '@/lib/image-compress';
+import { parseCategoryColors, getCategoryColor } from '@/lib/category-colors';
 import TemplateManager from './TemplateManager';
 import { BadgesManager } from './BadgesManager';
 
@@ -1986,6 +1987,28 @@ function SiteSettings() {
   const bool = (k: string, def = true) => cfg[k] === undefined ? def : cfg[k] === 'true';
   const setBool = (k: string, v: boolean) => set(k, String(v));
 
+  // 分类颜色 (立即保存)
+  const updateCategoryColor = (cat: string, hex: string) => {
+    setCfg(prev => {
+      const map = parseCategoryColors(prev.post_category_colors);
+      map[cat] = hex;
+      const value = JSON.stringify(map);
+      api.patch('/api/admin/site-config', { post_category_colors: value }).catch(() => {});
+      return { ...prev, post_category_colors: value };
+    });
+  };
+
+  // 分类重命名/删除时同步颜色配置
+  const moveCategoryColor = (prev: Record<string, string>, oldName: string, newName: string | null) => {
+    const map = parseCategoryColors(prev.post_category_colors);
+    if (map[oldName]) {
+      if (newName) map[newName] = map[oldName];
+      delete map[oldName];
+    }
+    return JSON.stringify(map);
+  };
+  const categoryColors = parseCategoryColors(cfg.post_category_colors);
+
   const save = async () => {
     setSaving(true); setMsg('');
     try {
@@ -2088,7 +2111,7 @@ function SiteSettings() {
           <div className="space-y-3">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">📝 帖子分类管理</label>
-              <p className="text-xs text-gray-400 mb-3">勾选「需审核」的分类，用户发帖后需管理员审核通过才会显示。</p>
+              <p className="text-xs text-gray-400 mb-3">勾选「需审核」的分类，用户发帖后需管理员审核通过才会显示。点右侧色块可为该分类选择颜色。</p>
 
               {/* 分类列表 + 审核复选框 */}
               <div className="space-y-2 mb-3">
@@ -2131,8 +2154,9 @@ function SiteSettings() {
                                   if (ri >= 0) rl[ri] = val;
                                   const newCategories = list.join(',');
                                   const newReview = rl.join(',');
-                                  api.patch('/api/admin/site-config', { post_categories: newCategories, review_categories: newReview }).catch(() => {});
-                                  return { ...prev, post_categories: newCategories, review_categories: newReview };
+                                  const newColors = moveCategoryColor(prev, cat, val);
+                                  api.patch('/api/admin/site-config', { post_categories: newCategories, review_categories: newReview, post_category_colors: newColors }).catch(() => {});
+                                  return { ...prev, post_categories: newCategories, review_categories: newReview, post_category_colors: newColors };
                                 });
                               }
                               setEditingCatIdx(null);
@@ -2151,8 +2175,9 @@ function SiteSettings() {
                                 if (ri >= 0) rl[ri] = val;
                                 const newCategories = list.join(',');
                                 const newReview = rl.join(',');
-                                api.patch('/api/admin/site-config', { post_categories: newCategories, review_categories: newReview }).catch(() => {});
-                                return { ...prev, post_categories: newCategories, review_categories: newReview };
+                                const newColors = moveCategoryColor(prev, cat, val);
+                                api.patch('/api/admin/site-config', { post_categories: newCategories, review_categories: newReview, post_category_colors: newColors }).catch(() => {});
+                                return { ...prev, post_categories: newCategories, review_categories: newReview, post_category_colors: newColors };
                               });
                             }
                             setEditingCatIdx(null);
@@ -2162,6 +2187,18 @@ function SiteSettings() {
                       ) : (
                         <span className="flex-1 text-sm font-medium text-gray-800">{cat}</span>
                       )}
+                      <label
+                        className="relative h-6 w-6 shrink-0 cursor-pointer rounded-full border border-gray-200"
+                        style={{ backgroundColor: getCategoryColor(cat, categoryColors) }}
+                        title="选择分类颜色"
+                      >
+                        <input
+                          type="color"
+                          value={getCategoryColor(cat, categoryColors)}
+                          onChange={e => updateCategoryColor(cat, e.target.value)}
+                          className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
+                        />
+                      </label>
                       {checked && !isEditing && (
                         <span className="flex h-5 items-center rounded-full bg-orange-100 px-2 text-xs font-bold text-orange-600">需审核</span>
                       )}
@@ -2180,7 +2217,9 @@ function SiteSettings() {
                             const rl = (prev.review_categories || '').split(',').map(s => s.trim()).filter(Boolean);
                             const ri = rl.indexOf(cat);
                             if (ri >= 0) rl.splice(ri, 1);
-                            return { ...prev, post_categories: newArr.join(','), review_categories: rl.join(',') };
+                            const newColors = moveCategoryColor(prev, cat, null);
+                            api.patch('/api/admin/site-config', { post_categories: newArr.join(','), review_categories: rl.join(','), post_category_colors: newColors }).catch(() => {});
+                            return { ...prev, post_categories: newArr.join(','), review_categories: rl.join(','), post_category_colors: newColors };
                           });
                         }}
                         className="text-xs text-red-500 hover:text-red-700 shrink-0"

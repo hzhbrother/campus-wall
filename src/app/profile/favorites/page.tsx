@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { api } from '@/lib/api';
 import { usePageRefresh } from '@/lib/use-page-refresh';
+import { CategoryTag } from '@/components/CategoryTag';
 
 interface FavPost {
   id: string;
@@ -59,7 +60,7 @@ export default function FavoritesPage() {
           {items.map(f => (
             <Link key={f.id} href={`/post/${f.post.id}`} className="block rounded-2xl bg-white p-4 shadow-sm hover:bg-gray-50 no-underline">
               <div className="flex items-center justify-between">
-                <span className="rounded bg-blue-50 px-1.5 py-0.5 text-xs text-blue-600">{f.post.category}</span>
+                <CategoryTag category={f.post.category} />
                 <span className="text-xs text-gray-400">{new Date(f.post.createdAt).toLocaleDateString()}</span>
               </div>
               <h3 className="mt-1.5 font-medium text-gray-900 line-clamp-1">{f.post.title}</h3>

@@ -6,6 +6,8 @@ import { useAuth } from '@/lib/auth-context';
 import { api } from '@/lib/api';
 import { usePageRefresh } from '@/lib/use-page-refresh';
 
+import { getCategoryColor, categoryTintStyle } from '@/lib/category-colors';
+import { useCategoryColors } from '@/lib/use-category-colors';
 const DEFAULT_CATEGORIES = ['日常', '校园', '失物招领', '二手交易', '表白墙', '寻物启事', '招聘兼职', '求助问答', '商业推广'];
 const MAX_LEN = 1000;
 const MAX_IMAGES = 3;          // 最多 3 张图
@@ -53,6 +55,7 @@ export default function NewPostPage() {
   const [images, setImages] = useState<string[]>([]);
   const [category, setCategory] = useState('');
   const [categories, setCategories] = useState<string[]>(DEFAULT_CATEGORIES);
+  const categoryColors = useCategoryColors();
   const [reviewCategories, setReviewCategories] = useState<string[]>(['招聘兼职', '商业推广']);
   const [showCategory, setShowCategory] = useState(false);
   const [isAnonymous, setIsAnonymous] = useState(false);
@@ -211,7 +214,10 @@ export default function NewPostPage() {
             <span className="text-lg">#️⃣</span>
             <span className="text-sm text-slate-700">主题分类</span>
           </div>
-          <span className={`text-sm ${category ? 'text-slate-900' : 'text-slate-400'}`}>
+          <span className={`flex items-center text-sm ${category ? 'font-medium text-slate-900' : 'text-slate-400'}`}>
+            {category && (
+              <span className="mr-1.5 h-2 w-2 rounded-full" style={{ backgroundColor: getCategoryColor(category, categoryColors) }} />
+            )}
             {category || '未选择'}
             <svg className="ml-1 inline h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="m9 18 6-6-6-6" strokeLinecap="round" strokeLinejoin="round"/></svg>
           </span>
@@ -248,11 +254,13 @@ export default function NewPostPage() {
               {categories.map(c => {
                 const needReview = reviewCategories.includes(c);
                 const active = category === c;
+                const hex = getCategoryColor(c, categoryColors);
                 return (
                   <button
                     key={c}
                     onClick={() => { setCategory(c); setShowCategory(false); }}
-                    className={`relative rounded-lg py-3 text-sm ${active ? 'bg-blue-500 text-white' : 'bg-slate-50 text-slate-700'}`}
+                    className="relative rounded-lg py-3 text-sm font-medium"
+                    style={active ? { backgroundColor: hex, color: '#fff' } : categoryTintStyle(hex)}
                   >
                     {c}
                     {needReview && (
