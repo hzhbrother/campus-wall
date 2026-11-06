@@ -6,7 +6,7 @@ import { testJuheConnection } from '@/lib/aggregated-login';
 
 export async function GET(req: NextRequest) {
   try {
-    await requireRole(req, [UserRole.ADMIN, UserRole.SUPER_ADMIN]);
+    await requireRole(req, UserRole.ADMIN, UserRole.SUPER_ADMIN);
     const result = await testJuheConnection();
     return NextResponse.json(result);
   } catch (e: any) {
