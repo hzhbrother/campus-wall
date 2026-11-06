@@ -12,9 +12,9 @@ export { getJuheTypeMeta };
 const DEFAULT_JUHE_API = 'https://u.cccyun.cc/connect.php';
 const JUHE_TIMEOUT_MS = 12000;
 
-// 彩虹云是国内面板服务, 常带 WAF/CC 防护, 默认 Node fetch 的 TLS 指纹容易被断连
-// 这里带浏览器 UA 并重试, 规避偶发的 "fetch failed"
-const JUHE_UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36';
+// 彩虹云是国内面板服务, 门口有百度云加速 WAF, 会按 TLS 指纹+UA 综合判定机器人
+// 伪装浏览器 UA + 非浏览器指纹反而更容易被 RST; 参考 VoiceHub 使用"诚实的机器人 UA"
+const JUHE_UA = 'Mozilla/5.0 (compatible; CampusWall OAuth/1.0)';
 
 async function juheFetch(url: string): Promise<Response> {
   let lastErr: unknown;
