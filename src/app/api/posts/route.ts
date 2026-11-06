@@ -11,6 +11,7 @@ import { getSiteConfigBool, getSiteConfigValue, getPostCategories, getReviewCate
 import { isUserBanned } from '@/lib/server-auth';
 import { createNotification } from '@/lib/notification-service';
 import { checkAndAwardBadges } from '@/lib/badge-service';
+import { postListSelect, fetchImageCounts } from '@/lib/post-list';
 
 export async function GET(req: NextRequest) {
   try {
@@ -42,20 +43,18 @@ export async function GET(req: NextRequest) {
         orderBy,
         skip: (page - 1) * pageSize,
         take: pageSize,
-        include: {
-          author: { select: { id: true, nickname: true, avatar: true, role: true, verified: true } },
-          _count: { select: { favorites: true } },
-        },
+        select: postListSelect,
       }),
       prisma.post.count({ where }),
     ]);
     // 列表视图: 截断 content 到 200 字, 不返回完整 base64 图片 (只返回图片数量)
     // 避免长文本+大图 base64 导致 payload 过大, 浏览器渲染卡死
+    const counts = await fetchImageCounts(rawItems.map(p => p.id));
     const items = rawItems.map(p => ({
       ...p,
       content: p.content.length > 200 ? p.content.slice(0, 200) + '…' : p.content,
       images: [],  // 列表不返回 base64 图片, 只返回数量
-      imageCount: p.images?.length || 0,
+      imageCount: counts.get(p.id) || 0,
       favoriteCount: p._count?.favorites || 0,
     }));
     return NextResponse.json({ items, total, page, pageSize }, {

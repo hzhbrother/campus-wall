@@ -18,8 +18,15 @@ export async function GET(req: NextRequest) {
         skip: (page - 1) * pageSize,
         take: pageSize,
         include: {
+          // 不取 base64 图片内容, 收藏列表页用不到, 减少传输体积
           post: {
-            include: { author: { select: { id: true, nickname: true, avatar: true } } },
+            select: {
+              id: true, authorId: true, title: true, content: true, category: true,
+              isAnonymous: true, status: true, pinned: true,
+              viewCount: true, likeCount: true, commentCount: true,
+              createdAt: true, updatedAt: true,
+              author: { select: { id: true, nickname: true, avatar: true } },
+            },
           },
         },
       }),

@@ -2,6 +2,7 @@
 import { PostStatus } from '@prisma/client';
 import { prisma } from '@/lib/prisma';
 import { getPostCategories, getReviewCategories, getSiteConfigValue } from '@/lib/site-config';
+import { postListSelect, fetchImageCounts } from '@/lib/post-list';
 import { PostListItem } from '@/components/PostCard';
 
 export interface HomeInitialData {
@@ -12,14 +13,14 @@ export interface HomeInitialData {
   announcement: string;
 }
 
-function mapPost(p: any): PostListItem {
+function mapPost(p: any, imageCount: number): PostListItem {
   return {
     id: p.id,
     title: p.title,
     content: p.content.length > 200 ? p.content.slice(0, 200) + '…' : p.content,
     category: p.category,
     images: [],
-    imageCount: p.images?.length || 0,
+    imageCount,
     pinned: p.pinned,
     viewCount: p.viewCount,
     likeCount: p.likeCount,
@@ -43,28 +44,25 @@ export async function getHomeData(): Promise<HomeInitialData> {
       where: { status: PostStatus.APPROVED },
       orderBy: [{ pinned: 'desc' }, { createdAt: 'desc' }],
       take: 10,
-      include: {
-        author: { select: { id: true, nickname: true, avatar: true, role: true, verified: true } },
-        _count: { select: { favorites: true } },
-      },
+      select: postListSelect,
     }),
     prisma.post.findMany({
       where: { status: PostStatus.APPROVED },
       orderBy: [{ likeCount: 'desc' }, { commentCount: 'desc' }, { viewCount: 'desc' }],
       take: 5,
-      include: {
-        author: { select: { id: true, nickname: true, avatar: true, role: true, verified: true } },
-        _count: { select: { favorites: true } },
-      },
+      select: postListSelect,
     }),
     getPostCategories(),
     getReviewCategories(),
     getSiteConfigValue('announcement_text', ''),
   ]);
 
+  // 图片数量单独用 cardinality 查询, 避免拉取 base64 图片内容
+  const counts = await fetchImageCounts([...rawItems, ...rawHot].map(p => p.id));
+
   return {
-    items: rawItems.map(mapPost),
-    hotItems: rawHot.map(mapPost),
+    items: rawItems.map(p => mapPost(p, counts.get(p.id) || 0)),
+    hotItems: rawHot.map(p => mapPost(p, counts.get(p.id) || 0)),
     categories: categories.length ? categories : DEFAULT_CATEGORIES,
     reviewCategories: reviewCategories || [],
     announcement: announcement || '欢迎来到校园墙！请文明发言，禁止发布违规内容。',
