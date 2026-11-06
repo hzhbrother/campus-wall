@@ -1978,6 +1978,20 @@ function SiteSettings() {
   const [msg, setMsg] = useState('');
   const [editingCatIdx, setEditingCatIdx] = useState<number | null>(null);
   const [editingCatName, setEditingCatName] = useState('');
+  const [juheTesting, setJuheTesting] = useState(false);
+  const [juheTestResult, setJuheTestResult] = useState<{ ok: boolean; message: string; endpoint?: string; causeCode?: string } | null>(null);
+
+  const testJuhe = async () => {
+    setJuheTesting(true); setJuheTestResult(null);
+    try {
+      // 先保存当前填写的配置, 再测试
+      await api.patch('/api/admin/site-config', { juhe_app_id: cfg.juhe_app_id || '', juhe_app_key: cfg.juhe_app_key || '', juhe_endpoint: cfg.juhe_endpoint || '' });
+      const r = await api.get<{ ok: boolean; message: string; endpoint?: string; causeCode?: string }>('/api/admin/juhe-test');
+      setJuheTestResult(r);
+    } catch (e: any) {
+      setJuheTestResult({ ok: false, message: e?.message || '测试请求失败' });
+    } finally { setJuheTesting(false); }
+  };
 
   useEffect(() => {
     api.get('/api/admin/site-config').then(setCfg).catch(console.error).finally(() => setLoading(false));
@@ -2342,6 +2356,22 @@ function SiteSettings() {
               />
             </div>
             <p className="text-[11px] text-gray-400">填写 App ID / App Key 后即可启用第三方登录, 留空时回退使用服务器环境变量。接口地址默认为彩虹云官方地址; 若提示"无法连接第三方登录服务", 说明服务器 IP 被拦截, 可在此更换其他接口地址或中转地址</p>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={testJuhe}
+                disabled={juheTesting}
+                className="rounded-lg bg-blue-500 px-3 py-1.5 text-xs font-medium text-white hover:bg-blue-600 disabled:opacity-50"
+              >
+                {juheTesting ? '测试中…' : '测试服务器连通性'}
+              </button>
+              {juheTestResult && (
+                <span className={`text-xs ${juheTestResult.ok ? 'text-green-600' : 'text-red-500'}`}>
+                  {juheTestResult.ok ? '✅ ' : '❌ '}{juheTestResult.message}
+                  {juheTestResult.causeCode ? ` (${juheTestResult.causeCode})` : ''}
+                </span>
+              )}
+            </div>
           </div>
 
           <div className="grid grid-cols-2 gap-2">

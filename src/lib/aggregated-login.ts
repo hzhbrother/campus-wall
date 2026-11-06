@@ -95,6 +95,56 @@ export async function isAggregatedLoginConfigured(): Promise<boolean> {
   return !!appId && !!appKey;
 }
 
+// 管理后台诊断: 测试服务器到聚合登录接口的连通性, 返回具体失败原因
+export async function testJuheConnection(): Promise<{
+  ok: boolean;
+  endpoint: string;
+  message: string;
+  causeCode?: string;
+}> {
+  let cfg: JuheConfig;
+  try {
+    cfg = await getJuheConfig();
+  } catch (e: any) {
+    return { ok: false, endpoint: '(配置错误)', message: e?.message || '配置读取失败' };
+  }
+  const { appId, appKey, endpoint } = cfg;
+  if (!appId || !appKey) {
+    return { ok: false, endpoint, message: '未配置 App ID / App Key' };
+  }
+  try {
+    const params = new URLSearchParams({
+      act: 'login', appid: appId, appkey: appKey, type: 'qq',
+      redirect_uri: 'https://example.com/oauth/callback',
+    });
+    const res = await fetch(`${endpoint}?${params.toString()}`, {
+      signal: AbortSignal.timeout(JUHE_TIMEOUT_MS),
+      cache: 'no-store',
+      headers: { 'User-Agent': JUHE_UA, Accept: 'application/json' },
+    });
+    const text = await res.text();
+    let data: any = null;
+    try { data = JSON.parse(text); } catch { /* 非 JSON */ }
+    if (data && typeof data === 'object') {
+      if (isOkCode(data.code) || data.url) return { ok: true, endpoint, message: '接口连通正常' };
+      return { ok: false, endpoint, message: `接口可达但返回错误: ${data.msg || JSON.stringify(data).slice(0, 100)}` };
+    }
+    if (CHALLENGE_RE.test(text)) {
+      return { ok: false, endpoint, message: '请求被 WAF 安全防护拦截 (返回了挑战页面), 需将服务器出口 IP 加白或更换接口地址' };
+    }
+    return { ok: false, endpoint, message: `返回非 JSON 响应 (HTTP ${res.status})` };
+  } catch (e: any) {
+    const cause = e?.cause?.code || e?.cause?.errno || e?.code || '';
+    const causeMsg = e?.cause?.message || '';
+    return {
+      ok: false,
+      endpoint,
+      message: e?.message || '请求失败',
+      causeCode: [cause, causeMsg].filter(Boolean).join(' ') || undefined,
+    };
+  }
+}
+
 // Step1: 获取跳转登录地址
 // 彩虹云返回 { code, msg, url, qrcode? }
 // 微信/支付宝等扫码登录会额外返回 qrcode 字段
