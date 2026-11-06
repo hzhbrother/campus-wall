@@ -23,7 +23,7 @@ const CONFIG_KEYS = [
   // 关于我们
   'about_content',
   // 聚合登录 (第三方登录) 凭证
-  'juhe_app_id', 'juhe_app_key', 'open_login_types',
+  'juhe_app_id', 'juhe_app_key', 'juhe_endpoint', 'open_login_types',
 ];
 
 export async function GET(req: NextRequest) {

@@ -2332,7 +2332,16 @@ function SiteSettings() {
                 />
               </div>
             </div>
-            <p className="text-[11px] text-gray-400">填写后即可启用第三方登录; 留空时将回退使用服务器环境变量 JUHE_APP_ID / JUHE_APP_KEY</p>
+            <div>
+              <label className="block text-xs font-medium text-gray-700 mb-1">接口地址 (选填)</label>
+              <input
+                value={cfg.juhe_endpoint || ''}
+                onChange={e => set('juhe_endpoint', e.target.value)}
+                className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
+                placeholder="https://u.cccyun.cc/connect.php"
+              />
+            </div>
+            <p className="text-[11px] text-gray-400">填写 App ID / App Key 后即可启用第三方登录, 留空时回退使用服务器环境变量。接口地址默认为彩虹云官方地址; 若提示"无法连接第三方登录服务", 说明服务器 IP 被拦截, 可在此更换其他接口地址或中转地址</p>
           </div>
 
           <div className="grid grid-cols-2 gap-2">
