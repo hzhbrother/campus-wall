@@ -3,39 +3,37 @@
 // 只需一对 App ID / App Key, 即可接入 QQ/微信/支付宝/微博/百度/华为/小米/抖音/哔哩哔哩/钉钉
 // 凭证优先从站点配置 (site_config: juhe_app_id / juhe_app_key) 读取, 未配置时回退到环境变量
 import { getSiteConfigValue } from './site-config';
+import { JUHE_TYPES, getJuheTypeMeta } from './aggregated-login-types';
+
+export { getJuheTypeMeta };
 
 const JUHE_API = 'https://u.cccyun.cc/connect.php';
+const JUHE_TIMEOUT_MS = 12000;
+
+// 凭证缓存: 避免每次登录/绑定都查两次数据库 (60 秒内复用)
+let credsCache: { appId: string; appKey: string; at: number } | null = null;
+const CREDS_TTL_MS = 60 * 1000;
 
 // 动态读取聚合登录凭证: 站点配置优先, 环境变量兜底
 async function getJuheCredentials(): Promise<{ appId: string; appKey: string }> {
-  const appId = (await getSiteConfigValue('juhe_app_id')) || process.env.JUHE_APP_ID || '';
-  const appKey = (await getSiteConfigValue('juhe_app_key')) || process.env.JUHE_APP_KEY || '';
+  if (credsCache && Date.now() - credsCache.at < CREDS_TTL_MS) {
+    return { appId: credsCache.appId, appKey: credsCache.appKey };
+  }
+  const [appIdCfg, appKeyCfg] = await Promise.all([
+    getSiteConfigValue('juhe_app_id'),
+    getSiteConfigValue('juhe_app_key'),
+  ]);
+  const appId = appIdCfg || process.env.JUHE_APP_ID || '';
+  const appKey = appKeyCfg || process.env.JUHE_APP_KEY || '';
+  credsCache = { appId, appKey, at: Date.now() };
   return { appId, appKey };
 }
-
-// 聚合登录支持的类型 (provider 对应 AccountProvider 枚举值)
-// 对齐彩虹云官方文档支持的 10 种登录方式
-export const JUHE_TYPES = [
-  { type: 'qq',       label: 'QQ',       provider: 'QQ' },
-  { type: 'wx',       label: '微信',     provider: 'WECHAT' },
-  { type: 'alipay',   label: '支付宝',   provider: 'ALIPAY' },
-  { type: 'sina',     label: '微博',     provider: 'WEIBO' },
-  { type: 'baidu',    label: '百度',     provider: 'BAIDU' },
-  { type: 'huawei',   label: '华为',     provider: 'HUAWEI' },
-  { type: 'xiaomi',   label: '小米',     provider: 'XIAOMI' },
-  { type: 'douyin',   label: '抖音',     provider: 'DOUYIN' },
-  { type: 'bilibili', label: '哔哩哔哩', provider: 'BILIBILI' },
-  { type: 'dingtalk', label: '钉钉',     provider: 'DINGTALK' },
-] as const;
 
 export async function isAggregatedLoginConfigured(): Promise<boolean> {
   const { appId, appKey } = await getJuheCredentials();
   return !!appId && !!appKey;
 }
 
-export function getJuheTypeMeta(type: string) {
-  return JUHE_TYPES.find(t => t.type === type);
-}
 
 // Step1: 获取跳转登录地址
 // 彩虹云返回 { code, msg, url, qrcode? }
@@ -58,7 +56,10 @@ export async function getAggregatedLoginUrl(
     type,
     redirect_uri: redirectUri,
   });
-  const res = await fetch(`${JUHE_API}?${params.toString()}`);
+  const res = await fetch(`${JUHE_API}?${params.toString()}`, {
+    signal: AbortSignal.timeout(JUHE_TIMEOUT_MS),
+    cache: 'no-store',
+  });
   const data = await res.json();
   if (data.code !== 0 || !data.url) {
     throw new Error(data.msg || '获取聚合登录地址失败');
@@ -93,7 +94,10 @@ export async function getAggregatedUserInfo(
     type,
     code,
   });
-  const res = await fetch(`${JUHE_API}?${params.toString()}`);
+  const res = await fetch(`${JUHE_API}?${params.toString()}`, {
+    signal: AbortSignal.timeout(JUHE_TIMEOUT_MS),
+    cache: 'no-store',
+  });
   const data = await res.json();
   // code=2: 用户未完成登录/取消授权
   if (data.code === 2) {

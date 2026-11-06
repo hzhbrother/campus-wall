@@ -3,7 +3,7 @@
 import { useEffect, useState, useCallback, useRef } from 'react';
 import { api } from '@/lib/api';
 import { PERMISSIONS, PERMISSIONS_BY_GROUP, SUPER_ADMIN_ONLY_PERMISSIONS } from '@/lib/permissions';
-import { JUHE_TYPES } from '@/lib/aggregated-login';
+import { JUHE_TYPES } from '@/lib/aggregated-login-types';
 import { BrandIcon } from '@/components/BrandIcons';
 import { compressImage } from '@/lib/image-compress';
 import { parseCategoryColors, getCategoryColor } from '@/lib/category-colors';

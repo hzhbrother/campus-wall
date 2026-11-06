@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useAuth } from '@/lib/auth-context';
 import { api } from '@/lib/api';
-import { JUHE_TYPES } from '@/lib/aggregated-login';
+import { JUHE_TYPES } from '@/lib/aggregated-login-types';
 import { BrandIcon } from '@/components/BrandIcons';
 
 const OAUTH_BASE = process.env.NEXT_PUBLIC_API_BASE || '';

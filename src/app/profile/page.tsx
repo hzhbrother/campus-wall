@@ -15,7 +15,7 @@ import { ExchangesView } from '@/components/ExchangesView';
 import { JoinOrgModal } from '@/components/JoinOrgModal';
 import { formatUserCode } from '@/lib/user-number';
 import { DEFAULT_ROLE_PERMISSIONS } from '@/lib/permissions';
-import { JUHE_TYPES } from '@/lib/aggregated-login';
+import { JUHE_TYPES } from '@/lib/aggregated-login-types';
 import { BrandIcon } from '@/components/BrandIcons';
 import type { AdminTab } from '@/components/admin/AdminPanel';
 
