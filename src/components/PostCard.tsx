@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import { VerifiedBadge } from './VerifiedBadge';
 import { CategoryTag } from './CategoryTag';
+import { formatMonthDay } from '@/lib/date-format';
 
 export interface PostListItem {
   id: string;
@@ -18,16 +19,7 @@ export interface PostListItem {
   author: { id: string; nickname: string; avatar?: string | null; verified?: boolean };
 }
 
-const fmtDate = (iso: string) => {
-  try {
-    const d = new Date(iso);
-    const mm = String(d.getMonth() + 1).padStart(2, '0');
-    const dd = String(d.getDate()).padStart(2, '0');
-    return `${mm}-${dd}`;
-  } catch {
-    return iso;
-  }
-};
+const fmtDate = formatMonthDay;
 
 export function PostCard({ post }: { post: PostListItem }) {
   return (

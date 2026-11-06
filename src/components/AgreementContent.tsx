@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { api } from '@/lib/api';
 import { usePageRefresh } from '@/lib/use-page-refresh';
+import { formatDateCN } from '@/lib/date-format';
 
 interface AgreementContentProps {
   type: 'agreement' | 'privacy';
@@ -37,7 +38,7 @@ export default function AgreementContent({ type, title, defaultContent }: Agreem
       </button>
       <div className="rounded-2xl bg-white p-5 shadow-sm">
         <h1 className="text-xl font-bold text-gray-900 mb-1">{title}</h1>
-        <p className="text-xs text-gray-400 mb-4">最后更新：{new Date().toLocaleDateString('zh-CN')}</p>
+        <p className="text-xs text-gray-400 mb-4">最后更新：{formatDateCN(new Date())}</p>
         {loading ? (
           <p className="py-8 text-center text-gray-400">加载中…</p>
         ) : (
