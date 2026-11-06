@@ -32,11 +32,18 @@ export async function GET(req: NextRequest, { params }: { params: { type: string
           user = { id: payload.sub, email: payload.email || null, role: payload.role, roleId: null, nickname: '', bannedUntil: null, verified: true } as any;
         }
       }
-      if (!user) return NextResponse.json({ message: '请先登录' }, { status: 401 });
+      if (!user) {
+        return NextResponse.redirect(`${origin}/oauth/callback?error=${encodeURIComponent('请先登录后再绑定')}`);
+      }
       res.cookies.set('oauth_bind_uid', user.id, { httpOnly: true, sameSite: 'lax', maxAge: 600, path: '/' });
     }
     return res;
   } catch (e: any) {
-    return NextResponse.json({ message: e?.message || '聚合登录初始化失败' }, { status: 503 });
+    // 出错时跳转到前端错误页, 不再返回原始 JSON
+    const raw = e?.message || '聚合登录初始化失败';
+    const msg = raw === 'fetch failed'
+      ? '无法连接第三方登录服务, 请稍后重试'
+      : raw;
+    return NextResponse.redirect(`${origin}/oauth/callback?error=${encodeURIComponent(msg)}`);
   }
 }

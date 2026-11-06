@@ -10,6 +10,28 @@ export { getJuheTypeMeta };
 const JUHE_API = 'https://u.cccyun.cc/connect.php';
 const JUHE_TIMEOUT_MS = 12000;
 
+// 彩虹云是国内面板服务, 常带 WAF/CC 防护, 默认 Node fetch 的 TLS 指纹容易被断连
+// 这里带浏览器 UA 并重试, 规避偶发的 "fetch failed"
+const JUHE_UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36';
+
+async function juheFetch(url: string): Promise<Response> {
+  let lastErr: unknown;
+  for (let attempt = 0; attempt < 3; attempt++) {
+    try {
+      const res = await fetch(url, {
+        signal: AbortSignal.timeout(JUHE_TIMEOUT_MS),
+        cache: 'no-store',
+        headers: { 'User-Agent': JUHE_UA, Accept: 'application/json' },
+      });
+      return res;
+    } catch (e) {
+      lastErr = e;
+      if (attempt < 2) await new Promise(r => setTimeout(r, 400 * (attempt + 1)));
+    }
+  }
+  throw lastErr;
+}
+
 // 凭证缓存: 避免每次登录/绑定都查两次数据库 (60 秒内复用)
 let credsCache: { appId: string; appKey: string; at: number } | null = null;
 const CREDS_TTL_MS = 60 * 1000;
@@ -56,11 +78,11 @@ export async function getAggregatedLoginUrl(
     type,
     redirect_uri: redirectUri,
   });
-  const res = await fetch(`${JUHE_API}?${params.toString()}`, {
-    signal: AbortSignal.timeout(JUHE_TIMEOUT_MS),
-    cache: 'no-store',
-  });
-  const data = await res.json();
+  const res = await juheFetch(`${JUHE_API}?${params.toString()}`);
+  const data = await res.json().catch(() => null);
+  if (!res.ok || !data) {
+    throw new Error(`第三方登录服务响应异常 (${res.status}), 请稍后重试`);
+  }
   if (data.code !== 0 || !data.url) {
     throw new Error(data.msg || '获取聚合登录地址失败');
   }
@@ -94,11 +116,11 @@ export async function getAggregatedUserInfo(
     type,
     code,
   });
-  const res = await fetch(`${JUHE_API}?${params.toString()}`, {
-    signal: AbortSignal.timeout(JUHE_TIMEOUT_MS),
-    cache: 'no-store',
-  });
-  const data = await res.json();
+  const res = await juheFetch(`${JUHE_API}?${params.toString()}`);
+  const data = await res.json().catch(() => null);
+  if (!res.ok || !data) {
+    throw new Error(`第三方登录服务响应异常 (${res.status}), 请稍后重试`);
+  }
   // code=2: 用户未完成登录/取消授权
   if (data.code === 2) {
     throw new Error('您取消了登录授权，请重试');
