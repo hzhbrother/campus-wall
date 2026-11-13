@@ -104,7 +104,7 @@ npm install
 
 # 2. 配置环境变量
 cp .env.example .env.local
-# 在 .env.local 填入 DATABASE_URL / DIRECT_URL (Neon 连接串) 和 JWT_SECRET
+# 在 .env.local 填入 DATABASE_URL / DIRECT_URL (Supabase 连接串) 和 JWT_SECRET
 
 # 3. 生成 Prisma Client + 推送表结构 + 初始化数据
 npm run prisma:generate
@@ -118,17 +118,17 @@ npm run dev
 # → http://localhost:3000 (前后端同源, API 在 /api/*)
 ```
 
-## 部署到 Vercel + Neon (推荐路径)
+## 部署到 Vercel + Supabase (推荐路径)
 
-### 1. 准备 Neon 数据库
+### 1. 准备 Supabase 数据库
 
-1. 访问 https://console.neon.tech 注册并登录
-2. 新建一个 Project, 区域选离 Vercel 近的 (如 `AWS Asia Pacific (Singapore)`), 记住数据库密码
-3. 打开 Dashboard → Connect, 获取两条连接串:
-   - **DATABASE_URL** (应用运行时): 选 **Pooled connection** (主机名带 `-pooler`), 末尾参数加 `?sslmode=require&pgbouncer=true&connect_timeout=10`
-     - 形如 `postgresql://<用户名>:<密码>@ep-xxx-pooler.<区域>.aws.neon.tech/neondb?sslmode=require&pgbouncer=true&connect_timeout=10`
-   - **DIRECT_URL** (建表/seed 直连): 选 **Direct connection** (主机名不带 `-pooler`)
-     - 形如 `postgresql://<用户名>:<密码>@ep-xxx.<区域>.aws.neon.tech/neondb?sslmode=require`
+1. 访问 https://supabase.com 注册并登录
+2. 新建一个 Project, 区域选离 Vercel 近的 (如 `Southeast Asia (Singapore)`), 记住设置的数据库密码
+3. 打开顶部 "Connect" 按钮, 获取两条连接串:
+   - **DATABASE_URL** (应用运行时): 选 **Transaction pooler** (端口 6543), 末尾加 `?pgbouncer=true&connection_limit=1`
+     - 形如 `postgresql://postgres.<项目ref>:<密码>@aws-0-<区域>.pooler.supabase.com:6543/postgres?pgbouncer=true&connection_limit=1`
+   - **DIRECT_URL** (建表/seed 直连): 选 **Session pooler** (端口 5432)
+     - 形如 `postgresql://postgres.<项目ref>:<密码>@aws-0-<区域>.pooler.supabase.com:5432/postgres`
 4. 复制保存两条连接串
 
 ### 2. 推送代码到 GitHub
@@ -153,11 +153,11 @@ gh repo create campus-wall --public --source=. --push
 
 ### 3. 初始化数据库表结构
 
-Prisma 表结构需要在 Neon 上初始化。两种方式二选一:
+Prisma 表结构需要在 Supabase 上初始化。两种方式二选一:
 
-**方式 A (本地连库)**: 把 Neon 两条连接串填到 `.env.local`, 运行 `npm run prisma:db:push && npm run prisma:db:seed`。
+**方式 A (本地连库)**: 把 Supabase 两条连接串填到 `.env.local`, 运行 `npm run prisma:db:push && npm run prisma:db:seed`。
 
-**方式 B (用 SQL Editor)**: Neon 控制台自带 SQL Editor, 也可手动跑 schema.prisma 转换出的 SQL (但 seed 推荐用方式 A 跑)。
+**方式 B (用 SQL Editor)**: Supabase 控制台自带 SQL Editor, 也可手动跑 schema.prisma 转换出的 SQL (但 seed 推荐用方式 A 跑)。
 
 ### 4. 在 Vercel 导入项目
 
@@ -171,8 +171,8 @@ Prisma 表结构需要在 Neon 上初始化。两种方式二选一:
 
 | Key | Value | 说明 |
 |---|---|---|
-| `DATABASE_URL` | Neon Pooled connection 连接串 (带 `-pooler`) | 必填 |
-| `DIRECT_URL` | Neon Direct connection 连接串 (不带 `-pooler`) | 必填 |
+| `DATABASE_URL` | Supabase Transaction pooler 连接串 (6543) | 必填 |
+| `DIRECT_URL` | Supabase Session pooler 连接串 (5432) | 必填 |
 | `JWT_SECRET` | 32+ 字符随机串 | 必填, 可用 `openssl rand -hex 32` 生成 |
 | `JWT_EXPIRES_IN` | `7d` | |
 | `SEED_SUPER_ADMIN_EMAIL` | `admin@campus.edu` | |
